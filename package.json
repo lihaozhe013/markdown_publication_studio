@@ -1,0 +1,63 @@
+{
+  "name": "markdown-publication-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A deterministic Markdown publication compiler with an Electron control panel.",
+  "type": "module",
+  "main": "out/main/index.js",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev": "electron-vite dev --config apps/desktop/electron.vite.config.ts",
+    "build": "electron-vite build --config apps/desktop/electron.vite.config.ts",
+    "start": "electron .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc -b tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "electron-builder"
+  },
+  "dependencies": {
+    "@markdown-publication/publication-core": "workspace:*",
+    "@markdown-publication/shared": "workspace:*",
+    "electron": "43.4.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "eslint": "10.8.1",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  },
+  "build": {
+    "appId": "com.markdownpublication.studio",
+    "productName": "Markdown Publication Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

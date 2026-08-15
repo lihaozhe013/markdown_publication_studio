@@ -1,0 +1,152 @@
+import { useState } from 'react';
+import type { PublicationDiagnostic } from '@markdown-publication/shared';
+
+export function App(): React.JSX.Element {
+  const [source, setSource] = useState<{ path: string; name: string } | null>(
+    null,
+  );
+  const [title, setTitle] = useState('No publication loaded');
+  const [html, setHtml] = useState('');
+  const [diagnostics, setDiagnostics] = useState<PublicationDiagnostic[]>([]);
+  const [status, setStatus] = useState('Choose a Markdown file to begin.');
+  const [busy, setBusy] = useState(false);
+
+  async function refreshPreview(path: string): Promise<void> {
+    setBusy(true);
+    setStatus('Rendering preview…');
+    try {
+      const result = await window.desktopApi.preview.build({
+        sourcePath: path,
+      });
+      setTitle(result.title);
+      setHtml(result.html);
+      setDiagnostics(result.diagnostics);
+      setStatus('Preview ready.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Preview failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openMarkdown(): Promise<void> {
+    try {
+      const selected = await window.desktopApi.project.openMarkdown();
+      if (!selected) return;
+      setSource(selected);
+      await refreshPreview(selected.path);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Could not open the Markdown file.',
+      );
+    }
+  }
+
+  async function exportPdf(): Promise<void> {
+    if (!source) return;
+    setBusy(true);
+    setStatus('Printing PDF with Electron Chromium…');
+    try {
+      const result = await window.desktopApi.export.start({
+        sourcePath: source.path,
+      });
+      if (!result) {
+        setStatus('Export cancelled.');
+        return;
+      }
+      setDiagnostics(result.diagnostics);
+      setStatus(`PDF written to ${result.outputPath}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Export failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="workspace">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">PUBLICATION COMPILER</p>
+          <h1>{title}</h1>
+        </div>
+        <div className="actions">
+          <button
+            className="secondary"
+            onClick={() => void openMarkdown()}
+            disabled={busy}
+          >
+            Open Markdown
+          </button>
+          <button
+            className="primary"
+            onClick={() => void exportPdf()}
+            disabled={!source || busy}
+          >
+            Export PDF
+          </button>
+        </div>
+      </header>
+      <section className="content-grid">
+        <aside className="sidebar">
+          <div className="panel-block">
+            <p className="eyebrow">SOURCE</p>
+            <p className="source-name">{source?.name ?? 'No file selected'}</p>
+            <p className="muted">
+              {source?.path ?? 'The renderer never receives filesystem access.'}
+            </p>
+          </div>
+          <div className="panel-block">
+            <p className="eyebrow">PIPELINE</p>
+            <ol className="pipeline">
+              <li className="active">Markdown compiler</li>
+              <li className="active">Publication HTML</li>
+              <li>Hidden Chromium print</li>
+              <li>PDF output</li>
+            </ol>
+          </div>
+          <div className="panel-block diagnostics">
+            <p className="eyebrow">DIAGNOSTICS</p>
+            {diagnostics.length === 0 ? (
+              <p className="muted">No warnings.</p>
+            ) : (
+              diagnostics.map((diagnostic) => (
+                <p
+                  className={`diagnostic ${diagnostic.severity}`}
+                  key={`${diagnostic.code}-${diagnostic.message}`}
+                >
+                  {diagnostic.message}
+                </p>
+              ))
+            )}
+          </div>
+        </aside>
+        <section className="preview-shell">
+          <div className="preview-toolbar">
+            <span>Preview</span>
+            <span className="status">{status}</span>
+          </div>
+          {html ? (
+            <iframe
+              title="Publication preview"
+              className="preview"
+              sandbox="allow-same-origin"
+              srcDoc={html}
+            />
+          ) : (
+            <div className="empty-state">
+              <div className="empty-mark">✦</div>
+              <h2>Bring your manuscript to life.</h2>
+              <p>
+                Open a Markdown file to render a page-size-aware publication
+                preview.
+              </p>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}

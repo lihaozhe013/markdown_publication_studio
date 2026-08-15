@@ -1,0 +1,7 @@
+node_modules
+dist
+out
+release
+pnpm-lock.yaml
+AGENTS.md
+docs/PROJECT_SPEC.md

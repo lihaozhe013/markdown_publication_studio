@@ -1,0 +1,10 @@
+{
+  "name": "@markdown-publication/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@markdown-publication/publication-core": "workspace:*",
+    "@markdown-publication/shared": "workspace:*"
+  }
+}

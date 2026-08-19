@@ -1,0 +1,328 @@
+/* ======================================================
+   Rose Theme for md-to-pdf (overlay for github-markdown.css)
+   Based on Typora's Rose theme — adapted for PDF output
+   ====================================================== */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter/static/Inter_18pt-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter/static/Inter_18pt-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter/static/Inter_18pt-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('../fonts/Open_Sans/static/OpenSans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('../fonts/Open_Sans/static/OpenSans-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('../fonts/Open_Sans/static/OpenSans-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf')
+    format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Bold.ttf')
+    format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font';
+  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf')
+    format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font';
+  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf')
+    format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font';
+  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Italic.ttf')
+    format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+.markdown-body {
+  /* ── Base sizing tokens ── */
+  --base-size-4: 0.25rem;
+  --base-size-8: 0.5rem;
+  --base-size-16: 1rem;
+  --base-size-24: 1.5rem;
+  --base-size-40: 2.5rem;
+  --base-text-weight-normal: 400;
+  --base-text-weight-medium: 500;
+  --base-text-weight-semibold: 600;
+
+  /* ── Material 3 Rose Palette ── */
+  --rose-primary: #6750a4;
+  --rose-on-primary: #ffffff;
+  --rose-primary-container: #eaddff;
+  --rose-on-primary-container: #21005d;
+  --rose-secondary: #625b71;
+  --rose-secondary-container: #eaddff;
+  --rose-tertiary: #7d5260;
+  --rose-tertiary-container: #ffd8e4;
+  --rose-error: #b3261e;
+
+  /* ── Fonts (exact same stack as github-markdown.css) ── */
+  --fontStack-sansSerif:
+    'Inter', 'Open Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji';
+  --fontStack-monospace:
+    'JetBrainsMono Nerd Font', ui-monospace, SFMono-Regular, SF Mono, Menlo,
+    Consolas, Liberation Mono, monospace;
+  font-family: var(--fontStack-sansSerif);
+  /* zoom: 85%; */
+
+  /* ── Override github-markdown.css variables ── */
+  --fgColor-default: #4a3b40;
+  --fgColor-muted: #5a3a44;
+  --fgColor-accent: #a14a6a;
+  --bgColor-default: #ffffff;
+  --bgColor-muted: #f7e9ee;
+  --bgColor-neutral-muted: #f9e3ea80;
+  --borderColor-default: #e1e3e1;
+  --borderColor-muted: #e1e3e1b3;
+  --borderColor-accent-emphasis: #a14a6a;
+  --focus-outlineColor: #a14a6a;
+}
+
+/* ── Headings ── */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  color: #3a2b2f;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.markdown-body h1 {
+  font-size: 17pt;
+  border-bottom-color: var(--rose-tertiary-container);
+}
+
+.markdown-body h2 {
+  font-size: 14pt;
+  border-bottom-color: var(--rose-tertiary-container);
+}
+
+.markdown-body h3 {
+  font-size: 12pt;
+}
+.markdown-body h4 {
+  font-size: 11pt;
+}
+.markdown-body h5 {
+  font-size: 10.5pt;
+}
+.markdown-body h6 {
+  font-size: 10pt;
+  color: var(--fgColor-muted);
+}
+
+/* ── Links ── */
+.markdown-body a {
+  color: #a14a6a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+/* ── Blockquotes ── */
+.markdown-body blockquote {
+  color: #5a3a44;
+  background-color: #f6dce4;
+  padding: 0.8rem 1.2rem;
+  border-left: 4px solid #a14a6a;
+  border-radius: 8px;
+}
+
+/* ── Inline Code ── */
+.markdown-body code:not(pre code) {
+  font-family: var(--fontStack-monospace, monospace);
+  color: #9a4f6a;
+  background-color: #f9e3ea;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 12pt;
+}
+
+/* ── Code Blocks ── */
+.markdown-body pre {
+  padding: var(--base-size-16);
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  color: var(--fgColor-default);
+  background-color: #f4e9ee;
+  border-radius: 8px;
+  border: 1px solid #f6dce4;
+  word-wrap: break-word;
+}
+
+.markdown-body pre code {
+  font-family: var(--fontStack-monospace);
+  color: #4a3b40;
+  background: transparent;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.markdown-body pre code [class] {
+  background: transparent;
+}
+
+/* ── Tables ── */
+.markdown-body table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.markdown-body table thead {
+  background-color: #f7e9ee;
+}
+
+.markdown-body table th {
+  font-weight: 600;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--borderColor-default);
+  border-right: 1px dashed var(--borderColor-default);
+}
+
+.markdown-body table td {
+  padding: 10px 16px;
+  border-bottom: 1px dashed var(--borderColor-default);
+  border-right: 1px dashed var(--borderColor-default);
+}
+
+.markdown-body table th:last-child,
+.markdown-body table td:last-child {
+  border-right: none;
+}
+
+.markdown-body table tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: #fbf1f4;
+}
+
+/* ── Horizontal Rules ── */
+.markdown-body hr {
+  height: 2px;
+  background-color: #f6dce4;
+  border: none;
+}
+
+/* ── Task Lists (Checkboxes) ── */
+.markdown-body input[type='checkbox'] {
+  accent-color: #a14a6a;
+}
+
+/* ── Images ── */
+.markdown-body img {
+  border-radius: 6px;
+}
+
+/* ── Highlights ── */
+.markdown-body mark {
+  background-color: var(--rose-primary-container);
+  color: var(--rose-on-primary-container);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+
+/* ── Tables of Contents (if generated) ── */
+.markdown-body ul:has(> li > a[href^='#']),
+.markdown-body ol:has(> li > a[href^='#']) {
+  color: var(--fgColor-default);
+}
+
+/* ── Print / PDF Specific ── */
+@media print {
+  .markdown-body {
+    zoom: 1;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    page-break-after: avoid;
+  }
+
+  .markdown-body pre,
+  .markdown-body blockquote,
+  .markdown-body table {
+    page-break-inside: avoid;
+  }
+}
+
+/* ── Mermaid Diagrams ── */
+.markdown-body .mermaid {
+  overflow: auto;
+  max-width: 100%;
+  margin: 1em 0;
+  text-align: center;
+}
+
+.markdown-body .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

@@ -117,7 +117,7 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    return publicationService.buildPreview(request.sourcePath);
+    return publicationService.buildPreview(request.sourcePath, request.themeId);
   });
 
   ipcMain.handle('export:start', async (_event, rawRequest: unknown) => {
@@ -138,7 +138,11 @@ function registerIpcHandlers(): void {
     if (result.canceled || !result.filePath) {
       return null;
     }
-    return publicationService.exportPdf(request.sourcePath, result.filePath);
+    return publicationService.exportPdf(
+      request.sourcePath,
+      result.filePath,
+      request.themeId,
+    );
   });
 }
 

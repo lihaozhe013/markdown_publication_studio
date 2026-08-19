@@ -7,17 +7,26 @@ import {
   renderPublicationHtml,
 } from '@markdown-publication/publication-core';
 import type { ExportResult, PreviewResult } from '@markdown-publication/shared';
+import type { ThemeId } from '@markdown-publication/shared';
 import type { PrintBackend } from './electron-print-backend.js';
+import { loadThemeStylesheet } from './theme-service.js';
 
 export class PublicationService {
   private readonly compilerPromise = createMarkdownCompiler();
 
   constructor(private readonly printBackend: PrintBackend) {}
 
-  async buildPreview(sourcePath: string): Promise<PreviewResult> {
+  async buildPreview(
+    sourcePath: string,
+    themeId: ThemeId,
+  ): Promise<PreviewResult> {
     const compiler = await this.compilerPromise;
     const chapter = await compileMarkdownFile(compiler, sourcePath);
-    const rendered = renderPublicationHtml([chapter], { title: chapter.title });
+    const rendered = renderPublicationHtml([chapter], {
+      title: chapter.title,
+      themeId,
+      stylesheet: await loadThemeStylesheet(themeId),
+    });
     return {
       title: chapter.title,
       html: rendered.html,
@@ -28,8 +37,9 @@ export class PublicationService {
   async exportPdf(
     sourcePath: string,
     outputPath: string,
+    themeId: ThemeId,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath);
+    const preview = await this.buildPreview(sourcePath, themeId);
     const pdf = await this.printBackend.render(preview.html);
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -43,8 +53,9 @@ export class PublicationService {
   async exportHtml(
     sourcePath: string,
     outputPath: string,
+    themeId: ThemeId,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath);
+    const preview = await this.buildPreview(sourcePath, themeId);
     const temporaryPath = resolve(
       dirname(outputPath),
       `.${randomUUID()}${extname(outputPath) || '.html'}`,

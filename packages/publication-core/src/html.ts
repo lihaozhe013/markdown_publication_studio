@@ -65,8 +65,9 @@ export function renderPublicationHtml(
       :not(pre) > code { background: #e9f2fb; padding: 1pt 4pt; border-radius: 3pt; }
       .shiki { padding: 14pt; border-radius: 6pt; overflow-x: auto; }
     </style>
+    <style>${options.stylesheet ?? ''}</style>
   </head>
-  <body data-publication-render-ready="true">
+  <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="true">
     ${body}
   </body>
 </html>`;

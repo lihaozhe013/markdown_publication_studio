@@ -49,6 +49,7 @@
     },
     "files": [
       "out/**/*",
+      "themes/**/*",
       "package.json"
     ],
     "win": {

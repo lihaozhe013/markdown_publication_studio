@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import type { PublicationDiagnostic } from '@markdown-publication/shared';
+import {
+  BUILT_IN_THEMES,
+  ThemeIdSchema,
+  type PublicationDiagnostic,
+  type ThemeId,
+} from '@markdown-publication/shared';
 
 export function App(): React.JSX.Element {
   const [source, setSource] = useState<{ path: string; name: string } | null>(
@@ -8,15 +13,20 @@ export function App(): React.JSX.Element {
   const [title, setTitle] = useState('No publication loaded');
   const [html, setHtml] = useState('');
   const [diagnostics, setDiagnostics] = useState<PublicationDiagnostic[]>([]);
+  const [themeId, setThemeId] = useState<ThemeId>('rose');
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
 
-  async function refreshPreview(path: string): Promise<void> {
+  async function refreshPreview(
+    path: string,
+    selectedTheme: ThemeId = themeId,
+  ): Promise<void> {
     setBusy(true);
     setStatus('Rendering preview…');
     try {
       const result = await window.desktopApi.preview.build({
         sourcePath: path,
+        themeId: selectedTheme,
       });
       setTitle(result.title);
       setHtml(result.html);
@@ -69,6 +79,7 @@ export function App(): React.JSX.Element {
     try {
       const result = await window.desktopApi.export.start({
         sourcePath: source.path,
+        themeId,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -114,6 +125,37 @@ export function App(): React.JSX.Element {
             <p className="source-name">{source?.name ?? 'No file selected'}</p>
             <p className="muted">
               {source?.path ?? 'The renderer never receives filesystem access.'}
+            </p>
+          </div>
+          <div className="panel-block">
+            <label className="eyebrow theme-label" htmlFor="theme-select">
+              STYLE
+            </label>
+            <select
+              id="theme-select"
+              className="theme-select"
+              value={themeId}
+              disabled={busy}
+              onChange={(event) => {
+                const parsed = ThemeIdSchema.safeParse(event.target.value);
+                if (!parsed.success) return;
+                setThemeId(parsed.data);
+                if (source) {
+                  void refreshPreview(source.path, parsed.data);
+                }
+              }}
+            >
+              {BUILT_IN_THEMES.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+            <p className="muted theme-description">
+              {
+                BUILT_IN_THEMES.find((theme) => theme.id === themeId)
+                  ?.description
+              }
             </p>
           </div>
           <div className="panel-block">

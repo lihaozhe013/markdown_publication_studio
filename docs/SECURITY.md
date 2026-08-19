@@ -6,6 +6,10 @@ start a PDF export.
 
 - Renderer code has no filesystem or Node.js access.
 - IPC payloads are validated with Zod before privileged work begins.
+- Theme selection accepts only the three bundled theme IDs. Theme CSS and its
+  bundled fonts are loaded by the main process and inlined before reaching the
+  preview or print window; arbitrary renderer-supplied stylesheet paths are not
+  supported.
 - Markdown HTML is disabled in `markdown-it`; generated publication HTML
   contains no publication-supplied scripts.
 - Local images are resolved relative to the selected Markdown file and embedded

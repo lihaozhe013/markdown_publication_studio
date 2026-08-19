@@ -1,4 +1,7 @@
-import type { PublicationDiagnostic } from '@markdown-publication/shared';
+import type {
+  PublicationDiagnostic,
+  ThemeId,
+} from '@markdown-publication/shared';
 
 export interface MarkdownSource {
   path: string;
@@ -19,6 +22,8 @@ export interface CompiledChapter {
 
 export interface PublicationHtmlOptions {
   title: string;
+  themeId?: ThemeId;
+  stylesheet?: string;
   pageSize?: 'A4' | 'Letter';
   margins?: {
     top: string;

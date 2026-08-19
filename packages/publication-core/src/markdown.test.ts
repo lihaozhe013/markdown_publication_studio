@@ -21,13 +21,19 @@ describe('publication core', () => {
 
     const compiler = await createMarkdownCompiler();
     const chapter = await compileMarkdownFile(compiler, sourcePath);
-    const publication = renderPublicationHtml([chapter], { title: 'Sample' });
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Sample',
+      themeId: 'github-markdown',
+      stylesheet: '.markdown-body { --test-theme: enabled; }',
+    });
 
     expect(publication.html).toContain('<h1>Sample</h1>');
     expect(publication.html).toContain('data:image/svg+xml;base64,');
     expect(publication.html).toContain('class="shiki');
     expect(publication.html).toContain('<table>');
     expect(publication.html).toContain('@page { size: A4;');
+    expect(publication.html).toContain('class="markdown-body"');
+    expect(publication.html).toContain('--test-theme: enabled');
     expect(publication.diagnostics).toEqual([]);
   });
 });

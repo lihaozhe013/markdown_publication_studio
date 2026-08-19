@@ -90,6 +90,21 @@ button:disabled {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.theme-label {
+  display: block;
+}
+.theme-select {
+  background: white;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  color: #142033;
+  font: inherit;
+  padding: 9px 10px;
+  width: 100%;
+}
+.theme-description {
+  margin-bottom: 0;
+}
 .pipeline {
   color: #7b8794;
   font-size: 13px;

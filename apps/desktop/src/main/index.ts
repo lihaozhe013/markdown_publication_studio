@@ -45,6 +45,24 @@ function createMainWindow(): BrowserWindow {
       preloadFile: basename(preloadPath),
     });
   });
+  window.webContents.on(
+    'console-message',
+    (_event, level, message, line, sourceId) => {
+      const details = { line, sourceId };
+      if (level >= 3) {
+        appLogger.error('[renderer] Console error', message, details);
+      } else if (level === 2) {
+        appLogger.warn('[renderer] Console warning', { message, ...details });
+      } else if (level === 1) {
+        appLogger.info('[renderer] Console message', { message, ...details });
+      } else {
+        appLogger.debug('[renderer] Console debug message', {
+          message,
+          ...details,
+        });
+      }
+    },
+  );
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
@@ -144,7 +162,7 @@ app.on('window-all-closed', () => {
 });
 
 if (!existsSync(join(currentDirectory, '../preload/index.cjs'))) {
-  console.warn(
+  appLogger.warn(
     '[startup] preload bundle is missing; run the build before launching Electron.',
   );
 }

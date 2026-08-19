@@ -3,6 +3,10 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 type LogDetails = Record<string, boolean | number | string | undefined>;
+type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
+const isDevelopmentLogEnabled =
+  process.env.MARKDOWN_PUBLICATION_DEV_LOG === '1';
 
 function formatError(error: unknown): string {
   if (error instanceof Error) {
@@ -18,12 +22,20 @@ export class AppLogger {
     this.enqueue('INFO', message, details);
   }
 
+  debug(message: string, details?: LogDetails): void {
+    this.enqueue('DEBUG', message, details);
+  }
+
+  warn(message: string, details?: LogDetails): void {
+    this.enqueue('WARN', message, details);
+  }
+
   error(message: string, error: unknown, details?: LogDetails): void {
     this.enqueue('ERROR', `${message}: ${formatError(error)}`, details);
   }
 
   private enqueue(
-    level: 'INFO' | 'ERROR',
+    level: LogLevel,
     message: string,
     details?: LogDetails,
   ): void {
@@ -34,6 +46,9 @@ export class AppLogger {
         const logsDirectory = app.getPath('logs');
         await mkdir(logsDirectory, { recursive: true });
         await appendFile(join(logsDirectory, 'main.log'), line, 'utf8');
+        if (isDevelopmentLogEnabled) {
+          await appendFile(join(process.cwd(), 'debug.log'), line, 'utf8');
+        }
       })
       .catch((error: unknown) => {
         console.error('[logging] Could not write application log.', error);

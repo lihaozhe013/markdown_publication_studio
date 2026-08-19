@@ -131,6 +131,7 @@ When this policy conflicts with an explicit task instruction from the repository
 - Generated `*.log` files MUST remain untracked.
 - Debug-only verbose logging MUST NOT be enabled by default in production builds.
 - When handing off a debugging workflow, provide a ready-to-run command and, where useful, an `rg` filter that isolates the relevant subsystem.
+- `pnpm dev` MUST write the development session's Electron/Vite output and application logs to the root `debug.log` file. The file is regenerated at the start of each development session and is ignored by Git. Agents can filter it with `cat debug.log | rg 'xxx'`.
 
 ## 11. Code Organization and File Size
 

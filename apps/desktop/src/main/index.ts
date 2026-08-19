@@ -1,4 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type OpenDialogOptions,
+} from 'electron';
 import { existsSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +15,7 @@ import {
   type MarkdownFileReference,
 } from '@markdown-publication/shared';
 import { ElectronPrintBackend } from './services/electron-print-backend.js';
+import { appLogger } from './services/app-logger.js';
 import {
   PublicationService,
   validateMarkdownPath,
@@ -26,13 +33,18 @@ function createMainWindow(): BrowserWindow {
     minWidth: 980,
     minHeight: 680,
     webPreferences: {
-      preload: join(currentDirectory, '../preload/index.mjs'),
+      preload: join(currentDirectory, '../preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
   });
   applyWindowSecurity(window);
+  window.webContents.on('preload-error', (_event, preloadPath, error) => {
+    appLogger.error('[startup] Preload failed', error, {
+      preloadFile: basename(preloadPath),
+    });
+  });
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
@@ -44,18 +56,38 @@ function createMainWindow(): BrowserWindow {
 function registerIpcHandlers(): void {
   ipcMain.handle(
     'project:open-markdown',
-    async (): Promise<MarkdownFileReference | null> => {
-      const result = await dialog.showOpenDialog({
-        properties: ['openFile'],
-        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+    async (event): Promise<MarkdownFileReference | null> => {
+      appLogger.info('[open-file] IPC request received', {
+        rendererId: event.sender.id,
       });
-      const selectedPath = result.filePaths[0];
-      if (result.canceled || !selectedPath) {
-        return null;
+      try {
+        const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+        const dialogOptions: OpenDialogOptions = {
+          title: 'Open Markdown file',
+          properties: ['openFile'],
+          filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        };
+        const result = ownerWindow
+          ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+        const selectedPath = result.filePaths[0];
+        appLogger.info('[open-file] Native dialog completed', {
+          canceled: result.canceled,
+          selectedFileCount: result.filePaths.length,
+        });
+        if (result.canceled || !selectedPath) {
+          return null;
+        }
+        await validateMarkdownPath(selectedPath);
+        approvedSourcePaths.add(selectedPath);
+        appLogger.info('[open-file] Markdown file approved', {
+          fileName: basename(selectedPath),
+        });
+        return { path: selectedPath, name: basename(selectedPath) };
+      } catch (error) {
+        appLogger.error('[open-file] Failed to open Markdown file', error);
+        throw error;
       }
-      await validateMarkdownPath(selectedPath);
-      approvedSourcePaths.add(selectedPath);
-      return { path: selectedPath, name: basename(selectedPath) };
     },
   );
 
@@ -93,6 +125,9 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(() => {
+  appLogger.info('[startup] Application is ready', {
+    logDirectory: app.getPath('logs'),
+  });
   registerIpcHandlers();
   createMainWindow();
   app.on('activate', () => {
@@ -108,7 +143,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-if (!existsSync(join(currentDirectory, '../preload/index.mjs'))) {
+if (!existsSync(join(currentDirectory, '../preload/index.cjs'))) {
   console.warn(
     '[startup] preload bundle is missing; run the build before launching Electron.',
   );

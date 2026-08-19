@@ -30,17 +30,35 @@ export function App(): React.JSX.Element {
   }
 
   async function openMarkdown(): Promise<void> {
+    setBusy(true);
+    setStatus('Opening Markdown file…');
+    console.info('[open-file] Open Markdown requested.');
     try {
+      if (!window.desktopApi?.project?.openMarkdown) {
+        throw new Error(
+          'The desktop bridge is unavailable. Restart the application after building it.',
+        );
+      }
       const selected = await window.desktopApi.project.openMarkdown();
-      if (!selected) return;
+      if (!selected) {
+        console.info('[open-file] Native dialog cancelled.');
+        setStatus('Open cancelled.');
+        return;
+      }
+      console.info('[open-file] Markdown file selected.', {
+        fileName: selected.name,
+      });
       setSource(selected);
       await refreshPreview(selected.path);
     } catch (error) {
+      console.error('[open-file] Open Markdown failed.', error);
       setStatus(
         error instanceof Error
           ? error.message
           : 'Could not open the Markdown file.',
       );
+    } finally {
+      setBusy(false);
     }
   }
 

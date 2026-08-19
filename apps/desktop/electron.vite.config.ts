@@ -24,6 +24,13 @@ export default defineConfig({
       externalizeDeps: {
         exclude: ['@markdown-publication/shared'],
       },
+      rollupOptions: {
+        external: ['electron'],
+        output: {
+          entryFileNames: 'index.cjs',
+          format: 'cjs',
+        },
+      },
       lib: {
         entry: resolve(desktopRoot, 'src/preload/index.ts'),
       },

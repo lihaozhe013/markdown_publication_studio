@@ -7,6 +7,7 @@
   "main": "out/main/index.js",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "predev": "electron --version",
     "dev": "electron-vite dev --config apps/desktop/electron.vite.config.ts",
     "build": "electron-vite build --config apps/desktop/electron.vite.config.ts",
     "start": "electron .",

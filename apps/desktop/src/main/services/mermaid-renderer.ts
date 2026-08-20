@@ -1,8 +1,11 @@
 import { BrowserWindow } from 'electron';
 import type {
+  MermaidGeometryReport,
+  MermaidSvgMetrics,
   PublicationDiagnostic,
   ThemeId,
 } from '@markdown-publication/shared';
+import { compareMermaidGeometry } from '@markdown-publication/shared';
 import { applyWindowSecurity } from '../security/window-security.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
 
@@ -27,7 +30,10 @@ interface MermaidOutput {
   rawSummary?: MermaidSvgSummary;
   sanitizedSummary?: MermaidSvgSummary;
   metrics?: MermaidSvgMetrics;
+  styledMetrics?: MermaidSvgMetrics;
   sanitizedMetrics?: MermaidSvgMetrics;
+  restoredMetrics?: MermaidSvgMetrics;
+  geometry?: MermaidGeometryReport;
   removed?: MermaidSanitizationReport;
 }
 
@@ -45,16 +51,6 @@ interface MermaidSvgSummary {
 interface MermaidSanitizationReport {
   tags: string[];
   attributes: string[];
-}
-
-interface MermaidSvgMetrics {
-  viewBox: string;
-  clientWidth: number;
-  clientHeight: number;
-  boundingBoxX: number;
-  boundingBoxY: number;
-  boundingBoxWidth: number;
-  boundingBoxHeight: number;
 }
 
 const RENDER_TIMEOUT_MS = 30_000;
@@ -91,7 +87,12 @@ function isMermaidOutput(value: unknown): value is MermaidOutput {
       isMermaidSvgSummary(output.sanitizedSummary)) &&
     (output.metrics === undefined || isMermaidSvgMetrics(output.metrics)) &&
     (output.sanitizedMetrics === undefined ||
-      isMermaidSvgMetrics(output.sanitizedMetrics))
+      isMermaidSvgMetrics(output.sanitizedMetrics)) &&
+    (output.styledMetrics === undefined ||
+      isMermaidSvgMetrics(output.styledMetrics)) &&
+    (output.restoredMetrics === undefined ||
+      isMermaidSvgMetrics(output.restoredMetrics)) &&
+    (output.geometry === undefined || isMermaidGeometryReport(output.geometry))
   );
 }
 
@@ -120,6 +121,23 @@ function isMermaidSvgMetrics(value: unknown): value is MermaidSvgMetrics {
   );
 }
 
+function isMermaidGeometryReport(
+  value: unknown,
+): value is MermaidGeometryReport {
+  if (!value || typeof value !== 'object') return false;
+  const report = value as Record<string, unknown>;
+  return (
+    typeof report.preserved === 'boolean' &&
+    typeof report.beforeElementCount === 'number' &&
+    typeof report.afterElementCount === 'number' &&
+    typeof report.beforeGeometryAttributeCount === 'number' &&
+    typeof report.afterGeometryAttributeCount === 'number' &&
+    typeof report.maxBoundingBoxDelta === 'number' &&
+    (report.firstDifference === undefined ||
+      typeof report.firstDifference === 'string')
+  );
+}
+
 function hasUsableMermaidGeometry(
   metrics: MermaidSvgMetrics | undefined,
 ): boolean {
@@ -139,6 +157,18 @@ function hasUsableMermaidGeometry(
   }
   const expectedHeight = (metrics.clientWidth * viewBoxHeight) / viewBoxWidth;
   return Math.abs(metrics.clientHeight - expectedHeight) <= 2;
+}
+
+function hasPreservedMermaidGeometry(output: MermaidOutput): boolean {
+  if (!output.geometry?.preserved) return false;
+  const restoredMetrics = output.restoredMetrics ?? output.sanitizedMetrics;
+  const metricReport = compareMermaidGeometry(
+    { elementCount: 0, geometryAttributeCount: 0, entries: [] },
+    { elementCount: 0, geometryAttributeCount: 0, entries: [] },
+    output.metrics,
+    restoredMetrics,
+  );
+  return metricReport.preserved;
 }
 
 function isMermaidOutputList(value: unknown): value is MermaidOutput[] {
@@ -222,6 +252,22 @@ export class ElectronMermaidRenderer implements MermaidRenderer {
         const output = rawOutput.find((item) => item.id === input?.id);
         if (!input || !output) continue;
         if (!output.svg) {
+          if (isRenderingDebugEnabled) {
+            appLogger.debug('[mermaid-render] SVG stage failure', {
+              diagramId: input.id,
+              report: JSON.stringify({
+                error: output.error,
+                raw: output.rawSummary,
+                sanitized: output.sanitizedSummary,
+                rawLayout: output.metrics,
+                styledLayout: output.styledMetrics,
+                sanitizedLayout: output.sanitizedMetrics,
+                restoredLayout: output.restoredMetrics,
+                geometry: output.geometry,
+                removed: output.removed,
+              }),
+            });
+          }
           diagnostics.push(
             diagnosticWithSourcePath(
               {
@@ -232,7 +278,15 @@ export class ElectronMermaidRenderer implements MermaidRenderer {
                 code: output.errorCode ?? 'mermaid-render-failed',
                 message: `Mermaid diagram could not be rendered: ${output.error ?? 'unknown error'}`,
                 feature: 'mermaid',
-                details: { diagramId: input.id },
+                details: {
+                  diagramId: input.id,
+                  raw: output.rawSummary,
+                  rawLayout: output.metrics,
+                  styledLayout: output.styledMetrics,
+                  sanitizedLayout: output.sanitizedMetrics,
+                  restoredLayout: output.restoredMetrics,
+                  geometry: output.geometry,
+                },
               },
               sourcePath,
             ),
@@ -241,7 +295,10 @@ export class ElectronMermaidRenderer implements MermaidRenderer {
         }
         if (
           !output.sanitizedSummary?.viewBox ||
-          !hasUsableMermaidGeometry(output.sanitizedMetrics)
+          !hasUsableMermaidGeometry(
+            output.restoredMetrics ?? output.sanitizedMetrics,
+          ) ||
+          !hasPreservedMermaidGeometry(output)
         ) {
           diagnostics.push(
             diagnosticWithSourcePath(
@@ -249,9 +306,17 @@ export class ElectronMermaidRenderer implements MermaidRenderer {
                 severity: 'error',
                 code: 'mermaid-svg-invalid',
                 message:
-                  'The Mermaid SVG has no valid viewBox after sanitization.',
+                  'The Mermaid SVG has invalid or unpreserved geometry after sanitization.',
                 feature: 'mermaid',
-                details: { diagramId: input.id },
+                details: {
+                  diagramId: input.id,
+                  raw: output.rawSummary,
+                  rawLayout: output.metrics,
+                  styledLayout: output.styledMetrics,
+                  sanitizedLayout: output.sanitizedMetrics,
+                  restoredLayout: output.restoredMetrics,
+                  geometry: output.geometry,
+                },
               },
               sourcePath,
             ),
@@ -265,7 +330,10 @@ export class ElectronMermaidRenderer implements MermaidRenderer {
               raw: output.rawSummary,
               sanitized: output.sanitizedSummary,
               rawLayout: output.metrics,
+              styledLayout: output.styledMetrics,
               sanitizedLayout: output.sanitizedMetrics,
+              restoredLayout: output.restoredMetrics,
+              geometry: output.geometry,
               removed: output.removed,
             }),
           });

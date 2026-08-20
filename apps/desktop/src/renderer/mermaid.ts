@@ -1,5 +1,11 @@
 import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
+import {
+  compareMermaidGeometry,
+  type MermaidGeometryReport,
+  type MermaidGeometrySignature,
+  type MermaidSvgMetrics,
+} from '@markdown-publication/shared';
 
 interface MermaidInput {
   id: string;
@@ -14,7 +20,10 @@ interface MermaidOutput {
   rawSummary?: MermaidSvgSummary;
   sanitizedSummary?: MermaidSvgSummary;
   metrics?: MermaidSvgMetrics;
+  styledMetrics?: MermaidSvgMetrics;
   sanitizedMetrics?: MermaidSvgMetrics;
+  restoredMetrics?: MermaidSvgMetrics;
+  geometry?: MermaidGeometryReport;
   removed?: MermaidSanitizationReport;
 }
 
@@ -32,16 +41,6 @@ interface MermaidSvgSummary {
 interface MermaidSanitizationReport {
   tags: string[];
   attributes: string[];
-}
-
-interface MermaidSvgMetrics {
-  viewBox: string;
-  clientWidth: number;
-  clientHeight: number;
-  boundingBoxX: number;
-  boundingBoxY: number;
-  boundingBoxWidth: number;
-  boundingBoxHeight: number;
 }
 
 type MermaidTheme = 'default' | 'dark' | 'forest' | 'neutral';
@@ -83,8 +82,7 @@ const computedStyleProperties = [
   'text-align',
   'text-decoration',
   'text-rendering',
-  'transform',
-  'transform-origin',
+  'visibility',
   'white-space',
 ];
 
@@ -106,6 +104,86 @@ const allowedInlineStyleProperties = new Set([
 
 const safeCssValue =
   /^(?!.*(?:expression\s*\(|javascript\s*:|@import|url\s*\(\s*(?!#[\w.:-]+\s*\))[^)]*\)))/iu;
+const svgNamespace = 'http://www.w3.org/2000/svg';
+
+const geometryAttributeNames = new Set([
+  'alignment-baseline',
+  'clip-path',
+  'clippathunits',
+  'cx',
+  'cy',
+  'd',
+  'filter',
+  'filterunits',
+  'fx',
+  'fy',
+  'gradienttransform',
+  'gradientunits',
+  'height',
+  'marker-end',
+  'marker-mid',
+  'marker-start',
+  'markerheight',
+  'markerunits',
+  'markerwidth',
+  'mask',
+  'maskcontentunits',
+  'maskunits',
+  'offset',
+  'orient',
+  'points',
+  'preserveaspectratio',
+  'patterncontentunits',
+  'patterntransform',
+  'patternunits',
+  'primitiveunits',
+  'r',
+  'refx',
+  'refy',
+  'result',
+  'rx',
+  'ry',
+  'stddeviation',
+  'transform',
+  'transform-origin',
+  'viewbox',
+  'width',
+  'x',
+  'x1',
+  'x2',
+  'y',
+  'y1',
+  'y2',
+]);
+
+interface ForeignObjectRecord {
+  attributes: Array<{ name: string; value: string }>;
+  innerHtml: string;
+}
+
+interface SanitizedMermaidSvg {
+  svg: string;
+  report: MermaidSanitizationReport;
+  styledMetrics?: MermaidSvgMetrics;
+  sanitizedMetrics?: MermaidSvgMetrics;
+  restoredMetrics?: MermaidSvgMetrics;
+  geometry: MermaidGeometryReport;
+}
+
+function assertSafeViewBox(viewBox: string): void {
+  const values = viewBox
+    .trim()
+    .split(/[\s,]+/u)
+    .map(Number);
+  if (
+    values.length !== 4 ||
+    values.some((value) => !Number.isFinite(value)) ||
+    (values[2] ?? 0) <= 0 ||
+    (values[3] ?? 0) <= 0
+  ) {
+    throw new Error('Mermaid SVG has an invalid viewBox.');
+  }
+}
 
 function mermaidConfig(
   theme?: MermaidTheme,
@@ -207,6 +285,110 @@ function bakeComputedStyles(svg: SVGSVGElement): void {
   for (const style of svg.querySelectorAll('style')) style.remove();
 }
 
+function collectGeometrySignature(
+  svg: SVGSVGElement,
+): MermaidGeometrySignature {
+  const entries: string[] = [];
+  let geometryAttributeCount = 0;
+  for (const element of [svg, ...svg.querySelectorAll<SVGElement>('*')]) {
+    if (element.namespaceURI !== svgNamespace) continue;
+    const attributes = [...element.attributes]
+      .filter((attribute) =>
+        geometryAttributeNames.has(attribute.name.toLowerCase()),
+      )
+      .filter((attribute) => {
+        if (element !== svg) return true;
+        return !['height', 'preserveaspectratio', 'width'].includes(
+          attribute.name.toLowerCase(),
+        );
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
+    geometryAttributeCount += attributes.length;
+    entries.push(
+      [
+        element.tagName.toLowerCase(),
+        ...attributes.map(
+          (attribute) => `${attribute.name.toLowerCase()}=${attribute.value}`,
+        ),
+      ].join('|'),
+    );
+  }
+  return {
+    elementCount: entries.length,
+    geometryAttributeCount,
+    entries,
+  };
+}
+
+function extractForeignObjects(
+  svg: SVGSVGElement,
+): Map<string, ForeignObjectRecord> {
+  const records = new Map<string, ForeignObjectRecord>();
+  for (const [index, foreignObject] of [
+    ...svg.querySelectorAll('foreignObject'),
+  ].entries()) {
+    const id = `mermaid-foreign-object-${index}`;
+    const marker = document.createElementNS(svgNamespace, 'g');
+    marker.setAttribute('data-publication-foreign-object-id', id);
+    records.set(id, {
+      attributes: [...foreignObject.attributes]
+        .filter((attribute) =>
+          ['x', 'y', 'width', 'height', 'transform', 'style'].includes(
+            attribute.name,
+          ),
+        )
+        .map((attribute) => ({
+          name: attribute.name,
+          value: attribute.value,
+        })),
+      innerHtml: foreignObject.innerHTML,
+    });
+    foreignObject.replaceWith(marker);
+  }
+  return records;
+}
+
+function restoreForeignObjects(
+  svg: SVGSVGElement,
+  records: Map<string, ForeignObjectRecord>,
+  htmlPurifier: typeof DOMPurify,
+): void {
+  const htmlSanitizer = {
+    ALLOWED_TAGS: ['div', 'span', 'p', 'br'],
+    ALLOWED_ATTR: ['class', 'style'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    ALLOWED_URI_REGEXP: /^$/u,
+    FORBID_TAGS: ['iframe', 'object', 'embed', 'script', 'style'],
+  };
+  for (const marker of [
+    ...svg.querySelectorAll<SVGGElement>(
+      'g[data-publication-foreign-object-id]',
+    ),
+  ]) {
+    const id = marker.getAttribute('data-publication-foreign-object-id');
+    const record = id === null ? undefined : records.get(id);
+    if (!record) throw new Error('Mermaid foreignObject marker is empty.');
+
+    const restored = document.createElementNS(svgNamespace, 'foreignObject');
+    for (const attribute of record.attributes) {
+      if (
+        ['x', 'y', 'width', 'height', 'transform', 'style'].includes(
+          attribute.name,
+        ) &&
+        safeCssValue.test(attribute.value)
+      ) {
+        restored.setAttribute(attribute.name, attribute.value);
+      }
+    }
+    const content = htmlPurifier.sanitize(record.innerHtml, htmlSanitizer);
+    const contentHost = document.createElement('div');
+    contentHost.innerHTML = content;
+    restored.append(...contentHost.childNodes);
+    marker.replaceWith(restored);
+  }
+}
+
 function sanitizeInlineStyles(root: SVGSVGElement): void {
   for (const element of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
     const declarations = [...element.style].flatMap((property) => {
@@ -252,7 +434,8 @@ function restrictForeignObjectContent(root: SVGSVGElement): void {
 }
 
 function validateSanitizedSvg(root: SVGSVGElement, rawViewBox: string): void {
-  if (root.getAttribute('viewBox') !== rawViewBox) {
+  const viewBox = root.getAttribute('viewBox') ?? root.getAttribute('viewbox');
+  if (viewBox !== rawViewBox) {
     throw new Error('Mermaid SVG sanitization changed the root viewBox.');
   }
   for (const element of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
@@ -277,43 +460,10 @@ function validateSanitizedSvg(root: SVGSVGElement, rawViewBox: string): void {
   }
 }
 
-function sanitizeRenderedSvg(svgMarkup: string): {
-  svg: string;
-  report: MermaidSanitizationReport;
-} {
-  const host = document.createElement('div');
-  host.innerHTML = svgMarkup;
-  const svg = host.querySelector<SVGSVGElement>('svg');
-  if (!svg || host.querySelectorAll('svg').length !== 1) {
-    throw new Error('Mermaid returned an invalid SVG root.');
-  }
-  const rawViewBox = svg.getAttribute('viewBox');
-  if (!rawViewBox) throw new Error('Mermaid SVG is missing a viewBox.');
-  svg.classList.add('mermaid-diagram');
-  bakeComputedStyles(svg);
-
-  const cleaned = DOMPurify.sanitize(svg.outerHTML, {
-    USE_PROFILES: { html: true, svg: true, svgFilters: true },
-    ADD_TAGS: ['foreignObject', 'div', 'span', 'p', 'br'],
-    ADD_ATTR: ['style'],
-    ALLOW_DATA_ATTR: true,
-    ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:png|gif|jpeg|webp);base64,)/iu,
-    FORBID_TAGS: ['embed', 'iframe', 'image', 'object', 'script', 'style'],
-  });
-  const cleanedHost = document.createElement('div');
-  cleanedHost.innerHTML = cleaned;
-  const cleanedSvg = cleanedHost.querySelector<SVGSVGElement>('svg');
-  if (
-    !cleanedSvg ||
-    cleanedHost.querySelectorAll('svg').length !== 1 ||
-    cleanedSvg.getAttribute('viewBox') !== rawViewBox
-  ) {
-    throw new Error('Mermaid SVG sanitization changed the root viewBox.');
-  }
-  restrictForeignObjectContent(cleanedSvg);
-  sanitizeInlineStyles(cleanedSvg);
-  validateSanitizedSvg(cleanedSvg, rawViewBox);
-  const removed = DOMPurify.removed.map((entry) => {
+function collectRemovedEntries(
+  purifier: typeof DOMPurify,
+): MermaidSanitizationReport {
+  const removed = purifier.removed.map((entry) => {
     if (!entry || typeof entry !== 'object') return 'unknown';
     if ('element' in entry && entry.element instanceof Element) {
       return `tag:${entry.element.tagName.toLowerCase()}`;
@@ -330,13 +480,98 @@ function sanitizeRenderedSvg(svgMarkup: string): {
     return 'unknown';
   });
   return {
+    tags: [...new Set(removed.filter((item) => item.startsWith('tag:')))],
+    attributes: [
+      ...new Set(removed.filter((item) => item.startsWith('attr:'))),
+    ],
+  };
+}
+
+function mergeSanitizationReports(
+  ...reports: MermaidSanitizationReport[]
+): MermaidSanitizationReport {
+  return {
+    tags: [...new Set(reports.flatMap((report) => report.tags))],
+    attributes: [...new Set(reports.flatMap((report) => report.attributes))],
+  };
+}
+
+function sanitizeRenderedSvg(svgMarkup: string): SanitizedMermaidSvg {
+  const host = document.createElement('div');
+  host.innerHTML = svgMarkup;
+  const svg = host.querySelector<SVGSVGElement>('svg');
+  if (!svg || host.querySelectorAll('svg').length !== 1) {
+    throw new Error('Mermaid returned an invalid SVG root.');
+  }
+  const rawViewBox = svg.getAttribute('viewBox');
+  if (!rawViewBox) throw new Error('Mermaid SVG is missing a viewBox.');
+  assertSafeViewBox(rawViewBox);
+  svg.classList.add('mermaid-diagram');
+  bakeComputedStyles(svg);
+  const styledMetrics = captureSvgMetrics(svg.outerHTML);
+  const styledSignature = collectGeometrySignature(svg);
+  const foreignObjects = extractForeignObjects(svg);
+  const svgPurifier = DOMPurify(window);
+  const htmlPurifier = DOMPurify(window);
+  svgPurifier.clearConfig();
+  htmlPurifier.clearConfig();
+  svgPurifier.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    NAMESPACE: svgNamespace,
+    IN_PLACE: true,
+    ADD_TAGS: ['use'],
+    ALLOW_DATA_ATTR: true,
+    FORBID_TAGS: [
+      'animate',
+      'animatecolor',
+      'animatemotion',
+      'animatetransform',
+      'embed',
+      'iframe',
+      'image',
+      'object',
+      'script',
+      'set',
+      'style',
+    ],
+  });
+  const sanitizedMetrics = captureSvgMetrics(svg.outerHTML);
+  const svgRemoved = collectRemovedEntries(svgPurifier);
+  const cleanedSvg = svg;
+  const sanitizedViewBox =
+    cleanedSvg.getAttribute('viewBox') ?? cleanedSvg.getAttribute('viewbox');
+  if (sanitizedViewBox !== rawViewBox) {
+    if (sanitizedViewBox === null) {
+      cleanedSvg.setAttribute('viewBox', rawViewBox);
+    } else {
+      throw new Error('Mermaid SVG sanitization changed the root viewBox.');
+    }
+  } else {
+    cleanedSvg.setAttribute('viewBox', rawViewBox);
+    cleanedSvg.removeAttribute('viewbox');
+  }
+  cleanedSvg.setAttribute('width', '100%');
+  cleanedSvg.removeAttribute('height');
+  restoreForeignObjects(cleanedSvg, foreignObjects, htmlPurifier);
+  const htmlRemoved = collectRemovedEntries(htmlPurifier);
+  restrictForeignObjectContent(cleanedSvg);
+  sanitizeInlineStyles(cleanedSvg);
+  validateSanitizedSvg(cleanedSvg, rawViewBox);
+  const restoredMetrics = captureSvgMetrics(cleanedSvg.outerHTML);
+  const restoredSignature = collectGeometrySignature(cleanedSvg);
+  const geometry = compareMermaidGeometry(
+    styledSignature,
+    restoredSignature,
+    styledMetrics,
+    restoredMetrics,
+  );
+  return {
     svg: cleanedSvg.outerHTML,
-    report: {
-      tags: [...new Set(removed.filter((item) => item.startsWith('tag:')))],
-      attributes: [
-        ...new Set(removed.filter((item) => item.startsWith('attr:'))),
-      ],
-    },
+    report: mergeSanitizationReports(svgRemoved, htmlRemoved),
+    ...(styledMetrics === undefined ? {} : { styledMetrics }),
+    ...(sanitizedMetrics === undefined ? {} : { sanitizedMetrics }),
+    ...(restoredMetrics === undefined ? {} : { restoredMetrics }),
+    geometry,
   };
 }
 
@@ -348,10 +583,7 @@ window.__publicationRenderMermaid = async (items, theme) => {
       const rendered = await mermaid.render(item.id, item.source);
       const rawSummary = summarizeSvgMarkup(rendered.svg);
       const metrics = captureSvgMetrics(rendered.svg);
-      let sanitized: {
-        svg: string;
-        report: MermaidSanitizationReport;
-      };
+      let sanitized: SanitizedMermaidSvg;
       try {
         sanitized = sanitizeRenderedSvg(rendered.svg);
       } catch (error) {
@@ -359,10 +591,33 @@ window.__publicationRenderMermaid = async (items, theme) => {
           id: item.id,
           error: error instanceof Error ? error.message : String(error),
           errorCode: 'mermaid-svg-invalid',
+          rawSummary,
+          ...(metrics === undefined ? {} : { metrics }),
         });
         continue;
       }
-      const sanitizedMetrics = captureSvgMetrics(sanitized.svg);
+      if (!sanitized.geometry.preserved) {
+        output.push({
+          id: item.id,
+          error: `Mermaid SVG geometry was not preserved: ${sanitized.geometry.firstDifference ?? 'content bounds changed'}.`,
+          errorCode: 'mermaid-svg-invalid',
+          rawSummary,
+          sanitizedSummary: summarizeSvgMarkup(sanitized.svg),
+          ...(metrics === undefined ? {} : { metrics }),
+          ...(sanitized.styledMetrics === undefined
+            ? {}
+            : { styledMetrics: sanitized.styledMetrics }),
+          ...(sanitized.sanitizedMetrics === undefined
+            ? {}
+            : { sanitizedMetrics: sanitized.sanitizedMetrics }),
+          ...(sanitized.restoredMetrics === undefined
+            ? {}
+            : { restoredMetrics: sanitized.restoredMetrics }),
+          geometry: sanitized.geometry,
+          removed: sanitized.report,
+        });
+        continue;
+      }
       const sanitizedSummary = summarizeSvgMarkup(sanitized.svg);
       output.push({
         id: item.id,
@@ -370,7 +625,16 @@ window.__publicationRenderMermaid = async (items, theme) => {
         rawSummary,
         sanitizedSummary,
         ...(metrics === undefined ? {} : { metrics }),
-        ...(sanitizedMetrics === undefined ? {} : { sanitizedMetrics }),
+        ...(sanitized.styledMetrics === undefined
+          ? {}
+          : { styledMetrics: sanitized.styledMetrics }),
+        ...(sanitized.sanitizedMetrics === undefined
+          ? {}
+          : { sanitizedMetrics: sanitized.sanitizedMetrics }),
+        ...(sanitized.restoredMetrics === undefined
+          ? {}
+          : { restoredMetrics: sanitized.restoredMetrics }),
+        geometry: sanitized.geometry,
         removed: sanitized.report,
       });
     } catch (error) {

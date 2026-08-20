@@ -79,3 +79,102 @@ export interface DesktopApi {
     html(request: ExportRequest): Promise<ExportResult | null>;
   };
 }
+
+export interface MermaidSvgMetrics {
+  viewBox: string;
+  clientWidth: number;
+  clientHeight: number;
+  boundingBoxX: number;
+  boundingBoxY: number;
+  boundingBoxWidth: number;
+  boundingBoxHeight: number;
+}
+
+export interface MermaidGeometrySignature {
+  elementCount: number;
+  geometryAttributeCount: number;
+  entries: readonly string[];
+}
+
+export interface MermaidGeometryReport {
+  preserved: boolean;
+  beforeElementCount: number;
+  afterElementCount: number;
+  beforeGeometryAttributeCount: number;
+  afterGeometryAttributeCount: number;
+  maxBoundingBoxDelta: number;
+  firstDifference?: string;
+}
+
+const MERMAID_GEOMETRY_TOLERANCE_PX = 2;
+const MERMAID_GEOMETRY_TOLERANCE_RATIO = 0.01;
+
+function metricDelta(
+  before: MermaidSvgMetrics,
+  after: MermaidSvgMetrics,
+): number {
+  return Math.max(
+    Math.abs(before.boundingBoxX - after.boundingBoxX),
+    Math.abs(before.boundingBoxY - after.boundingBoxY),
+    Math.abs(before.boundingBoxWidth - after.boundingBoxWidth),
+    Math.abs(before.boundingBoxHeight - after.boundingBoxHeight),
+  );
+}
+
+function metricTolerance(
+  before: MermaidSvgMetrics,
+  after: MermaidSvgMetrics,
+): number {
+  return Math.max(
+    MERMAID_GEOMETRY_TOLERANCE_PX,
+    Math.max(
+      Math.abs(before.boundingBoxX),
+      Math.abs(before.boundingBoxY),
+      Math.abs(before.boundingBoxWidth),
+      Math.abs(before.boundingBoxHeight),
+      Math.abs(after.boundingBoxX),
+      Math.abs(after.boundingBoxY),
+      Math.abs(after.boundingBoxWidth),
+      Math.abs(after.boundingBoxHeight),
+    ) * MERMAID_GEOMETRY_TOLERANCE_RATIO,
+  );
+}
+
+export function compareMermaidGeometry(
+  before: MermaidGeometrySignature,
+  after: MermaidGeometrySignature,
+  beforeMetrics: MermaidSvgMetrics | undefined,
+  afterMetrics: MermaidSvgMetrics | undefined,
+): MermaidGeometryReport {
+  let firstDifference: string | undefined;
+  const maxEntries = Math.max(before.entries.length, after.entries.length);
+  for (let index = 0; index < maxEntries; index += 1) {
+    if (before.entries[index] !== after.entries[index]) {
+      firstDifference = `geometry entry ${index} changed`;
+      break;
+    }
+  }
+
+  const maxBoundingBoxDelta =
+    beforeMetrics === undefined || afterMetrics === undefined
+      ? Number.POSITIVE_INFINITY
+      : metricDelta(beforeMetrics, afterMetrics);
+  const metricsPreserved =
+    beforeMetrics !== undefined &&
+    afterMetrics !== undefined &&
+    maxBoundingBoxDelta <= metricTolerance(beforeMetrics, afterMetrics);
+
+  return {
+    preserved:
+      firstDifference === undefined &&
+      before.elementCount === after.elementCount &&
+      before.geometryAttributeCount === after.geometryAttributeCount &&
+      metricsPreserved,
+    beforeElementCount: before.elementCount,
+    afterElementCount: after.elementCount,
+    beforeGeometryAttributeCount: before.geometryAttributeCount,
+    afterGeometryAttributeCount: after.geometryAttributeCount,
+    maxBoundingBoxDelta,
+    ...(firstDifference === undefined ? {} : { firstDifference }),
+  };
+}

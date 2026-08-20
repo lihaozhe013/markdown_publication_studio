@@ -303,10 +303,10 @@ export function App(): React.JSX.Element {
             {diagnostics.length === 0 ? (
               <p className="muted">No warnings.</p>
             ) : (
-              diagnostics.map((diagnostic) => (
+              diagnostics.map((diagnostic, index) => (
                 <p
                   className={`diagnostic ${diagnostic.severity}`}
-                  key={`${diagnostic.code}-${diagnostic.message}`}
+                  key={`${diagnostic.code}-${diagnostic.message}-${index}`}
                 >
                   {diagnostic.message}
                 </p>

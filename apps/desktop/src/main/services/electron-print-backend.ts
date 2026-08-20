@@ -115,8 +115,17 @@ export class ElectronPrintBackend implements PrintBackend {
           for (const svg of document.querySelectorAll('svg.mermaid-diagram')) {
             const viewBox = svg.viewBox.baseVal;
             const rectangle = svg.getBoundingClientRect();
+            let bounds;
+            try {
+              bounds = svg.getBBox();
+            } catch {
+              bounds = undefined;
+            }
             if (viewBox.width <= 0 || viewBox.height <= 0 || rectangle.height <= 0) {
               throw new Error('Publication contains a Mermaid diagram with invalid geometry.');
+            }
+            if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+              throw new Error('Publication contains a Mermaid diagram with no visible content.');
             }
             const expectedHeight = rectangle.width * viewBox.height / viewBox.width;
             if (Math.abs(rectangle.height - expectedHeight) > 2) {

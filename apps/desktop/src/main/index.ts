@@ -59,13 +59,13 @@ function createMainWindow(): BrowserWindow {
   });
   window.webContents.on(
     'console-message',
-    (_event, level, message, line, sourceId) => {
-      const details = { line, sourceId };
-      if (level >= 3) {
+    ({ level, message, lineNumber, sourceId }) => {
+      const details = { line: lineNumber, sourceId };
+      if (level === 'error') {
         appLogger.error('[renderer] Console error', message, details);
-      } else if (level === 2) {
+      } else if (level === 'warning') {
         appLogger.warn('[renderer] Console warning', { message, ...details });
-      } else if (level === 1) {
+      } else if (level === 'info') {
         appLogger.info('[renderer] Console message', { message, ...details });
       } else {
         appLogger.debug('[renderer] Console debug message', {

@@ -1,5 +1,5 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, extname, resolve } from 'node:path';
+import { basename, dirname, extname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   compileMarkdownFile,
@@ -13,6 +13,59 @@ import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
 import { loadThemeStylesheet } from './theme-service.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
+
+function logAssetDiagnostics(
+  sourcePath: string,
+  diagnostics: PreviewResult['diagnostics'],
+): void {
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.feature !== 'asset') continue;
+    const referenceKind =
+      typeof diagnostic.details?.referenceKind === 'string'
+        ? diagnostic.details.referenceKind
+        : 'unknown';
+    const reason =
+      typeof diagnostic.details?.reason === 'string'
+        ? diagnostic.details.reason
+        : undefined;
+    const details = {
+      code: diagnostic.code,
+      sourceFile: basename(sourcePath),
+      referenceKind,
+      ...(reason ? { reason } : {}),
+      message: diagnostic.message,
+    };
+    if (diagnostic.severity === 'error') {
+      appLogger.error(
+        '[asset] Asset resolution error',
+        diagnostic.message,
+        details,
+      );
+    } else if (diagnostic.severity === 'warning') {
+      appLogger.warn('[asset] Asset resolution warning', details);
+    } else {
+      appLogger.info('[asset] Asset resolution info', details);
+    }
+  }
+}
+
+function countMatches(value: string, pattern: RegExp): number {
+  let count = 0;
+  while (pattern.exec(value) !== null) count += 1;
+  return count;
+}
+
+function summarizeEmbeddedImages(html: string): {
+  embeddedImageCount: number;
+  unresolvedImageCount: number;
+} {
+  const imageCount = countMatches(html, /<img\b/giu);
+  const embeddedImageCount = countMatches(html, /\bsrc="data:image\//giu);
+  return {
+    embeddedImageCount,
+    unresolvedImageCount: Math.max(0, imageCount - embeddedImageCount),
+  };
+}
 
 export class PublicationService {
   private readonly compilerPromise = createMarkdownCompiler();
@@ -38,6 +91,13 @@ export class PublicationService {
       mermaid: { enabled: true },
       html: { policy: 'safe-static' },
     });
+    logAssetDiagnostics(sourcePath, chapter.diagnostics);
+    if (isRenderingDebugEnabled) {
+      appLogger.debug('[asset] Image embedding summary', {
+        sourceFile: basename(sourcePath),
+        ...summarizeEmbeddedImages(chapter.html),
+      });
+    }
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,

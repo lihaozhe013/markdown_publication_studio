@@ -21,13 +21,19 @@ start a PDF export.
   runtime script.
 - KaTeX output is generated statically in the publication core and its CSS and
   fonts are embedded into the generated document.
-- Local images are resolved relative to the selected Markdown file and embedded
-  as data URLs only when they stay inside that project root.
+- Relative local images are resolved relative to the selected Markdown file and
+  embedded as data URLs only when they stay inside that project root.
+- Absolute filesystem image references are read and embedded as data URLs after
+  the user selects the Markdown file through the native file dialog. This is an
+  explicit product authorization for external local assets, but it means users
+  should not open untrusted Markdown files because their image references may
+  read arbitrary local files.
 - PDF output is rendered in a separate hidden `BrowserWindow` with
   `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.
 - The print window denies new windows and unrestricted navigation.
 - AI credentials and AI provider code are not part of this milestone.
 
-Local publication images remain project-relative and are embedded as data URLs.
-External media is not permitted by the generated document CSP; ordinary
-HTTP(S)/mailto links remain supported.
+Local publication images are embedded as data URLs. Relative references remain
+project-relative, while authorized absolute filesystem references may point
+outside the project root. External media is not permitted by the generated
+document CSP; ordinary HTTP(S)/mailto links remain supported.

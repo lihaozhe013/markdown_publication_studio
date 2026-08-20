@@ -64,7 +64,19 @@ function escapeAttribute(value: string): string {
 }
 
 function isLocalReference(value: string): boolean {
-  return !/^(?:[a-z][a-z\d+.-]*:|\/\/)/iu.test(value);
+  return isAbsolute(value) || !/^(?:[a-z][a-z\d+.-]*:|\/\/)/iu.test(value);
+}
+
+function decodeLocalReference(
+  reference: string,
+): { value: string } | { error: string } {
+  try {
+    return { value: decodeURIComponent(reference) };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function isWithinRoot(candidate: string, root: string): boolean {
@@ -82,22 +94,47 @@ async function embedLocalImages(
 ): Promise<{ html: string; diagnostics: PublicationDiagnostic[] }> {
   const diagnostics: PublicationDiagnostic[] = [];
   const imagePattern = /(<img\b[^>]*\bsrc=)(["'])(.*?)\2/giu;
-  const matches = [...html.matchAll(imagePattern)];
+  const matches = Array.from(html.matchAll(imagePattern));
   const replacements = await Promise.all(
     matches.map(async (match) => {
-      const reference = match[3];
-      if (!reference || !isLocalReference(reference)) {
+      const rawReference = match[3];
+      if (!rawReference || !isLocalReference(rawReference)) {
         return { match, replacement: undefined };
       }
 
-      const assetPath = resolve(dirname(sourcePath), reference);
-      if (!isWithinRoot(assetPath, projectRoot)) {
+      const decodedReference = decodeLocalReference(rawReference);
+      if ('error' in decodedReference) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'invalid-image-reference',
+          message: `The image reference is not valid URL encoding: ${rawReference}`,
+          sourcePath,
+          feature: 'asset',
+          details: {
+            reason: decodedReference.error,
+            referenceKind: isAbsolute(rawReference) ? 'absolute' : 'relative',
+          },
+        });
+        return { match, replacement: undefined };
+      }
+
+      const reference = decodedReference.value;
+      if (!isLocalReference(reference)) {
+        return { match, replacement: undefined };
+      }
+
+      const absoluteReference = isAbsolute(reference);
+      const assetPath = absoluteReference
+        ? resolve(reference)
+        : resolve(dirname(sourcePath), reference);
+      if (!absoluteReference && !isWithinRoot(assetPath, projectRoot)) {
         diagnostics.push({
           severity: 'warning',
           code: 'asset-outside-project-root',
           message: `The image reference is outside the project root: ${reference}`,
           sourcePath,
           feature: 'asset',
+          details: { referenceKind: 'relative' },
         });
         return { match, replacement: undefined };
       }
@@ -112,6 +149,9 @@ async function embedLocalImages(
             message: `The image type is not supported for embedding: ${reference}`,
             sourcePath,
             feature: 'asset',
+            details: {
+              referenceKind: absoluteReference ? 'absolute' : 'relative',
+            },
           });
           return { match, replacement: undefined };
         }
@@ -128,6 +168,7 @@ async function embedLocalImages(
           feature: 'asset',
           details: {
             reason: error instanceof Error ? error.message : String(error),
+            referenceKind: absoluteReference ? 'absolute' : 'relative',
           },
         });
         return { match, replacement: undefined };

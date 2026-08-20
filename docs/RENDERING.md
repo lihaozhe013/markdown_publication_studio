@@ -9,7 +9,7 @@ Markdown
   -> Shiki code highlighting
   -> KaTeX formula rendering
   -> safe static HTML filtering
-  -> project-relative asset embedding
+  -> local asset resolution and data-URL embedding
   -> Mermaid placeholder extraction
   -> isolated Chromium Mermaid SVG rendering
   -> static publication HTML
@@ -46,6 +46,15 @@ sanitized geometry and renderer startup failures are errors and block export.
 Raw Markdown HTML is limited to static semantic elements, tables, details,
 restricted SVG, and safe attributes. Scripts, event attributes, iframe/embed
 content, dangerous URL schemes, external media, and unsafe CSS are rejected.
+
+## Local images
+
+Relative image references are resolved from the Markdown file and must remain
+inside its project root. Absolute filesystem image references are allowed after
+the user selects the Markdown file through the native file dialog; they are read
+by the main process and embedded as data URLs before preview, HTML export, or
+PDF printing. Missing or unsupported absolute assets produce the same
+diagnostics as relative assets.
 
 ## Readiness and printing
 

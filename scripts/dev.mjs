@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -7,23 +7,26 @@ const debugLog = createWriteStream(debugLogPath, {
   encoding: 'utf8',
   flags: 'w',
 });
-const packageManager = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-const child = spawn(
-  packageManager,
-  [
-    'exec',
-    'electron-vite',
-    'dev',
-    '--watch',
-    '--config',
-    'apps/desktop/electron.vite.config.ts',
-  ],
-  {
-    detached: process.platform !== 'win32',
-    env: { ...process.env, MARKDOWN_PUBLICATION_DEV_LOG: '1' },
-    stdio: ['inherit', 'pipe', 'pipe'],
-  },
-);
+const args = [
+  'exec',
+  'electron-vite',
+  'dev',
+  '--watch',
+  '--config',
+  'apps/desktop/electron.vite.config.ts',
+];
+const common = {
+  env: { ...process.env, MARKDOWN_PUBLICATION_DEV_LOG: '1' },
+  stdio: ['inherit', 'pipe', 'pipe'],
+};
+const child =
+  process.platform === 'win32'
+    ? spawn(
+        process.env.ComSpec ?? 'cmd.exe',
+        ['/d', '/s', '/c', 'pnpm', ...args],
+        { ...common, windowsVerbatimArguments: true },
+      )
+    : spawn('pnpm', args, { ...common, detached: true });
 
 function forwardOutput(stream, target) {
   stream.on('data', (chunk) => {
@@ -38,7 +41,9 @@ forwardOutput(child.stderr, process.stderr);
 function stopChild(signal) {
   if (child.exitCode !== null) return;
   if (process.platform === 'win32') {
-    child.kill();
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+    });
     return;
   }
   try {

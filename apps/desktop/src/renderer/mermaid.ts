@@ -54,7 +54,7 @@ declare global {
   }
 }
 
-const computedStyleProperties = [
+const svgComputedStyleProperties = [
   'color',
   'display',
   'fill',
@@ -65,11 +65,9 @@ const computedStyleProperties = [
   'font-style',
   'font-weight',
   'letter-spacing',
-  'line-height',
   'opacity',
   'overflow',
   'paint-order',
-  'padding',
   'stroke',
   'stroke-dasharray',
   'stroke-dashoffset',
@@ -79,15 +77,57 @@ const computedStyleProperties = [
   'stroke-opacity',
   'stroke-width',
   'text-anchor',
-  'text-align',
   'text-decoration',
   'text-rendering',
   'visibility',
   'white-space',
 ];
 
+const htmlComputedStyleProperties = [
+  'background-color',
+  'border-bottom-color',
+  'border-bottom-style',
+  'border-bottom-width',
+  'border-left-color',
+  'border-left-style',
+  'border-left-width',
+  'border-right-color',
+  'border-right-style',
+  'border-right-width',
+  'border-top-color',
+  'border-top-style',
+  'border-top-width',
+  'box-sizing',
+  'color',
+  'display',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'letter-spacing',
+  'line-height',
+  'margin-bottom',
+  'margin-left',
+  'margin-right',
+  'margin-top',
+  'opacity',
+  'overflow',
+  'overflow-wrap',
+  'padding-bottom',
+  'padding-left',
+  'padding-right',
+  'padding-top',
+  'text-align',
+  'text-decoration',
+  'vertical-align',
+  'visibility',
+  'white-space',
+  'word-break',
+];
+
 const allowedInlineStyleProperties = new Set([
-  ...computedStyleProperties,
+  ...svgComputedStyleProperties,
+  ...htmlComputedStyleProperties,
   'aspect-ratio',
   'height',
   'max-height',
@@ -103,8 +143,20 @@ const allowedInlineStyleProperties = new Set([
 ]);
 
 const safeCssValue =
-  /^(?!.*(?:expression\s*\(|javascript\s*:|@import|url\s*\(\s*(?!#[\w.:-]+\s*\))[^)]*\)))/iu;
+  /^(?!.*(?:expression\s*\(|javascript\s*:|@import|url\s*\(\s*(?!#[\w.:-]+\s*\))[^)]*\)))/isu;
 const svgNamespace = 'http://www.w3.org/2000/svg';
+const unsafeMermaidSvgTagNames = [
+  'animate',
+  'animatecolor',
+  'animatemotion',
+  'animatetransform',
+  'embed',
+  'iframe',
+  'image',
+  'object',
+  'script',
+  'set',
+];
 
 const geometryAttributeNames = new Set([
   'alignment-baseline',
@@ -199,10 +251,14 @@ function mermaidConfig(
       'themeVariables',
       'fontFamily',
       'altFontFamily',
+      'htmlLabels',
+      'flowchart',
+      'sequence',
       'dompurifyConfig',
     ],
     ...(theme === undefined ? {} : { theme }),
-    flowchart: { htmlLabels: false },
+    htmlLabels: true,
+    flowchart: { htmlLabels: true, useMaxWidth: true, wrappingWidth: 200 },
     sequence: { useMaxWidth: true },
     dompurifyConfig: {
       ADD_TAGS: ['foreignObject', 'div', 'span', 'p', 'br'],
@@ -272,17 +328,60 @@ function captureSvgMetrics(svgMarkup: string): MermaidSvgMetrics | undefined {
 }
 
 function bakeComputedStyles(svg: SVGSVGElement): void {
-  const elements = [svg, ...svg.querySelectorAll<SVGElement>('*')];
+  const elements = [
+    svg,
+    ...svg.querySelectorAll<HTMLElement | SVGElement>('*'),
+  ];
   for (const element of elements) {
     const computed = window.getComputedStyle(element);
-    for (const property of computedStyleProperties) {
+    const properties =
+      element instanceof HTMLElement
+        ? htmlComputedStyleProperties
+        : svgComputedStyleProperties;
+    for (const property of properties) {
       const value = computed.getPropertyValue(property).trim();
-      if (value && value !== 'normal' && safeCssValue.test(value)) {
+      if (value && safeCssValue.test(value)) {
         element.style.setProperty(property, value);
       }
     }
   }
   for (const style of svg.querySelectorAll('style')) style.remove();
+}
+
+function validateSvgBeforeStyleBake(svg: SVGSVGElement): void {
+  const elements = [
+    svg,
+    ...svg.querySelectorAll<HTMLElement | SVGElement>('*'),
+  ];
+  if (
+    elements.some((element) =>
+      unsafeMermaidSvgTagNames.includes(element.tagName.toLowerCase()),
+    )
+  ) {
+    throw new Error('Mermaid SVG contains an unsafe element.');
+  }
+  for (const element of elements) {
+    for (const attribute of [...element.attributes]) {
+      if (/^on/iu.test(attribute.name)) {
+        throw new Error('Mermaid SVG contains an event handler attribute.');
+      }
+      if (
+        ['href', 'xlink:href', 'src'].includes(attribute.name.toLowerCase()) &&
+        !attribute.value.startsWith('#')
+      ) {
+        throw new Error('Mermaid SVG contains an external resource reference.');
+      }
+    }
+    const inlineStyle = element.getAttribute('style') ?? '';
+    if (!safeCssValue.test(inlineStyle)) {
+      throw new Error('Mermaid SVG contains unsafe inline CSS.');
+    }
+  }
+  for (const style of svg.querySelectorAll('style')) {
+    if (!safeCssValue.test(style.textContent ?? '')) {
+      throw new Error('Mermaid SVG contains an unsafe stylesheet.');
+    }
+  }
 }
 
 function collectGeometrySignature(
@@ -498,6 +597,8 @@ function mergeSanitizationReports(
 
 function sanitizeRenderedSvg(svgMarkup: string): SanitizedMermaidSvg {
   const host = document.createElement('div');
+  host.style.cssText =
+    'position:absolute;left:-100000px;top:0;width:900px;pointer-events:none;';
   host.innerHTML = svgMarkup;
   const svg = host.querySelector<SVGSVGElement>('svg');
   if (!svg || host.querySelectorAll('svg').length !== 1) {
@@ -506,77 +607,72 @@ function sanitizeRenderedSvg(svgMarkup: string): SanitizedMermaidSvg {
   const rawViewBox = svg.getAttribute('viewBox');
   if (!rawViewBox) throw new Error('Mermaid SVG is missing a viewBox.');
   assertSafeViewBox(rawViewBox);
-  svg.classList.add('mermaid-diagram');
-  bakeComputedStyles(svg);
-  const styledMetrics = captureSvgMetrics(svg.outerHTML);
-  const styledSignature = collectGeometrySignature(svg);
-  const foreignObjects = extractForeignObjects(svg);
-  const svgPurifier = DOMPurify(window);
-  const htmlPurifier = DOMPurify(window);
-  svgPurifier.clearConfig();
-  htmlPurifier.clearConfig();
-  svgPurifier.sanitize(svg, {
-    USE_PROFILES: { svg: true, svgFilters: true },
-    NAMESPACE: svgNamespace,
-    IN_PLACE: true,
-    ADD_TAGS: ['use'],
-    ALLOW_DATA_ATTR: true,
-    FORBID_TAGS: [
-      'animate',
-      'animatecolor',
-      'animatemotion',
-      'animatetransform',
-      'embed',
-      'iframe',
-      'image',
-      'object',
-      'script',
-      'set',
-      'style',
-    ],
-  });
-  const sanitizedMetrics = captureSvgMetrics(svg.outerHTML);
-  const svgRemoved = collectRemovedEntries(svgPurifier);
-  const cleanedSvg = svg;
-  const sanitizedViewBox =
-    cleanedSvg.getAttribute('viewBox') ?? cleanedSvg.getAttribute('viewbox');
-  if (sanitizedViewBox !== rawViewBox) {
-    if (sanitizedViewBox === null) {
-      cleanedSvg.setAttribute('viewBox', rawViewBox);
+  validateSvgBeforeStyleBake(svg);
+  document.body.append(host);
+  try {
+    svg.classList.add('mermaid-diagram');
+    bakeComputedStyles(svg);
+    const styledMetrics = captureSvgMetrics(svg.outerHTML);
+    const styledSignature = collectGeometrySignature(svg);
+    const foreignObjects = extractForeignObjects(svg);
+    const svgPurifier = DOMPurify(window);
+    const htmlPurifier = DOMPurify(window);
+    svgPurifier.clearConfig();
+    htmlPurifier.clearConfig();
+    svgPurifier.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      NAMESPACE: svgNamespace,
+      IN_PLACE: true,
+      ADD_TAGS: ['use'],
+      ALLOW_DATA_ATTR: true,
+      FORBID_TAGS: [...unsafeMermaidSvgTagNames, 'style'],
+    });
+    const sanitizedMetrics = captureSvgMetrics(svg.outerHTML);
+    const svgRemoved = collectRemovedEntries(svgPurifier);
+    const cleanedSvg = svg;
+    const sanitizedViewBox =
+      cleanedSvg.getAttribute('viewBox') ?? cleanedSvg.getAttribute('viewbox');
+    if (sanitizedViewBox !== rawViewBox) {
+      if (sanitizedViewBox === null) {
+        cleanedSvg.setAttribute('viewBox', rawViewBox);
+      } else {
+        throw new Error('Mermaid SVG sanitization changed the root viewBox.');
+      }
     } else {
-      throw new Error('Mermaid SVG sanitization changed the root viewBox.');
+      cleanedSvg.setAttribute('viewBox', rawViewBox);
+      cleanedSvg.removeAttribute('viewbox');
     }
-  } else {
-    cleanedSvg.setAttribute('viewBox', rawViewBox);
-    cleanedSvg.removeAttribute('viewbox');
+    cleanedSvg.setAttribute('width', '100%');
+    cleanedSvg.removeAttribute('height');
+    restoreForeignObjects(cleanedSvg, foreignObjects, htmlPurifier);
+    const htmlRemoved = collectRemovedEntries(htmlPurifier);
+    restrictForeignObjectContent(cleanedSvg);
+    sanitizeInlineStyles(cleanedSvg);
+    validateSanitizedSvg(cleanedSvg, rawViewBox);
+    const restoredMetrics = captureSvgMetrics(cleanedSvg.outerHTML);
+    const restoredSignature = collectGeometrySignature(cleanedSvg);
+    const geometry = compareMermaidGeometry(
+      styledSignature,
+      restoredSignature,
+      styledMetrics,
+      restoredMetrics,
+    );
+    return {
+      svg: cleanedSvg.outerHTML,
+      report: mergeSanitizationReports(svgRemoved, htmlRemoved),
+      ...(styledMetrics === undefined ? {} : { styledMetrics }),
+      ...(sanitizedMetrics === undefined ? {} : { sanitizedMetrics }),
+      ...(restoredMetrics === undefined ? {} : { restoredMetrics }),
+      geometry,
+    };
+  } finally {
+    host.remove();
   }
-  cleanedSvg.setAttribute('width', '100%');
-  cleanedSvg.removeAttribute('height');
-  restoreForeignObjects(cleanedSvg, foreignObjects, htmlPurifier);
-  const htmlRemoved = collectRemovedEntries(htmlPurifier);
-  restrictForeignObjectContent(cleanedSvg);
-  sanitizeInlineStyles(cleanedSvg);
-  validateSanitizedSvg(cleanedSvg, rawViewBox);
-  const restoredMetrics = captureSvgMetrics(cleanedSvg.outerHTML);
-  const restoredSignature = collectGeometrySignature(cleanedSvg);
-  const geometry = compareMermaidGeometry(
-    styledSignature,
-    restoredSignature,
-    styledMetrics,
-    restoredMetrics,
-  );
-  return {
-    svg: cleanedSvg.outerHTML,
-    report: mergeSanitizationReports(svgRemoved, htmlRemoved),
-    ...(styledMetrics === undefined ? {} : { styledMetrics }),
-    ...(sanitizedMetrics === undefined ? {} : { sanitizedMetrics }),
-    ...(restoredMetrics === undefined ? {} : { restoredMetrics }),
-    geometry,
-  };
 }
 
 window.__publicationRenderMermaid = async (items, theme) => {
   mermaid.initialize(mermaidConfig(theme));
+  await document.fonts.ready;
   const output: MermaidOutput[] = [];
   for (const item of items) {
     try {

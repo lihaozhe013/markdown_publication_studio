@@ -14,6 +14,7 @@ const child = spawn(
     'exec',
     'electron-vite',
     'dev',
+    '--watch',
     '--config',
     'apps/desktop/electron.vite.config.ts',
   ],

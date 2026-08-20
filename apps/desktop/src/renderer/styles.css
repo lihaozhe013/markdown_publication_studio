@@ -157,12 +157,23 @@ button:disabled {
 }
 .empty-state {
   align-items: center;
+  background: rgb(255 255 255 / 45%);
+  border: 2px dashed #bcccdc;
+  border-radius: 16px;
   display: flex;
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  padding: 80px;
+  margin: 24px;
+  padding: 56px;
   text-align: center;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+.empty-state.is-dragging {
+  background: #e6f2ff;
+  border-color: #4ba3ff;
 }
 .empty-mark {
   align-items: center;
@@ -174,7 +185,11 @@ button:disabled {
   height: 72px;
   justify-content: center;
   margin-bottom: 20px;
+  transition: transform 140ms ease;
   width: 72px;
+}
+.empty-state.is-dragging .empty-mark {
+  transform: scale(1.08);
 }
 .empty-state h2 {
   color: #102a43;

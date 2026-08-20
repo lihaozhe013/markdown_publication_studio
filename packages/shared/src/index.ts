@@ -12,6 +12,10 @@ export const ExportRequestSchema = z.object({
   themeId: ThemeIdSchema.default('rose'),
 });
 
+export const OpenDroppedMarkdownRequestSchema = z.object({
+  sourcePath: z.string().min(1),
+});
+
 export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
 export type ExportRequest = z.infer<typeof ExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
@@ -70,6 +74,7 @@ export interface ExportResult {
 export interface DesktopApi {
   project: {
     openMarkdown(): Promise<MarkdownFileReference | null>;
+    openDroppedMarkdown(file: File): Promise<MarkdownFileReference>;
   };
   preview: {
     build(request: PreviewRequest): Promise<PreviewResult>;

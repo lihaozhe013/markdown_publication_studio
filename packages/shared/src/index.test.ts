@@ -2,9 +2,26 @@ import { describe, expect, it } from 'vitest';
 import {
   compareMermaidGeometry,
   compareMermaidMetrics,
+  OpenDroppedMarkdownRequestSchema,
   type MermaidGeometrySignature,
   type MermaidSvgMetrics,
 } from './index.js';
+
+describe('Dropped Markdown request validation', () => {
+  it('accepts a non-empty source path', () => {
+    expect(
+      OpenDroppedMarkdownRequestSchema.parse({
+        sourcePath: '/manuscripts/book.md',
+      }),
+    ).toEqual({ sourcePath: '/manuscripts/book.md' });
+  });
+
+  it('rejects an empty source path', () => {
+    expect(() =>
+      OpenDroppedMarkdownRequestSchema.parse({ sourcePath: '' }),
+    ).toThrow();
+  });
+});
 
 const signature = (entries: readonly string[]): MermaidGeometrySignature => ({
   elementCount: entries.length,

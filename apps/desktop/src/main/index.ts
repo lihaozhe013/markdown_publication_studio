@@ -10,6 +10,7 @@ import { basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ExportRequestSchema,
+  OpenDroppedMarkdownRequestSchema,
   PreviewRequestSchema,
   type DesktopApi,
   type MarkdownFileReference,
@@ -49,6 +50,7 @@ function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      navigateOnDragDrop: false,
     },
   });
   applyWindowSecurity(window);
@@ -121,11 +123,38 @@ function registerIpcHandlers(): void {
     },
   );
 
+  ipcMain.handle(
+    'project:open-dropped-markdown',
+    async (event, rawRequest: unknown): Promise<MarkdownFileReference> => {
+      appLogger.info('[open-file] Dropped Markdown open request received', {
+        rendererId: event.sender.id,
+      });
+      try {
+        const request = OpenDroppedMarkdownRequestSchema.parse(rawRequest);
+        await validateMarkdownPath(request.sourcePath);
+        approvedSourcePaths.add(request.sourcePath);
+        appLogger.info('[open-file] Dropped Markdown file approved', {
+          fileName: basename(request.sourcePath),
+        });
+        return {
+          path: request.sourcePath,
+          name: basename(request.sourcePath),
+        };
+      } catch (error) {
+        appLogger.error(
+          '[open-file] Failed to open dropped Markdown file',
+          error,
+        );
+        throw error;
+      }
+    },
+  );
+
   ipcMain.handle('preview:build', async (_event, rawRequest: unknown) => {
     const request = PreviewRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
       throw new Error(
-        'The Markdown file must be selected through the native file dialog first.',
+        'The Markdown file must be opened through the application first.',
       );
     }
     await validateMarkdownPath(request.sourcePath);
@@ -136,7 +165,7 @@ function registerIpcHandlers(): void {
     const request = ExportRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
       throw new Error(
-        'The Markdown file must be selected through the native file dialog first.',
+        'The Markdown file must be opened through the application first.',
       );
     }
     await validateMarkdownPath(request.sourcePath);
@@ -161,7 +190,7 @@ function registerIpcHandlers(): void {
     const request = ExportRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
       throw new Error(
-        'The Markdown file must be selected through the native file dialog first.',
+        'The Markdown file must be opened through the application first.',
       );
     }
     await validateMarkdownPath(request.sourcePath);

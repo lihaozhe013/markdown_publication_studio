@@ -117,6 +117,8 @@ export function App(): React.JSX.Element {
   const [themeId, setThemeId] = useState<ThemeId>('rose');
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
+  const dragDepthRef = useRef(0);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   async function refreshPreview(
@@ -168,6 +170,37 @@ export function App(): React.JSX.Element {
         error instanceof Error
           ? error.message
           : 'Could not open the Markdown file.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openDroppedMarkdown(file: File): Promise<void> {
+    setBusy(true);
+    setStatus('Opening dropped Markdown file…');
+    console.info('[open-file] Dropped Markdown requested.', {
+      fileName: file.name,
+    });
+    try {
+      if (!window.desktopApi?.project?.openDroppedMarkdown) {
+        throw new Error(
+          'The desktop bridge is unavailable. Restart the application after building it.',
+        );
+      }
+      const selected =
+        await window.desktopApi.project.openDroppedMarkdown(file);
+      console.info('[open-file] Dropped Markdown file selected.', {
+        fileName: selected.name,
+      });
+      setSource(selected);
+      await refreshPreview(selected.path);
+    } catch (error) {
+      console.error('[open-file] Open dropped Markdown failed.', error);
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Could not open the dropped Markdown file.',
       );
     } finally {
       setBusy(false);
@@ -343,13 +376,52 @@ export function App(): React.JSX.Element {
               }}
             />
           ) : (
-            <div className="empty-state">
+            <div
+              className={`empty-state${dropActive ? ' is-dragging' : ''}`}
+              role="region"
+              aria-label="Markdown file drop zone"
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (
+                  source ||
+                  busy ||
+                  !event.dataTransfer.types.includes('Files')
+                )
+                  return;
+                dragDepthRef.current += 1;
+                setDropActive(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect =
+                  source || busy ? 'none' : 'copy';
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                if (dragDepthRef.current === 0) setDropActive(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                dragDepthRef.current = 0;
+                setDropActive(false);
+                if (source || busy) return;
+                const files = [...event.dataTransfer.files];
+                if (files.length !== 1) {
+                  setStatus('Drop exactly one Markdown file at a time.');
+                  return;
+                }
+                const file = files[0];
+                if (file) void openDroppedMarkdown(file);
+              }}
+            >
               <div className="empty-mark">✦</div>
-              <h2>Bring your manuscript to life.</h2>
-              <p>
-                Open a Markdown file to render a page-size-aware publication
-                preview.
-              </p>
+              <h2>
+                {dropActive
+                  ? 'Drop to open your manuscript.'
+                  : 'Bring your manuscript to life.'}
+              </h2>
+              <p>Drag a .md or .markdown file here, or use Open Markdown.</p>
             </div>
           )}
         </section>

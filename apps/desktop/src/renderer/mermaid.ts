@@ -133,10 +133,6 @@ const allowedInlineStyleProperties = new Set([
   'max-height',
   'max-width',
   'margin',
-  'margin-bottom',
-  'margin-left',
-  'margin-right',
-  'margin-top',
   'min-height',
   'min-width',
   'width',
@@ -268,8 +264,6 @@ function mermaidConfig(
   };
 }
 
-mermaid.initialize(mermaidConfig());
-
 function summarizeSvgMarkup(svg: string): MermaidSvgSummary {
   const elementNames = [...svg.matchAll(/<\/?([a-z][\w:-]*)\b[^>]*>/giu)].map(
     (match) => match[1]?.toLowerCase() ?? '',
@@ -348,6 +342,26 @@ function bakeComputedStyles(svg: SVGSVGElement): void {
   for (const style of svg.querySelectorAll('style')) style.remove();
 }
 
+function validateSafeElementAttributes(element: Element): void {
+  for (const attribute of [...element.attributes]) {
+    if (/^on/iu.test(attribute.name)) {
+      throw new Error('Mermaid SVG contains an event handler attribute.');
+    }
+    if (
+      ['href', 'xlink:href', 'src'].includes(attribute.name.toLowerCase()) &&
+      !attribute.value.startsWith('#')
+    ) {
+      throw new Error('Mermaid SVG contains an external resource reference.');
+    }
+  }
+}
+
+function validateSafeInlineStyle(style: string): void {
+  if (!safeCssValue.test(style)) {
+    throw new Error('Mermaid SVG contains unsafe inline CSS.');
+  }
+}
+
 function validateSvgBeforeStyleBake(svg: SVGSVGElement): void {
   const elements = [
     svg,
@@ -361,21 +375,8 @@ function validateSvgBeforeStyleBake(svg: SVGSVGElement): void {
     throw new Error('Mermaid SVG contains an unsafe element.');
   }
   for (const element of elements) {
-    for (const attribute of [...element.attributes]) {
-      if (/^on/iu.test(attribute.name)) {
-        throw new Error('Mermaid SVG contains an event handler attribute.');
-      }
-      if (
-        ['href', 'xlink:href', 'src'].includes(attribute.name.toLowerCase()) &&
-        !attribute.value.startsWith('#')
-      ) {
-        throw new Error('Mermaid SVG contains an external resource reference.');
-      }
-    }
-    const inlineStyle = element.getAttribute('style') ?? '';
-    if (!safeCssValue.test(inlineStyle)) {
-      throw new Error('Mermaid SVG contains unsafe inline CSS.');
-    }
+    validateSafeElementAttributes(element);
+    validateSafeInlineStyle(element.getAttribute('style') ?? '');
   }
   for (const style of svg.querySelectorAll('style')) {
     if (!safeCssValue.test(style.textContent ?? '')) {
@@ -509,53 +510,14 @@ function sanitizeInlineStyles(root: SVGSVGElement): void {
   }
 }
 
-function restrictForeignObjectContent(root: SVGSVGElement): void {
-  const allowedTags = new Set(['DIV', 'SPAN', 'P', 'BR']);
-  for (const foreignObject of root.querySelectorAll('foreignObject')) {
-    for (const element of [
-      ...foreignObject.querySelectorAll<HTMLElement>('*'),
-    ].reverse()) {
-      if (!allowedTags.has(element.tagName)) {
-        const parent = element.parentNode;
-        if (!parent) continue;
-        while (element.firstChild)
-          parent.insertBefore(element.firstChild, element);
-        element.remove();
-        continue;
-      }
-      for (const attribute of [...element.attributes]) {
-        if (attribute.name !== 'class' && attribute.name !== 'style') {
-          element.removeAttribute(attribute.name);
-        }
-      }
-    }
-  }
-}
-
 function validateSanitizedSvg(root: SVGSVGElement, rawViewBox: string): void {
   const viewBox = root.getAttribute('viewBox') ?? root.getAttribute('viewbox');
   if (viewBox !== rawViewBox) {
     throw new Error('Mermaid SVG sanitization changed the root viewBox.');
   }
   for (const element of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
-    for (const attribute of [...element.attributes]) {
-      if (/^on/iu.test(attribute.name)) {
-        throw new Error('Mermaid SVG contains an event handler attribute.');
-      }
-      if (
-        ['href', 'xlink:href', 'src'].includes(attribute.name.toLowerCase())
-      ) {
-        if (!attribute.value.startsWith('#')) {
-          throw new Error(
-            'Mermaid SVG contains an external resource reference.',
-          );
-        }
-      }
-    }
-    const style = element.getAttribute('style') ?? '';
-    if (!safeCssValue.test(style)) {
-      throw new Error('Mermaid SVG contains unsafe inline CSS.');
-    }
+    validateSafeElementAttributes(element);
+    validateSafeInlineStyle(element.getAttribute('style') ?? '');
   }
 }
 
@@ -646,7 +608,6 @@ function sanitizeRenderedSvg(svgMarkup: string): SanitizedMermaidSvg {
     cleanedSvg.removeAttribute('height');
     restoreForeignObjects(cleanedSvg, foreignObjects, htmlPurifier);
     const htmlRemoved = collectRemovedEntries(htmlPurifier);
-    restrictForeignObjectContent(cleanedSvg);
     sanitizeInlineStyles(cleanedSvg);
     validateSanitizedSvg(cleanedSvg, rawViewBox);
     const restoredMetrics = captureSvgMetrics(cleanedSvg.outerHTML);

@@ -155,9 +155,16 @@ export class ElectronPrintBackend implements PrintBackend {
           if (typeof result !== 'string') {
             throw new Error('Publication debug inspection returned no report.');
           }
-          const report = result;
-          appLogger.debug('[math-render] Print document probe', { report });
-          appLogger.debug('[mermaid-render] Print document probe', { report });
+          const report = JSON.parse(result) as {
+            math?: unknown;
+            diagrams?: unknown;
+          };
+          appLogger.debug('[math-render] Print document probe', {
+            report: JSON.stringify(report.math ?? {}),
+          });
+          appLogger.debug('[mermaid-render] Print document probe', {
+            report: JSON.stringify(report.diagrams ?? []),
+          });
         } catch (error) {
           appLogger.error('[render] Print document probe failed', error);
         }

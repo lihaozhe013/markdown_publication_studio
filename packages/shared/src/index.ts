@@ -106,6 +106,11 @@ export interface MermaidGeometryReport {
   firstDifference?: string;
 }
 
+export interface MermaidMetricsReport {
+  preserved: boolean;
+  maxBoundingBoxDelta: number;
+}
+
 const MERMAID_GEOMETRY_TOLERANCE_PX = 2;
 const MERMAID_GEOMETRY_TOLERANCE_RATIO = 0.01;
 
@@ -140,6 +145,22 @@ function metricTolerance(
   );
 }
 
+export function compareMermaidMetrics(
+  before: MermaidSvgMetrics | undefined,
+  after: MermaidSvgMetrics | undefined,
+): MermaidMetricsReport {
+  const maxBoundingBoxDelta =
+    before === undefined || after === undefined
+      ? Number.POSITIVE_INFINITY
+      : metricDelta(before, after);
+  const preserved =
+    before !== undefined &&
+    after !== undefined &&
+    maxBoundingBoxDelta <= metricTolerance(before, after);
+
+  return { preserved, maxBoundingBoxDelta };
+}
+
 export function compareMermaidGeometry(
   before: MermaidGeometrySignature,
   after: MermaidGeometrySignature,
@@ -155,26 +176,19 @@ export function compareMermaidGeometry(
     }
   }
 
-  const maxBoundingBoxDelta =
-    beforeMetrics === undefined || afterMetrics === undefined
-      ? Number.POSITIVE_INFINITY
-      : metricDelta(beforeMetrics, afterMetrics);
-  const metricsPreserved =
-    beforeMetrics !== undefined &&
-    afterMetrics !== undefined &&
-    maxBoundingBoxDelta <= metricTolerance(beforeMetrics, afterMetrics);
+  const metricsReport = compareMermaidMetrics(beforeMetrics, afterMetrics);
 
   return {
     preserved:
       firstDifference === undefined &&
       before.elementCount === after.elementCount &&
       before.geometryAttributeCount === after.geometryAttributeCount &&
-      metricsPreserved,
+      metricsReport.preserved,
     beforeElementCount: before.elementCount,
     afterElementCount: after.elementCount,
     beforeGeometryAttributeCount: before.geometryAttributeCount,
     afterGeometryAttributeCount: after.geometryAttributeCount,
-    maxBoundingBoxDelta,
+    maxBoundingBoxDelta: metricsReport.maxBoundingBoxDelta,
     ...(firstDifference === undefined ? {} : { firstDifference }),
   };
 }

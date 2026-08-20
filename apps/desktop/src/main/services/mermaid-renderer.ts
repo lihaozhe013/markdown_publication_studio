@@ -5,7 +5,7 @@ import type {
   PublicationDiagnostic,
   ThemeId,
 } from '@markdown-publication/shared';
-import { compareMermaidGeometry } from '@markdown-publication/shared';
+import { compareMermaidMetrics } from '@markdown-publication/shared';
 import { applyWindowSecurity } from '../security/window-security.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
 
@@ -142,7 +142,7 @@ function hasUsableMermaidGeometry(
   metrics: MermaidSvgMetrics | undefined,
 ): boolean {
   if (!metrics) return false;
-  const values = metrics.viewBox.split(/\s+/u).map(Number);
+  const values = metrics.viewBox.split(/[\s,]+/u).map(Number);
   const viewBoxWidth = values[2] ?? Number.NaN;
   const viewBoxHeight = values[3] ?? Number.NaN;
   if (
@@ -162,13 +162,7 @@ function hasUsableMermaidGeometry(
 function hasPreservedMermaidGeometry(output: MermaidOutput): boolean {
   if (!output.geometry?.preserved) return false;
   const restoredMetrics = output.restoredMetrics ?? output.sanitizedMetrics;
-  const metricReport = compareMermaidGeometry(
-    { elementCount: 0, geometryAttributeCount: 0, entries: [] },
-    { elementCount: 0, geometryAttributeCount: 0, entries: [] },
-    output.metrics,
-    restoredMetrics,
-  );
-  return metricReport.preserved;
+  return compareMermaidMetrics(output.metrics, restoredMetrics).preserved;
 }
 
 function isMermaidOutputList(value: unknown): value is MermaidOutput[] {

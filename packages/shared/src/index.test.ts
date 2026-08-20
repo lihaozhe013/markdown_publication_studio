@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareMermaidGeometry,
+  compareMermaidMetrics,
   type MermaidGeometrySignature,
   type MermaidSvgMetrics,
 } from './index.js';
@@ -28,6 +29,16 @@ const metrics = (
 });
 
 describe('Mermaid geometry validation', () => {
+  it('compares metrics without requiring geometry signatures', () => {
+    const report = compareMermaidMetrics(
+      metrics(980, 960),
+      metrics(980.5, 960.5),
+    );
+
+    expect(report.preserved).toBe(true);
+    expect(report.maxBoundingBoxDelta).toBe(0.5);
+  });
+
   it('accepts unchanged geometry within the rendering tolerance', () => {
     const before = signature(['svg|viewbox=0 0 1000 1000', 'path|d=M0 0']);
     const after = signature(['svg|viewbox=0 0 1000 1000', 'path|d=M0 0']);

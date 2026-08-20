@@ -46,6 +46,8 @@ export interface PublicationDiagnostic {
   message: string;
   sourcePath?: string;
   line?: number;
+  chapterId?: string;
+  feature?: 'asset' | 'code' | 'html' | 'math' | 'mermaid' | 'render';
   details?: Record<string, unknown>;
 }
 
@@ -74,5 +76,6 @@ export interface DesktopApi {
   };
   export: {
     start(request: ExportRequest): Promise<ExportResult | null>;
+    html(request: ExportRequest): Promise<ExportResult | null>;
   };
 }

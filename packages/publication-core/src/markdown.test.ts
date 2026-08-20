@@ -4,6 +4,13 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { compileMarkdownFile, createMarkdownCompiler } from './markdown.js';
 import { renderPublicationHtml } from './html.js';
+import { getKatexFontAssetSummary } from './math.js';
+import {
+  katexFontAssetSummary,
+  removedSvgStructure,
+  summarizeSvgMarkup,
+} from './render-debug.js';
+import { sanitizePublicationHtml } from './sanitizer.js';
 
 describe('publication core', () => {
   it('compiles Markdown with syntax highlighting and embedded local images', async () => {
@@ -34,6 +41,114 @@ describe('publication core', () => {
     expect(publication.html).toContain('@page { size: A4;');
     expect(publication.html).toContain('class="markdown-body"');
     expect(publication.html).toContain('--test-theme: enabled');
+    expect(publication.html).toContain('.code-block.shiki code');
     expect(publication.diagnostics).toEqual([]);
+  });
+
+  it('supports broad language coverage, math, Mermaid placeholders, and safe HTML', async () => {
+    const compiler = await createMarkdownCompiler();
+    const chapter = await compiler.compile(
+      {
+        path: '/tmp/features.md',
+        content: `# Features
+
+Inline math $x^2 + y^2 = z^2$.
+
+$$
+\\frac{1}{2}x^2
+$$
+
+$$
+\\int_{-\\infty}^{\\infty} e^{-x^2}\\,dx = \\sqrt{\\pi}
+$$
+
+$$
+\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}
+$$
+
+<details><summary>More</summary><div class="callout">Static HTML</div></details>
+<script>alert('blocked')</script>
+<div onclick="alert('blocked')">No event handlers</div>
+
+~~~python
+def answer() -> int:
+    return 42
+~~~
+
+~~~mermaid
+flowchart TD
+  A[Start] --> B[Finish]
+~~~
+
+~~~not-a-real-language
+plain text
+~~~`,
+      },
+      { projectRoot: '/tmp' },
+    );
+
+    expect(chapter.html).toContain('class="shiki code-block"');
+    expect(chapter.html).toContain('data-language="python"');
+    expect(chapter.html).toContain('class="katex"');
+    expect(chapter.html).toContain('katex-display');
+    expect(chapter.html).toContain('<mtable');
+    expect(chapter.html).toContain('class="math-block"');
+    expect(chapter.html).toContain('class="mermaid-placeholder"');
+    expect(chapter.html).toContain('<details>');
+    expect(chapter.html).not.toContain('<script');
+    expect(chapter.html).not.toContain('onclick');
+    expect(
+      chapter.diagnostics.some(
+        (diagnostic) => diagnostic.code === 'unsupported-language',
+      ),
+    ).toBe(true);
+    expect(chapter.mermaidDiagramCount).toBe(1);
+
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Features',
+      themeId: 'rose',
+      features: {
+        math: { enabled: true },
+        mermaid: { enabled: true },
+        html: { policy: 'safe-static' },
+      },
+    });
+    expect(publication.html).not.toMatch(/url\(fonts\//u);
+    expect(publication.html).toContain('overflow-y: visible');
+    expect(publication.html).not.toContain('.math-block .katex {');
+  });
+
+  it('removes dangerous HTML while preserving the safe static subset', () => {
+    const result = sanitizePublicationHtml(
+      '<div class="safe">ok</div><script>alert(1)</script><iframe src="https://example.com"></iframe><a href="javascript:alert(1)">bad</a>',
+    );
+
+    expect(result.html).toContain('<div class="safe">ok</div>');
+    expect(result.html).not.toContain('<script');
+    expect(result.html).not.toContain('<iframe');
+    expect(result.html).not.toContain('javascript:');
+    expect(result.removedContent).toBe(true);
+  });
+
+  it('reports font assets and structural changes for rendering diagnostics', () => {
+    const bundledFonts = getKatexFontAssetSummary();
+    const fontAssets = katexFontAssetSummary(
+      '@font-face { font-family: KaTeX_Main; src: url(fonts/KaTeX_Main-Regular.woff2); }',
+    );
+    const raw = summarizeSvgMarkup(
+      '<svg viewBox="0 0 100 20"><defs><clipPath id="clip"><rect width="100" height="20" /></clipPath></defs><g clip-path="url(#clip)"><path d="M0 0" /></g></svg>',
+    );
+    const sanitized = summarizeSvgMarkup(
+      '<svg viewBox="0 0 100 20"><defs><rect width="100" height="20" /></defs><g><path d="M0 0" /></g></svg>',
+    );
+
+    expect(bundledFonts.relativeFontUrlCount).toBe(0);
+    expect(bundledFonts.dataFontUrlCount).toBe(20);
+    expect(fontAssets.relativeFontUrlCount).toBe(1);
+    expect(fontAssets.dataFontUrlCount).toBe(0);
+    expect(removedSvgStructure(raw, sanitized)).toEqual({
+      elements: 'clippath',
+      attributes: 'clip-path,id',
+    });
   });
 });

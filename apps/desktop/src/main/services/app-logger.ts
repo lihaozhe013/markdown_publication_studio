@@ -5,8 +5,12 @@ import { join } from 'node:path';
 type LogDetails = Record<string, boolean | number | string | undefined>;
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
-const isDevelopmentLogEnabled =
+export const isDevelopmentLogEnabled =
   process.env.MARKDOWN_PUBLICATION_DEV_LOG === '1';
+
+export const isRenderingDebugEnabled =
+  isDevelopmentLogEnabled ||
+  process.env.MARKDOWN_PUBLICATION_RENDER_DEBUG === '1';
 
 function formatError(error: unknown): string {
   if (error instanceof Error) {

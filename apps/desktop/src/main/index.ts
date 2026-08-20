@@ -15,6 +15,7 @@ import {
   type MarkdownFileReference,
 } from '@markdown-publication/shared';
 import { ElectronPrintBackend } from './services/electron-print-backend.js';
+import { ElectronMermaidRenderer } from './services/mermaid-renderer.js';
 import { appLogger } from './services/app-logger.js';
 import {
   PublicationService,
@@ -23,7 +24,18 @@ import {
 import { applyWindowSecurity } from './security/window-security.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
-const publicationService = new PublicationService(new ElectronPrintBackend());
+const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
+  ? new URL(
+      'mermaid.html',
+      process.env.ELECTRON_RENDERER_URL.endsWith('/')
+        ? process.env.ELECTRON_RENDERER_URL
+        : `${process.env.ELECTRON_RENDERER_URL}/`,
+    ).toString()
+  : join(currentDirectory, '../renderer/mermaid.html');
+const publicationService = new PublicationService(
+  new ElectronPrintBackend(),
+  new ElectronMermaidRenderer(mermaidRendererPage),
+);
 const approvedSourcePaths = new Set<string>();
 
 function createMainWindow(): BrowserWindow {
@@ -139,6 +151,31 @@ function registerIpcHandlers(): void {
       return null;
     }
     return publicationService.exportPdf(
+      request.sourcePath,
+      result.filePath,
+      request.themeId,
+    );
+  });
+
+  ipcMain.handle('export:html', async (_event, rawRequest: unknown) => {
+    const request = ExportRequestSchema.parse(rawRequest);
+    if (!approvedSourcePaths.has(request.sourcePath)) {
+      throw new Error(
+        'The Markdown file must be selected through the native file dialog first.',
+      );
+    }
+    await validateMarkdownPath(request.sourcePath);
+    const result = await dialog.showSaveDialog({
+      defaultPath: join(
+        process.cwd(),
+        `${basename(request.sourcePath, extname(request.sourcePath))}.html`,
+      ),
+      filters: [{ name: 'HTML', extensions: ['html'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+    return publicationService.exportHtml(
       request.sourcePath,
       result.filePath,
       request.themeId,

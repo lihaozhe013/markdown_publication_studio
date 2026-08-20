@@ -10,6 +10,7 @@ const api: DesktopApi = {
   },
   export: {
     start: (request) => ipcRenderer.invoke('export:start', request),
+    html: (request) => ipcRenderer.invoke('export:html', request),
   },
 };
 

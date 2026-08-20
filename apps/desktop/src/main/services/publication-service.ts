@@ -4,33 +4,60 @@ import { randomUUID } from 'node:crypto';
 import {
   compileMarkdownFile,
   createMarkdownCompiler,
+  getKatexFontAssetSummary,
   renderPublicationHtml,
 } from '@markdown-publication/publication-core';
 import type { ExportResult, PreviewResult } from '@markdown-publication/shared';
 import type { ThemeId } from '@markdown-publication/shared';
 import type { PrintBackend } from './electron-print-backend.js';
+import type { MermaidRenderer } from './mermaid-renderer.js';
 import { loadThemeStylesheet } from './theme-service.js';
+import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
 
 export class PublicationService {
   private readonly compilerPromise = createMarkdownCompiler();
 
-  constructor(private readonly printBackend: PrintBackend) {}
+  constructor(
+    private readonly printBackend: PrintBackend,
+    private readonly mermaidRenderer: MermaidRenderer,
+  ) {}
 
   async buildPreview(
     sourcePath: string,
     themeId: ThemeId,
   ): Promise<PreviewResult> {
+    if (isRenderingDebugEnabled) {
+      appLogger.debug('[math-render] KaTeX stylesheet asset summary', {
+        report: JSON.stringify(getKatexFontAssetSummary()),
+      });
+    }
     const compiler = await this.compilerPromise;
-    const chapter = await compileMarkdownFile(compiler, sourcePath);
+    const chapter = await compileMarkdownFile(compiler, sourcePath, {
+      codeTheme: 'github-dark',
+      math: { enabled: true },
+      mermaid: { enabled: true },
+      html: { policy: 'safe-static' },
+    });
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,
+      features: {
+        codeTheme: 'github-dark',
+        math: { enabled: true },
+        mermaid: { enabled: true },
+        html: { policy: 'safe-static' },
+      },
       stylesheet: await loadThemeStylesheet(themeId),
     });
+    const mermaid = await this.mermaidRenderer.render(
+      rendered.html,
+      themeId,
+      sourcePath,
+    );
     return {
       title: chapter.title,
-      html: rendered.html,
-      diagnostics: rendered.diagnostics,
+      html: mermaid.html,
+      diagnostics: [...rendered.diagnostics, ...mermaid.diagnostics],
     };
   }
 
@@ -40,6 +67,7 @@ export class PublicationService {
     themeId: ThemeId,
   ): Promise<ExportResult> {
     const preview = await this.buildPreview(sourcePath, themeId);
+    this.throwOnFatalDiagnostics(preview.diagnostics);
     const pdf = await this.printBackend.render(preview.html);
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -56,6 +84,7 @@ export class PublicationService {
     themeId: ThemeId,
   ): Promise<ExportResult> {
     const preview = await this.buildPreview(sourcePath, themeId);
+    this.throwOnFatalDiagnostics(preview.diagnostics);
     const temporaryPath = resolve(
       dirname(outputPath),
       `.${randomUUID()}${extname(outputPath) || '.html'}`,
@@ -63,6 +92,17 @@ export class PublicationService {
     await writeFile(temporaryPath, preview.html, 'utf8');
     await rename(temporaryPath, outputPath);
     return { outputPath, diagnostics: preview.diagnostics };
+  }
+
+  private throwOnFatalDiagnostics(
+    diagnostics: PreviewResult['diagnostics'],
+  ): void {
+    const fatal = diagnostics.find(
+      (diagnostic) => diagnostic.severity === 'error',
+    );
+    if (fatal) {
+      throw new Error(fatal.message);
+    }
   }
 }
 

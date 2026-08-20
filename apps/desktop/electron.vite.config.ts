@@ -2,11 +2,17 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import { katexAssetsPlugin } from '../../scripts/katex-assets-plugin.js';
 
 const desktopRoot = fileURLToPath(new URL('./', import.meta.url));
 
 export default defineConfig({
   main: {
+    plugins: [
+      katexAssetsPlugin(
+        resolve(desktopRoot, '../../packages/publication-core'),
+      ),
+    ],
     build: {
       externalizeDeps: {
         exclude: [
@@ -41,7 +47,10 @@ export default defineConfig({
     plugins: [react()],
     build: {
       rollupOptions: {
-        input: resolve(desktopRoot, 'src/renderer/index.html'),
+        input: {
+          index: resolve(desktopRoot, 'src/renderer/index.html'),
+          mermaid: resolve(desktopRoot, 'src/renderer/mermaid.html'),
+        },
       },
     },
   },

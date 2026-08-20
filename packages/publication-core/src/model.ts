@@ -8,8 +8,22 @@ export interface MarkdownSource {
   content: string;
 }
 
+export interface PublicationFeatureOptions {
+  codeTheme?: 'github-dark' | 'github-light';
+  math?: {
+    enabled: boolean;
+  };
+  mermaid?: {
+    enabled: boolean;
+  };
+  html?: {
+    policy: 'safe-static';
+  };
+}
+
 export interface CompileContext {
   projectRoot: string;
+  features?: PublicationFeatureOptions;
 }
 
 export interface CompiledChapter {
@@ -18,12 +32,14 @@ export interface CompiledChapter {
   title: string;
   html: string;
   diagnostics: PublicationDiagnostic[];
+  mermaidDiagramCount: number;
 }
 
 export interface PublicationHtmlOptions {
   title: string;
   themeId?: ThemeId;
   stylesheet?: string;
+  features?: PublicationFeatureOptions;
   pageSize?: 'A4' | 'Letter';
   margins?: {
     top: string;

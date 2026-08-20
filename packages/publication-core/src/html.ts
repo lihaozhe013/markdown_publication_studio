@@ -1,5 +1,6 @@
 import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import type { CompiledChapter, PublicationHtmlOptions } from './model.js';
+import { getKatexStylesheet } from './math.js';
 
 const defaultMargins = {
   top: '18mm',
@@ -21,6 +22,8 @@ export function renderPublicationHtml(
 ): { html: string; diagnostics: PublicationDiagnostic[] } {
   const margins = { ...defaultMargins, ...options.margins };
   const diagnostics = chapters.flatMap((chapter) => chapter.diagnostics);
+  const mathStylesheet =
+    options.features?.math?.enabled === false ? '' : getKatexStylesheet();
   const body = chapters
     .map(
       (chapter) =>
@@ -33,8 +36,8 @@ export function renderPublicationHtml(
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="publication-render-ready" content="true">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; font-src data: https:;">
+    <meta name="publication-render-ready" content="false">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:;">
     <title>${escapeAttribute(options.title)}</title>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
@@ -63,11 +66,29 @@ export function renderPublicationHtml(
       pre { overflow-x: auto; padding: 14pt; border-radius: 6pt; break-inside: avoid; background: #0d1117; }
       code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 9pt; }
       :not(pre) > code { background: #e9f2fb; padding: 1pt 4pt; border-radius: 3pt; }
-      .shiki { padding: 14pt; border-radius: 6pt; overflow-x: auto; }
+      .code-block { margin: 10pt 0; }
+      .code-block.shiki { padding: 14pt; border-radius: 6pt; overflow-x: auto; }
+      .code-block.shiki code { color: inherit; background: transparent; }
+      .code-block.shiki code span[style] { background: transparent; }
+      .code-block--plain { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .mermaid-placeholder, .mermaid-container { margin: 14pt 0; break-inside: avoid; }
+      .mermaid-container { display: flow-root; max-width: 100%; overflow-x: auto; overflow-y: visible; text-align: center; }
+      .mermaid-diagram { display: block; max-width: 100%; height: auto; margin: 0 auto; vertical-align: top; }
+      .math-block { display: block; width: 100%; margin: 18pt 0; overflow-x: auto; overflow-y: visible; break-inside: avoid; text-align: center; }
+      .math-block .katex-display { width: 100%; margin: 0; padding: 0.15em 0; overflow-x: auto; overflow-y: visible; text-align: center; }
+      .math-block .katex-display > .katex { max-width: 100%; white-space: nowrap; }
+      .markdown-body > p > .katex { vertical-align: middle; }
+      .math-error { color: #b42318; background: #fff1f0; padding: 2pt 4pt; }
+      @media print { .code-block, .mermaid-diagram, .math-block { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     </style>
     <style>${options.stylesheet ?? ''}</style>
+    <style>${mathStylesheet}</style>
+    <style>
+      .markdown-body .code-block.shiki code { color: inherit; background: transparent; }
+      .markdown-body .code-block.shiki code span[style] { background: transparent; }
+    </style>
   </head>
-  <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="true">
+  <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="false">
     ${body}
   </body>
 </html>`;

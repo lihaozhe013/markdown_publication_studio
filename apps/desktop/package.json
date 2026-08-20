@@ -5,6 +5,8 @@
   "type": "module",
   "dependencies": {
     "@markdown-publication/publication-core": "workspace:*",
-    "@markdown-publication/shared": "workspace:*"
+    "@markdown-publication/shared": "workspace:*",
+    "dompurify": "3.4.13",
+    "mermaid": "11.16.1"
   }
 }

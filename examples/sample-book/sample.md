@@ -16,8 +16,34 @@ export function publish(title: string): string {
 }
 ```
 
-| Stage        | Backend           |
-| ------------ | ----------------- |
-| Markdown     | markdown-it       |
-| Highlighting | Shiki             |
+| Stage        | Backend     |
+| ------------ | ----------- |
+| Markdown     | markdown-it |
+| Highlighting | Shiki       |
+
+## Advanced rendering
+
+Inline formula: $E = mc^2$.
+
+$$
+\int_0^1 x^2\,dx = \frac{1}{3}
+$$
+
+```rust
+fn answer() -> u32 {
+    42
+}
+```
+
+```mermaid
+flowchart TD
+  Source --> Compiler
+  Compiler --> Publication
+```
+
+<details>
+<summary>Embedded static HTML</summary>
+
+<div class="callout">This block is allowed because it is static HTML.</div>
+</details>
 | PDF          | Electron Chromium |

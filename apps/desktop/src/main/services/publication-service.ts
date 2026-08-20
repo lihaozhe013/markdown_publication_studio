@@ -33,12 +33,11 @@ function logAssetDiagnostics(
       sourceFile: basename(sourcePath),
       referenceKind,
       ...(reason ? { reason } : {}),
-      message: diagnostic.message,
     };
     if (diagnostic.severity === 'error') {
       appLogger.error(
         '[asset] Asset resolution error',
-        diagnostic.message,
+        diagnostic.code,
         details,
       );
     } else if (diagnostic.severity === 'warning') {
@@ -47,24 +46,6 @@ function logAssetDiagnostics(
       appLogger.info('[asset] Asset resolution info', details);
     }
   }
-}
-
-function countMatches(value: string, pattern: RegExp): number {
-  let count = 0;
-  while (pattern.exec(value) !== null) count += 1;
-  return count;
-}
-
-function summarizeEmbeddedImages(html: string): {
-  embeddedImageCount: number;
-  unresolvedImageCount: number;
-} {
-  const imageCount = countMatches(html, /<img\b/giu);
-  const embeddedImageCount = countMatches(html, /\bsrc="data:image\//giu);
-  return {
-    embeddedImageCount,
-    unresolvedImageCount: Math.max(0, imageCount - embeddedImageCount),
-  };
 }
 
 export class PublicationService {
@@ -92,12 +73,6 @@ export class PublicationService {
       html: { policy: 'safe-static' },
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
-    if (isRenderingDebugEnabled) {
-      appLogger.debug('[asset] Image embedding summary', {
-        sourceFile: basename(sourcePath),
-        ...summarizeEmbeddedImages(chapter.html),
-      });
-    }
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,

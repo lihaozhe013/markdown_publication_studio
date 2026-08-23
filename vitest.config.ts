@@ -7,7 +7,7 @@ export default defineConfig({
     katexAssetsPlugin(resolve(process.cwd(), 'packages/publication-core')),
   ],
   test: {
-    include: ['packages/**/*.test.ts'],
+    include: ['apps/**/*.test.ts', 'packages/**/*.test.ts'],
     environment: 'node',
   },
 });

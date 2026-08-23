@@ -2,14 +2,108 @@ import { z } from 'zod';
 
 export const ThemeIdSchema = z.enum(['rose', 'github-markdown', 'claude']);
 
+export const PageNumberFontIdSchema = z.enum([
+  'inter',
+  'open-sans',
+  'noto-sans-sc',
+  'jetbrains-mono',
+  'anthropic-serif',
+  'noto-serif-sc',
+  'zhuque-fangsong',
+]);
+
+export const PageNumberStyleSchema = z.enum(['normal', 'bold', 'italic']);
+
+export const PageNumberFirstPageModeSchema = z.enum([
+  'all-pages',
+  'hide-first-start-at-1',
+  'hide-first-start-at-2',
+]);
+
+const pageNumberFormatTokenPattern = /\{([^{}]*)\}/gu;
+const pageNumberFormatTokens = new Set(['page', 'pages']);
+
+export function isValidPageNumberFormat(value: string): boolean {
+  if (value.length === 0 || value.length > 160 || /[\r\n]/u.test(value)) {
+    return false;
+  }
+
+  const matches = [...value.matchAll(pageNumberFormatTokenPattern)];
+  if (matches.length === 0) return false;
+  if (matches.some((match) => !pageNumberFormatTokens.has(match[1] ?? ''))) {
+    return false;
+  }
+
+  const withoutTokens = value.replace(pageNumberFormatTokenPattern, '');
+  return !/[{}]/u.test(withoutTokens);
+}
+
+export const PageNumberFormatSchema = z
+  .string()
+  .trim()
+  .refine(isValidPageNumberFormat, {
+    message:
+      'Use at least one supported placeholder: {page} or {pages}. Unknown placeholders are not allowed.',
+  });
+
+export const PageNumberSettingsSchema = z.object({
+  enabled: z.boolean(),
+  fontFamily: PageNumberFontIdSchema,
+  fontSizePt: z.number().finite().min(6).max(24),
+  style: PageNumberStyleSchema,
+  format: PageNumberFormatSchema,
+  firstPageMode: PageNumberFirstPageModeSchema,
+});
+
+export const DEFAULT_PAGE_NUMBER_SETTINGS = {
+  enabled: false,
+  fontFamily: 'noto-sans-sc',
+  fontSizePt: 10,
+  style: 'normal',
+  format: '{page} / {pages}',
+  firstPageMode: 'all-pages',
+} as const satisfies z.infer<typeof PageNumberSettingsSchema>;
+
+export function formatPageNumber(
+  format: string,
+  page: number | string,
+  pages: number | string,
+): string {
+  return format
+    .replaceAll('{page}', String(page))
+    .replaceAll('{pages}', String(pages));
+}
+
+export interface NumberedPage {
+  page: number;
+  pages: number;
+}
+
+export function resolveNumberedPage(
+  pageIndex: number,
+  pageCount: number,
+  mode: PageNumberFirstPageMode,
+): NumberedPage | undefined {
+  if (mode === 'all-pages') {
+    return { page: pageIndex + 1, pages: pageCount };
+  }
+  if (pageIndex === 0) return undefined;
+  if (mode === 'hide-first-start-at-1') {
+    return { page: pageIndex, pages: Math.max(0, pageCount - 1) };
+  }
+  return { page: pageIndex + 1, pages: pageCount };
+}
+
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
 });
 
 export const ExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
 });
 
 export const OpenDroppedMarkdownRequestSchema = z.object({
@@ -19,6 +113,10 @@ export const OpenDroppedMarkdownRequestSchema = z.object({
 export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
 export type ExportRequest = z.infer<typeof ExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
+export type PageNumberSettings = z.infer<typeof PageNumberSettingsSchema>;
+export type PageNumberFontId = PageNumberSettings['fontFamily'];
+export type PageNumberStyle = PageNumberSettings['style'];
+export type PageNumberFirstPageMode = PageNumberSettings['firstPageMode'];
 
 export interface PublicationTheme {
   id: ThemeId;
@@ -51,7 +149,8 @@ export interface PublicationDiagnostic {
   sourcePath?: string;
   line?: number;
   chapterId?: string;
-  feature?: 'asset' | 'code' | 'html' | 'math' | 'mermaid' | 'render';
+  feature?:
+    'asset' | 'code' | 'html' | 'math' | 'mermaid' | 'page-number' | 'render';
   details?: Record<string, unknown>;
 }
 
@@ -72,6 +171,10 @@ export interface ExportResult {
 }
 
 export interface DesktopApi {
+  settings: {
+    getPageNumber(): Promise<PageNumberSettings>;
+    savePageNumber(settings: PageNumberSettings): Promise<PageNumberSettings>;
+  };
   project: {
     openMarkdown(): Promise<MarkdownFileReference | null>;
     openDroppedMarkdown(file: File): Promise<MarkdownFileReference>;

@@ -105,6 +105,57 @@ button:disabled {
 .theme-description {
   margin-bottom: 0;
 }
+.toggle-row {
+  align-items: center;
+  color: #142033;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+}
+.toggle-row input {
+  accent-color: #1b64b0;
+  height: 16px;
+  width: 16px;
+}
+.page-number-controls {
+  border: 0;
+  display: grid;
+  gap: 7px 8px;
+  grid-template-columns: 1fr 1.4fr;
+  margin: 14px 0 0;
+  min-width: 0;
+  padding: 0;
+}
+.page-number-controls label {
+  align-self: center;
+  color: #52606d;
+  font-size: 11px;
+  font-weight: 700;
+}
+.page-number-controls select,
+.page-number-controls input[type='number'],
+.page-number-controls input[type='text'] {
+  background: white;
+  border: 1px solid #bcccdc;
+  border-radius: 7px;
+  color: #142033;
+  font: inherit;
+  min-width: 0;
+  padding: 7px 8px;
+  width: 100%;
+}
+.page-number-controls:disabled {
+  opacity: 0.55;
+}
+.page-number-help {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.page-number-panel .diagnostic {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
 .pipeline {
   color: #7b8794;
   font-size: 13px;

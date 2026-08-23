@@ -1,10 +1,27 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
+  DEFAULT_PAGE_NUMBER_SETTINGS,
+  PageNumberFirstPageModeSchema,
+  PageNumberFontIdSchema,
+  PageNumberSettingsSchema,
+  PageNumberStyleSchema,
   ThemeIdSchema,
   type PublicationDiagnostic,
+  type PageNumberFontId,
+  type PageNumberSettings,
   type ThemeId,
 } from '@markdown-publication/shared';
+
+const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
+  { id: 'inter', name: 'Inter' },
+  { id: 'open-sans', name: 'Open Sans' },
+  { id: 'noto-sans-sc', name: 'Noto Sans SC' },
+  { id: 'jetbrains-mono', name: 'JetBrains Mono' },
+  { id: 'anthropic-serif', name: 'Anthropic Serif' },
+  { id: 'noto-serif-sc', name: 'Noto Serif SC' },
+  { id: 'zhuque-fangsong', name: 'Zhuque Fangsong' },
+];
 
 const katexFontFamilies = [
   'KaTeX_Main',
@@ -115,15 +132,43 @@ export function App(): React.JSX.Element {
   const [html, setHtml] = useState('');
   const [diagnostics, setDiagnostics] = useState<PublicationDiagnostic[]>([]);
   const [themeId, setThemeId] = useState<ThemeId>('rose');
+  const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
+    ...DEFAULT_PAGE_NUMBER_SETTINGS,
+  });
+  const [pageNumberError, setPageNumberError] = useState('');
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const dragDepthRef = useRef(0);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadPageNumber = window.desktopApi?.settings?.getPageNumber;
+    if (!loadPageNumber) return undefined;
+
+    void loadPageNumber()
+      .then((settings) => {
+        if (!mounted) return;
+        setPageNumber(settings);
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        setStatus(
+          error instanceof Error
+            ? `Could not load page number settings: ${error.message}`
+            : 'Could not load page number settings.',
+        );
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   async function refreshPreview(
     path: string,
     selectedTheme: ThemeId = themeId,
+    selectedPageNumber: PageNumberSettings = pageNumber,
   ): Promise<void> {
     setBusy(true);
     setStatus('Rendering preview…');
@@ -131,6 +176,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.preview.build({
         sourcePath: path,
         themeId: selectedTheme,
+        pageNumber: selectedPageNumber,
       });
       setTitle(result.title);
       setHtml(result.html);
@@ -141,6 +187,44 @@ export function App(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function commitPageNumberSettings(
+    nextSettings: PageNumberSettings,
+  ): Promise<void> {
+    const parsed = PageNumberSettingsSchema.safeParse(nextSettings);
+    if (!parsed.success) {
+      setPageNumberError(
+        parsed.error.issues[0]?.message ?? 'Invalid page number settings.',
+      );
+      return;
+    }
+
+    setPageNumberError('');
+    try {
+      const saved = await window.desktopApi.settings.savePageNumber(
+        parsed.data,
+      );
+      setPageNumber(saved);
+      if (source) {
+        await refreshPreview(source.path, themeId, saved);
+      }
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? `Could not save page number settings: ${error.message}`
+          : 'Could not save page number settings.',
+      );
+    }
+  }
+
+  function updatePageNumberField<K extends keyof PageNumberSettings>(
+    key: K,
+    value: PageNumberSettings[K],
+  ): void {
+    const nextSettings = { ...pageNumber, [key]: value };
+    setPageNumber(nextSettings);
+    void commitPageNumberSettings(nextSettings);
   }
 
   async function openMarkdown(): Promise<void> {
@@ -215,6 +299,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.start({
         sourcePath: source.path,
         themeId,
+        pageNumber,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -237,6 +322,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.html({
         sourcePath: source.path,
         themeId,
+        pageNumber,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -321,6 +407,127 @@ export function App(): React.JSX.Element {
                   ?.description
               }
             </p>
+          </div>
+          <div className="panel-block page-number-panel">
+            <p className="eyebrow">PAGE NUMBERS</p>
+            <label className="toggle-row" htmlFor="page-number-enabled">
+              <input
+                id="page-number-enabled"
+                type="checkbox"
+                checked={pageNumber.enabled}
+                disabled={busy}
+                onChange={(event) =>
+                  updatePageNumberField('enabled', event.target.checked)
+                }
+              />
+              <span>Enable page numbers</span>
+            </label>
+            <fieldset
+              className="page-number-controls"
+              disabled={busy || !pageNumber.enabled}
+            >
+              <label htmlFor="page-number-font">Font</label>
+              <select
+                id="page-number-font"
+                value={pageNumber.fontFamily}
+                onChange={(event) => {
+                  const parsed = PageNumberFontIdSchema.safeParse(
+                    event.target.value,
+                  );
+                  if (parsed.success) {
+                    updatePageNumberField('fontFamily', parsed.data);
+                  }
+                }}
+              >
+                {pageNumberFonts.map((font) => (
+                  <option key={font.id} value={font.id}>
+                    {font.name}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="page-number-size">Size (pt)</label>
+              <input
+                id="page-number-size"
+                type="number"
+                min="6"
+                max="24"
+                step="0.5"
+                value={pageNumber.fontSizePt}
+                onChange={(event) =>
+                  updatePageNumberField(
+                    'fontSizePt',
+                    Number(event.target.value),
+                  )
+                }
+              />
+
+              <label htmlFor="page-number-style">Style</label>
+              <select
+                id="page-number-style"
+                value={pageNumber.style}
+                onChange={(event) => {
+                  const parsed = PageNumberStyleSchema.safeParse(
+                    event.target.value,
+                  );
+                  if (parsed.success) {
+                    updatePageNumberField('style', parsed.data);
+                  }
+                }}
+              >
+                <option value="normal">Regular</option>
+                <option value="bold">Bold</option>
+                <option value="italic">Italic</option>
+              </select>
+
+              <label htmlFor="page-number-format">Format</label>
+              <input
+                id="page-number-format"
+                type="text"
+                value={pageNumber.format}
+                maxLength={160}
+                onChange={(event) =>
+                  setPageNumber((current) => ({
+                    ...current,
+                    format: event.target.value,
+                  }))
+                }
+                onBlur={() => void commitPageNumberSettings(pageNumber)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+              <p className="muted page-number-help">
+                Use {'{page}'} and {'{pages}'}. Preview uses ? for the total.
+              </p>
+
+              <label htmlFor="page-number-first-page">First page</label>
+              <select
+                id="page-number-first-page"
+                value={pageNumber.firstPageMode}
+                onChange={(event) => {
+                  const parsed = PageNumberFirstPageModeSchema.safeParse(
+                    event.target.value,
+                  );
+                  if (parsed.success) {
+                    updatePageNumberField('firstPageMode', parsed.data);
+                  }
+                }}
+              >
+                <option value="all-pages">Show every page from 1</option>
+                <option value="hide-first-start-at-1">
+                  Hide first page, then start at 1
+                </option>
+                <option value="hide-first-start-at-2">
+                  Hide first page, then start at 2
+                </option>
+              </select>
+            </fieldset>
+            {pageNumberError ? (
+              <p className="diagnostic error">{pageNumberError}</p>
+            ) : null}
           </div>
           <div className="panel-block">
             <p className="eyebrow">PIPELINE</p>

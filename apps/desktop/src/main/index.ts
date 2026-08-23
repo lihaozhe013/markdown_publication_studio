@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ExportRequestSchema,
   OpenDroppedMarkdownRequestSchema,
+  PageNumberSettingsSchema,
   PreviewRequestSchema,
   type DesktopApi,
   type MarkdownFileReference,
@@ -23,6 +24,8 @@ import {
   validateMarkdownPath,
 } from './services/publication-service.js';
 import { applyWindowSecurity } from './security/window-security.js';
+import { AppSettingsService } from './services/app-settings-service.js';
+import { PageNumberPdfService } from './services/page-number-pdf-service.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
@@ -36,7 +39,9 @@ const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
 const publicationService = new PublicationService(
   new ElectronPrintBackend(),
   new ElectronMermaidRenderer(mermaidRendererPage),
+  new PageNumberPdfService(),
 );
+const appSettingsService = new AppSettingsService();
 const approvedSourcePaths = new Set<string>();
 
 function createMainWindow(): BrowserWindow {
@@ -86,6 +91,18 @@ function createMainWindow(): BrowserWindow {
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.handle('settings:get-page-number', async () =>
+    appSettingsService.loadPageNumber(),
+  );
+
+  ipcMain.handle(
+    'settings:save-page-number',
+    async (_event, rawSettings: unknown) => {
+      const settings = PageNumberSettingsSchema.parse(rawSettings);
+      return appSettingsService.savePageNumber(settings);
+    },
+  );
+
   ipcMain.handle(
     'project:open-markdown',
     async (event): Promise<MarkdownFileReference | null> => {
@@ -158,7 +175,11 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    return publicationService.buildPreview(request.sourcePath, request.themeId);
+    return publicationService.buildPreview(
+      request.sourcePath,
+      request.themeId,
+      request.pageNumber,
+    );
   });
 
   ipcMain.handle('export:start', async (_event, rawRequest: unknown) => {
@@ -183,6 +204,7 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
+      request.pageNumber,
     );
   });
 
@@ -208,6 +230,7 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
+      request.pageNumber,
     );
   });
 }

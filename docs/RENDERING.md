@@ -13,7 +13,9 @@ Markdown
   -> Mermaid placeholder extraction
   -> isolated Chromium Mermaid SVG rendering
   -> static publication HTML
-  -> preview / HTML export / printToPDF
+  -> preview / simulated page-number footer / HTML export
+  -> isolated printToPDF
+  -> PDF page-number post-processing
 ```
 
 ## Code blocks
@@ -62,6 +64,21 @@ The print backend waits for fonts and images, verifies that no Mermaid
 placeholder remains, sets the explicit `publication-render-ready` marker, and
 then calls Electron Chromium with `printBackground: true` and
 `preferCSSPageSize: true`. Fixed delays are not used for synchronization.
+
+## Page numbers
+
+The preview and self-contained HTML export display a fixed simulated footer. The
+`{pages}` placeholder is shown as `?` because a scrolling HTML document does not
+have a final PDF page count.
+
+PDF export hides the simulated footer during Chromium printing. After the page
+stream is produced, the main process uses `pdf-lib` and an application bundled
+font to draw the configured centered footer. This keeps page numbering out of
+the body layout and allows the first page to be omitted or renumbered after the
+exact page count is known. Large CJK fonts are embedded in full because
+`pdf-lib` font subsetting can produce invalid mappings for Latin digits and
+punctuation; smaller Latin fonts remain subsetted to avoid unnecessary PDF size
+growth.
 
 ## Rendering diagnostics
 

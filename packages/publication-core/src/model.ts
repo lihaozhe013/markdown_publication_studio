@@ -1,4 +1,5 @@
 import type {
+  PageNumberSettings,
   PublicationDiagnostic,
   ThemeId,
 } from '@markdown-publication/shared';
@@ -35,6 +36,11 @@ export interface CompiledChapter {
   mermaidDiagramCount: number;
 }
 
+export interface PublicationPageNumberOptions extends PageNumberSettings {
+  fontFamilyName: string;
+  fontFaceCss: string;
+}
+
 export interface PublicationHtmlOptions {
   title: string;
   themeId?: ThemeId;
@@ -47,4 +53,5 @@ export interface PublicationHtmlOptions {
     bottom: string;
     left: string;
   };
+  pageNumber?: PublicationPageNumberOptions;
 }

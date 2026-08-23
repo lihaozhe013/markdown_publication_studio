@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopApi } from '@markdown-publication/shared';
 
 const api: DesktopApi = {
+  settings: {
+    getPageNumber: () => ipcRenderer.invoke('settings:get-page-number'),
+    savePageNumber: (settings) =>
+      ipcRenderer.invoke('settings:save-page-number', settings),
+  },
   project: {
     openMarkdown: () => ipcRenderer.invoke('project:open-markdown'),
     openDroppedMarkdown: (file) => {

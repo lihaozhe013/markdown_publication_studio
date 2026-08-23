@@ -570,6 +570,13 @@ Initial pagination rules should cover at least:
 - basic table overflow detection;
 - explicit user page breaks.
 
+Page numbers are a separate layout concern. The initial implementation must
+support a centered footer with a bundled font family, a 6–24pt size, regular,
+bold, or italic styling, and a validated format containing `{page}` and/or
+`{pages}`. The first-page policy must support numbering every page, hiding the
+first page and starting at 1 on the second page, or hiding the first page while
+retaining the physical page number 2 on the second page.
+
 ---
 
 # 13. Preview architecture
@@ -636,7 +643,8 @@ Typical export sequence:
 7. Wait for an explicit application-level `publication-render-ready` signal.
 8. Collect warnings/overflow diagnostics.
 9. Call `webContents.printToPDF()`.
-10. Post-process the returned PDF bytes.
+10. Post-process the returned PDF bytes, including deterministic page-number
+    drawing when enabled.
 11. Write atomically to output path.
 
 Use:
@@ -663,6 +671,8 @@ MVP operations:
 - prepend cover PDF pages;
 - combine front matter and body PDFs if rendered separately;
 - append back matter;
+- draw centered page numbers with embedded bundled fonts after the final page
+  count is known;
 - write PDF metadata;
 - preserve page dimensions correctly;
 - fail loudly on malformed intermediate PDFs.
@@ -1410,4 +1420,3 @@ Once that vertical slice passes automated and manual verification, proceed to th
 When architectural trade-offs are unclear, prefer the option that preserves this principle:
 
 > Markdown remains plain source material. The publication manifest remains portable and human-readable. The GUI makes the publishing pipeline easy to operate. Chromium is the default rendering backend, not the product's domain model. The same publishing core must eventually serve GUI, batch, and CLI workflows.
-

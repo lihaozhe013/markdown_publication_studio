@@ -2,10 +2,55 @@ import { describe, expect, it } from 'vitest';
 import {
   compareMermaidGeometry,
   compareMermaidMetrics,
+  DEFAULT_PAGE_NUMBER_SETTINGS,
+  ExportRequestSchema,
+  formatPageNumber,
+  isValidPageNumberFormat,
   OpenDroppedMarkdownRequestSchema,
+  PageNumberSettingsSchema,
+  resolveNumberedPage,
   type MermaidGeometrySignature,
   type MermaidSvgMetrics,
 } from './index.js';
+
+describe('Page number settings', () => {
+  it('accepts the default settings and request defaults', () => {
+    expect(
+      PageNumberSettingsSchema.parse(DEFAULT_PAGE_NUMBER_SETTINGS),
+    ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
+    expect(
+      ExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageNumber,
+    ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
+  });
+
+  it('accepts supported placeholders and rejects unknown tokens', () => {
+    expect(isValidPageNumberFormat('第 {page} 页 / 共 {pages} 页')).toBe(true);
+    expect(isValidPageNumberFormat('{page}')).toBe(true);
+    expect(isValidPageNumberFormat('{chapter}')).toBe(false);
+    expect(isValidPageNumberFormat('Page {page')).toBe(false);
+    expect(isValidPageNumberFormat('Page number')).toBe(false);
+  });
+
+  it('formats page labels for each first-page rule', () => {
+    expect(resolveNumberedPage(0, 4, 'all-pages')).toEqual({
+      page: 1,
+      pages: 4,
+    });
+    expect(resolveNumberedPage(0, 4, 'hide-first-start-at-1')).toBeUndefined();
+    expect(resolveNumberedPage(1, 4, 'hide-first-start-at-1')).toEqual({
+      page: 1,
+      pages: 3,
+    });
+    expect(resolveNumberedPage(1, 4, 'hide-first-start-at-2')).toEqual({
+      page: 2,
+      pages: 4,
+    });
+    expect(formatPageNumber('第 {page} 页 / 共 {pages} 页', 2, 8)).toBe(
+      '第 2 页 / 共 8 页',
+    );
+  });
+});
 
 describe('Dropped Markdown request validation', () => {
   it('accepts a non-empty source path', () => {

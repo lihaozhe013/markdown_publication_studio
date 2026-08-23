@@ -38,7 +38,6 @@ async function createFontLoader(): Promise<
   const asset: PageNumberFontAsset = {
     familyName: 'Noto Sans SC',
     bytes,
-    fontFaceCss: '',
     allowSubsetting: false,
   };
   return async () => asset;

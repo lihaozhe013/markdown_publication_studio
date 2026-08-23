@@ -12,7 +12,6 @@ interface PageNumberFontDefinition {
 export interface PageNumberFontAsset {
   familyName: string;
   bytes: Uint8Array;
-  fontFaceCss: string;
   allowSubsetting: boolean;
 }
 
@@ -57,10 +56,6 @@ const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
 
 const assetCache = new Map<PageNumberFontId, Promise<PageNumberFontAsset>>();
 
-function escapeCssString(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-}
-
 function fontRoot(): string {
   return resolve(app.getAppPath(), 'themes', 'md2p-gui');
 }
@@ -70,12 +65,9 @@ async function loadPageNumberFontUncached(
 ): Promise<PageNumberFontAsset> {
   const definition = pageNumberFonts[fontId];
   const bytes = await readFile(resolve(fontRoot(), definition.relativePath));
-  const familyName = escapeCssString(definition.familyName);
-  const fontData = bytes.toString('base64');
   return {
     familyName: definition.familyName,
     bytes,
-    fontFaceCss: `@font-face { font-family: "${familyName}"; src: url("data:font/ttf;base64,${fontData}") format("truetype"); font-style: normal; font-weight: 400; font-display: block; }`,
     allowSubsetting: definition.allowSubsetting,
   };
 }

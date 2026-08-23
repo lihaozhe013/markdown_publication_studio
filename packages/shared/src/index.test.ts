@@ -3,11 +3,13 @@ import {
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
-  ExportRequestSchema,
+  HtmlExportRequestSchema,
+  PdfExportRequestSchema,
   formatPageNumber,
   isValidPageNumberFormat,
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
+  PreviewRequestSchema,
   resolveNumberedPage,
   type MermaidGeometrySignature,
   type MermaidSvgMetrics,
@@ -19,9 +21,15 @@ describe('Page number settings', () => {
       PageNumberSettingsSchema.parse(DEFAULT_PAGE_NUMBER_SETTINGS),
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
     expect(
-      ExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
         .pageNumber,
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
+    ).not.toHaveProperty('pageNumber');
+    expect(
+      HtmlExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
+    ).not.toHaveProperty('pageNumber');
   });
 
   it('accepts supported placeholders and rejects unknown tokens', () => {

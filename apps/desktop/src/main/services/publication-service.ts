@@ -6,7 +6,6 @@ import {
   createMarkdownCompiler,
   getKatexFontAssetSummary,
   renderPublicationHtml,
-  type PublicationPageNumberOptions,
 } from '@markdown-publication/publication-core';
 import type {
   ExportResult,
@@ -18,7 +17,6 @@ import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
 import { loadThemeStylesheet } from './theme-service.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
-import { loadPageNumberFont } from './page-number-font-service.js';
 import { PageNumberPdfService } from './page-number-pdf-service.js';
 
 function logAssetDiagnostics(
@@ -67,7 +65,6 @@ export class PublicationService {
   async buildPreview(
     sourcePath: string,
     themeId: ThemeId,
-    pageNumber: PageNumberSettings,
   ): Promise<PreviewResult> {
     if (isRenderingDebugEnabled) {
       appLogger.debug('[math-render] KaTeX stylesheet asset summary', {
@@ -82,7 +79,6 @@ export class PublicationService {
       html: { policy: 'safe-static' },
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
-    const pageNumberOptions = await this.loadPageNumberOptions(pageNumber);
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,
@@ -93,7 +89,6 @@ export class PublicationService {
         html: { policy: 'safe-static' },
       },
       stylesheet: await loadThemeStylesheet(themeId),
-      ...(pageNumberOptions ? { pageNumber: pageNumberOptions } : {}),
     });
     const mermaid = await this.mermaidRenderer.render(
       rendered.html,
@@ -113,9 +108,17 @@ export class PublicationService {
     themeId: ThemeId,
     pageNumber: PageNumberSettings,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath, themeId, pageNumber);
+    const preview = await this.buildPreview(sourcePath, themeId);
     this.throwOnFatalDiagnostics(preview.diagnostics);
     const printedPdf = await this.printBackend.render(preview.html);
+    if (pageNumber.enabled) {
+      appLogger.info('[page-number] Applying PDF page-number settings', {
+        fontFamily: pageNumber.fontFamily,
+        fontSizePt: pageNumber.fontSizePt,
+        style: pageNumber.style,
+        firstPageMode: pageNumber.firstPageMode,
+      });
+    }
     const pdf = await this.pageNumberPdfService.apply(printedPdf, pageNumber);
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -130,9 +133,8 @@ export class PublicationService {
     sourcePath: string,
     outputPath: string,
     themeId: ThemeId,
-    pageNumber: PageNumberSettings,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath, themeId, pageNumber);
+    const preview = await this.buildPreview(sourcePath, themeId);
     this.throwOnFatalDiagnostics(preview.diagnostics);
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -152,26 +154,6 @@ export class PublicationService {
     if (fatal) {
       throw new Error(fatal.message);
     }
-  }
-
-  private async loadPageNumberOptions(
-    settings: PageNumberSettings,
-  ): Promise<PublicationPageNumberOptions | undefined> {
-    if (!settings.enabled) return undefined;
-
-    const font = await loadPageNumberFont(settings.fontFamily);
-    appLogger.info('[page-number] Page number rendering configured', {
-      fontFamily: font.familyName,
-      fontEmbedding: font.allowSubsetting ? 'subset' : 'full',
-      fontSizePt: settings.fontSizePt,
-      style: settings.style,
-      firstPageMode: settings.firstPageMode,
-    });
-    return {
-      ...settings,
-      fontFamilyName: font.familyName,
-      fontFaceCss: font.fontFaceCss,
-    };
   }
 }
 

@@ -12,7 +12,9 @@ building a preview, and starting an export.
   supported.
 - Page-number fonts are selected from an application-owned allow-list of bundled
   font assets. The page-number format accepts only `{page}` and `{pages}`
-  placeholders and is escaped before entering preview HTML.
+  placeholders and is validated before entering the main-process PDF
+  post-processing stage. Page-number fonts never enter the interactive preview
+  or HTML export.
 - Markdown HTML uses a safe-static allow-list. Scripts, event handlers,
   `javascript:` URLs, iframes, embeds, `foreignObject`, and unsafe CSS are
   removed before publication HTML is returned.

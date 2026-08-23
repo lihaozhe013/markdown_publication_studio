@@ -168,7 +168,6 @@ export function App(): React.JSX.Element {
   async function refreshPreview(
     path: string,
     selectedTheme: ThemeId = themeId,
-    selectedPageNumber: PageNumberSettings = pageNumber,
   ): Promise<void> {
     setBusy(true);
     setStatus('Rendering preview…');
@@ -176,7 +175,6 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.preview.build({
         sourcePath: path,
         themeId: selectedTheme,
-        pageNumber: selectedPageNumber,
       });
       setTitle(result.title);
       setHtml(result.html);
@@ -206,9 +204,6 @@ export function App(): React.JSX.Element {
         parsed.data,
       );
       setPageNumber(saved);
-      if (source) {
-        await refreshPreview(source.path, themeId, saved);
-      }
     } catch (error) {
       setStatus(
         error instanceof Error
@@ -322,7 +317,6 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.html({
         sourcePath: source.path,
         themeId,
-        pageNumber,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -500,7 +494,7 @@ export function App(): React.JSX.Element {
                 }}
               />
               <p className="muted page-number-help">
-                Use {'{page}'} and {'{pages}'}. Preview uses ? for the total.
+                Use {'{page}'} and {'{pages}'}. Applied to PDF export only.
               </p>
 
               <label htmlFor="page-number-first-page">First page</label>

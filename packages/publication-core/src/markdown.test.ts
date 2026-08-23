@@ -45,7 +45,7 @@ describe('publication core', () => {
     expect(publication.diagnostics).toEqual([]);
   });
 
-  it('renders a styled simulated page number for preview and HTML export', async () => {
+  it('does not render page numbers in preview or HTML export', async () => {
     const compiler = await createMarkdownCompiler();
     const chapter = await compiler.compile(
       { path: '/tmp/page-number.md', content: '# Page number\n\nContent.' },
@@ -54,25 +54,10 @@ describe('publication core', () => {
     const publication = renderPublicationHtml([chapter], {
       title: 'Page number',
       themeId: 'rose',
-      pageNumber: {
-        enabled: true,
-        fontFamily: 'noto-sans-sc',
-        fontFamilyName: 'Noto Sans SC',
-        fontSizePt: 12,
-        style: 'italic',
-        format: '第 {page} 页 / 共 {pages} 页',
-        firstPageMode: 'hide-first-start-at-2',
-        fontFaceCss: '@font-face { font-family: "Noto Sans SC"; }',
-      },
     });
 
-    expect(publication.html).toContain('class="page-number-preview"');
-    expect(publication.html).toContain('第 2 页 / 共 ? 页');
-    expect(publication.html).toContain('font-size: 12pt');
-    expect(publication.html).toContain('font-style: italic');
-    expect(publication.html).toContain('color: #000000 !important');
-    expect(publication.html).toContain('.page-number-preview { display: none');
-    expect(publication.html).toContain('@font-face');
+    expect(publication.html).not.toContain('page-number-preview');
+    expect(publication.html).not.toContain('第 1 页 / 共 ? 页');
   });
 
   it('embeds an absolute image path outside the Markdown project root', async () => {

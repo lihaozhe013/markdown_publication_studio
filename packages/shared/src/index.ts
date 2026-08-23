@@ -97,13 +97,17 @@ export function resolveNumberedPage(
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
-  pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
 });
 
-export const ExportRequestSchema = z.object({
+export const PdfExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
   pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+});
+
+export const HtmlExportRequestSchema = z.object({
+  sourcePath: z.string().min(1),
+  themeId: ThemeIdSchema.default('rose'),
 });
 
 export const OpenDroppedMarkdownRequestSchema = z.object({
@@ -111,7 +115,8 @@ export const OpenDroppedMarkdownRequestSchema = z.object({
 });
 
 export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
-export type ExportRequest = z.infer<typeof ExportRequestSchema>;
+export type PdfExportRequest = z.infer<typeof PdfExportRequestSchema>;
+export type HtmlExportRequest = z.infer<typeof HtmlExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
 export type PageNumberSettings = z.infer<typeof PageNumberSettingsSchema>;
 export type PageNumberFontId = PageNumberSettings['fontFamily'];
@@ -183,8 +188,8 @@ export interface DesktopApi {
     build(request: PreviewRequest): Promise<PreviewResult>;
   };
   export: {
-    start(request: ExportRequest): Promise<ExportResult | null>;
-    html(request: ExportRequest): Promise<ExportResult | null>;
+    start(request: PdfExportRequest): Promise<ExportResult | null>;
+    html(request: HtmlExportRequest): Promise<ExportResult | null>;
   };
 }
 

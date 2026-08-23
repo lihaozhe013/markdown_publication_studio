@@ -9,9 +9,10 @@ import { existsSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ExportRequestSchema,
+  HtmlExportRequestSchema,
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
+  PdfExportRequestSchema,
   PreviewRequestSchema,
   type DesktopApi,
   type MarkdownFileReference,
@@ -175,15 +176,11 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    return publicationService.buildPreview(
-      request.sourcePath,
-      request.themeId,
-      request.pageNumber,
-    );
+    return publicationService.buildPreview(request.sourcePath, request.themeId);
   });
 
   ipcMain.handle('export:start', async (_event, rawRequest: unknown) => {
-    const request = ExportRequestSchema.parse(rawRequest);
+    const request = PdfExportRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
       throw new Error(
         'The Markdown file must be opened through the application first.',
@@ -209,7 +206,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('export:html', async (_event, rawRequest: unknown) => {
-    const request = ExportRequestSchema.parse(rawRequest);
+    const request = HtmlExportRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
       throw new Error(
         'The Markdown file must be opened through the application first.',
@@ -230,7 +227,6 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
-      request.pageNumber,
     );
   });
 }

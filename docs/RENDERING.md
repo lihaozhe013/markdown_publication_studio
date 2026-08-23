@@ -13,7 +13,7 @@ Markdown
   -> Mermaid placeholder extraction
   -> isolated Chromium Mermaid SVG rendering
   -> static publication HTML
-  -> preview / simulated page-number footer / HTML export
+  -> preview / HTML export
   -> isolated printToPDF
   -> PDF page-number post-processing
 ```
@@ -67,18 +67,15 @@ then calls Electron Chromium with `printBackground: true` and
 
 ## Page numbers
 
-The preview and self-contained HTML export display a fixed simulated footer. The
-`{pages}` placeholder is shown as `?` because a scrolling HTML document does not
-have a final PDF page count.
-
-PDF export hides the simulated footer during Chromium printing. After the page
-stream is produced, the main process uses `pdf-lib` and an application bundled
-font to draw the configured centered footer. This keeps page numbering out of
-the body layout and allows the first page to be omitted or renumbered after the
-exact page count is known. Large CJK fonts are embedded in full because
-`pdf-lib` font subsetting can produce invalid mappings for Latin digits and
-punctuation; smaller Latin fonts remain subsetted to avoid unnecessary PDF size
-growth.
+Page numbers are intentionally absent from the interactive preview and
+self-contained HTML export. PDF export adds them only after Chromium has
+produced the final page stream. The main process uses `pdf-lib` and an
+application bundled font to draw the configured centered footer. This keeps page
+numbering out of the body layout and allows the first page to be omitted or
+renumbered after the exact page count is known. Large CJK fonts are embedded in
+full because `pdf-lib` font subsetting can produce invalid mappings for Latin
+digits and punctuation; smaller Latin fonts remain subsetted to avoid
+unnecessary PDF size growth.
 
 ## Rendering diagnostics
 

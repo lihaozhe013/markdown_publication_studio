@@ -2,7 +2,6 @@ export type {
   CompiledChapter,
   CompileContext,
   MarkdownSource,
-  PublicationPageNumberOptions,
   PublicationFeatureOptions,
   PublicationHtmlOptions,
 } from './model.js';

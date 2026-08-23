@@ -570,12 +570,14 @@ Initial pagination rules should cover at least:
 - basic table overflow detection;
 - explicit user page breaks.
 
-Page numbers are a separate layout concern. The initial implementation must
+Page numbers are a separate PDF layout concern. The initial implementation must
 support a centered footer with a bundled font family, a 6–24pt size, regular,
 bold, or italic styling, and a validated format containing `{page}` and/or
-`{pages}`. The first-page policy must support numbering every page, hiding the
-first page and starting at 1 on the second page, or hiding the first page while
-retaining the physical page number 2 on the second page.
+`{pages}`. Page numbers are added only after PDF pagination is complete; they do
+not appear in the interactive preview or HTML export. The first-page policy must
+support numbering every page, hiding the first page and starting at 1 on the
+second page, or hiding the first page while retaining the physical page number 2
+on the second page.
 
 ---
 

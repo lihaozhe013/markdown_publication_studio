@@ -1,7 +1,4 @@
-import {
-  formatPageNumber,
-  type PublicationDiagnostic,
-} from '@markdown-publication/shared';
+import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import type { CompiledChapter, PublicationHtmlOptions } from './model.js';
 import { getKatexStylesheet } from './math.js';
 
@@ -19,33 +16,6 @@ function escapeAttribute(value: string): string {
     .replaceAll('<', '&lt;');
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function escapeCssString(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-}
-
-function pageNumberPreviewMarkup(
-  options: PublicationHtmlOptions['pageNumber'],
-): string {
-  if (!options?.enabled) return '';
-
-  const samplePage = options.firstPageMode === 'hide-first-start-at-2' ? 2 : 1;
-  const sampleText = formatPageNumber(options.format, samplePage, '?');
-  const fontWeight = options.style === 'bold' ? 700 : 400;
-  const fontStyle = options.style === 'italic' ? 'italic' : 'normal';
-  const style = `font-family: "${escapeCssString(options.fontFamilyName)}", sans-serif; font-size: ${options.fontSizePt}pt; font-style: ${fontStyle}; font-weight: ${fontWeight}; color: #000000 !important;`;
-
-  return `<div class="page-number-preview" aria-hidden="true" style="${escapeHtml(style)}">${escapeHtml(sampleText)}</div>`;
-}
-
 export function renderPublicationHtml(
   chapters: CompiledChapter[],
   options: PublicationHtmlOptions,
@@ -60,12 +30,6 @@ export function renderPublicationHtml(
         `<article class="chapter" data-source-path="${escapeAttribute(chapter.sourcePath)}">${chapter.html}</article>`,
     )
     .join('\n');
-  const pageNumber = options.pageNumber;
-  const pageNumberFontStylesheet = pageNumber?.enabled
-    ? pageNumber.fontFaceCss
-    : '';
-  const pageNumberPreview = pageNumberPreviewMarkup(pageNumber);
-
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -80,13 +44,11 @@ export function renderPublicationHtml(
       @media screen {
         body { max-width: 900px; margin: 0 auto; padding: 48px 64px; background: #eef1f5; }
         .chapter { margin: 0 0 32px; padding: 52px 64px; background: white; box-shadow: 0 12px 40px rgb(16 35 58 / 12%); }
-        .page-number-preview { position: fixed; z-index: 10; right: 0; bottom: 12px; left: 0; color: #000000 !important; line-height: 1; text-align: center; pointer-events: none; }
       }
       @media print {
         body { margin: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chapter { break-before: page; }
         .chapter:first-child { break-before: auto; }
-        .page-number-preview { display: none !important; }
       }
       body { color: #182230; font-size: 11pt; line-height: 1.6; }
       h1, h2, h3, h4 { color: #102a43; line-height: 1.2; break-after: avoid; }
@@ -118,7 +80,6 @@ export function renderPublicationHtml(
       .math-error { color: #b42318; background: #fff1f0; padding: 2pt 4pt; }
       @media print { .code-block, .mermaid-diagram, .math-block { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     </style>
-    <style>${pageNumberFontStylesheet}</style>
     <style>${options.stylesheet ?? ''}</style>
     <style>${mathStylesheet}</style>
     <style>
@@ -128,7 +89,6 @@ export function renderPublicationHtml(
   </head>
   <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="false">
     ${body}
-    ${pageNumberPreview}
   </body>
 </html>`;
   return { html, diagnostics };

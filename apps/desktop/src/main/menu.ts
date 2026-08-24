@@ -40,7 +40,11 @@ function showAboutWindow(): void {
 
   // Prepare temp directory for about page assets
   const tmpDir = join(app.getPath('temp'), 'markdown-publication-studio');
-  try { mkdirSync(tmpDir, { recursive: true }); } catch { /* exists */ }
+  try {
+    mkdirSync(tmpDir, { recursive: true });
+  } catch {
+    /* exists */
+  }
 
   // Write a minimal preload script for the close button IPC
   const preloadPath = join(tmpDir, 'about-preload.cjs');
@@ -207,8 +211,16 @@ contextBridge.exposeInMainWorld('aboutAPI', {
   win.on('closed', () => {
     aboutWindow = null;
     ipcMain.removeAllListeners(ABOUT_CLOSE_CHANNEL);
-    try { unlinkSync(tmpFile); } catch { /* ignore */ }
-    try { unlinkSync(preloadPath); } catch { /* ignore */ }
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      /* ignore */
+    }
+    try {
+      unlinkSync(preloadPath);
+    } catch {
+      /* ignore */
+    }
   });
 
   void win.loadFile(tmpFile);

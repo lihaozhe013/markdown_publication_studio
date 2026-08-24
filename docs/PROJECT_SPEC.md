@@ -1,34 +1,49 @@
 # Markdown Publication Studio — Agent Project Specification
 
-> Status: bootstrap specification / source of truth for the initial implementation
-> Baseline date: 2026-08-15
-> Project type: cross-platform desktop application
-> Primary goal: turn one or many Markdown documents into polished, reproducible publication-grade PDF/HTML deliverables through a simple GUI and a scriptable publishing pipeline.
+> Status: bootstrap specification / source of truth for the initial
+> implementation Baseline date: 2026-08-15 Project type: cross-platform desktop
+> application Primary goal: turn one or many Markdown documents into polished,
+> reproducible publication-grade PDF/HTML deliverables through a simple GUI and
+> a scriptable publishing pipeline.
 
 ---
 
 ## 0. Instructions to the coding agent
 
-This document is the implementation contract for the initial project. Start from an empty repository. Do not fork `md-to-pdf`; use it only as a reference for Markdown-to-HTML conversion, stylesheet handling, local asset resolution, browser lifecycle, print CSS, and PDF export behavior.
+This document is the implementation contract for the initial project. Start from
+an empty repository. Do not fork `md-to-pdf`; use it only as a reference for
+Markdown-to-HTML conversion, stylesheet handling, local asset resolution,
+browser lifecycle, print CSS, and PDF export behavior.
 
-Before creating `package.json`, resolve the latest **stable** versions from the package registry for every direct dependency. Do not use alpha, beta, RC, canary, nightly, next, or other prerelease channels unless this document explicitly requests one.
+Before creating `package.json`, resolve the latest **stable** versions from the
+package registry for every direct dependency. Do not use alpha, beta, RC,
+canary, nightly, next, or other prerelease channels unless this document
+explicitly requests one.
 
-The versions listed below are the minimum verified baseline as of 2026-08-15. If a newer stable patch/minor/major exists at bootstrap time and is compatible with this architecture, use the newer stable version and record the resolved versions in `docs/DEPENDENCY_BASELINE.md`.
+The versions listed below are the minimum verified baseline as of 2026-08-15. If
+a newer stable patch/minor/major exists at bootstrap time and is compatible with
+this architecture, use the newer stable version and record the resolved versions
+in `docs/DEPENDENCY_BASELINE.md`.
 
 Mandatory baseline:
 
-- Electron: `43.4.0` or newer stable. Baseline Electron 43.4.0 embeds Chromium 150.0.7871.224 and Node.js 24.18.1.
-- TypeScript: `7.0.x` or newer stable TypeScript 7 release. TypeScript 7 is mandatory; do not downgrade to TypeScript 6.x.
+- Electron: `43.4.0` or newer stable. Baseline Electron 43.4.0 embeds Chromium
+  150.0.7871.224 and Node.js 24.18.1.
+- TypeScript: `7.0.x` or newer stable TypeScript 7 release. TypeScript 7 is
+  mandatory; do not downgrade to TypeScript 6.x.
 - React: `19.2.x` or newer stable.
 - Vite: `8.2.1` or newer stable.
 - pnpm: `11.21.0` or newer stable.
 - Vitest: `4.1.10` or newer stable.
 - Zod: `4.4.3` or newer stable.
-- electron-builder: `26.15.3` or newer stable, unless a newer stable packaging solution is demonstrably more appropriate.
+- electron-builder: `26.15.3` or newer stable, unless a newer stable packaging
+  solution is demonstrably more appropriate.
 
-After resolving dependencies, pin the resolved versions in the lockfile. Do not use floating dependency ranges as a substitute for reproducibility.
+After resolving dependencies, pin the resolved versions in the lockfile. Do not
+use floating dependency ranges as a substitute for reproducibility.
 
-Use strict TypeScript everywhere. Avoid JavaScript source files except unavoidable configuration shims.
+Use strict TypeScript everywhere. Avoid JavaScript source files except
+unavoidable configuration shims.
 
 ---
 
@@ -36,13 +51,19 @@ Use strict TypeScript everywhere. Avoid JavaScript source files except unavoidab
 
 The product is **not a Markdown editor**.
 
-The product is a desktop publishing and batch-processing application for users who already have Markdown content and want to turn it into finished publications with minimal manual layout work.
+The product is a desktop publishing and batch-processing application for users
+who already have Markdown content and want to turn it into finished publications
+with minimal manual layout work.
 
-The product should feel closer to a “Markdown publishing compiler with a visual control panel” than to Typora, Obsidian, VS Code, or a note-taking application.
+The product should feel closer to a “Markdown publishing compiler with a visual
+control panel” than to Typora, Obsidian, VS Code, or a note-taking application.
 
 The central user promise is:
 
-> Give the application Markdown files, choose or configure a publication style, and receive a polished publication without manually handling HTML, CSS, browser printing, page assembly, cover composition, or repetitive batch conversion.
+> Give the application Markdown files, choose or configure a publication style,
+> and receive a polished publication without manually handling HTML, CSS,
+> browser printing, page assembly, cover composition, or repetitive batch
+> conversion.
 
 Primary use cases:
 
@@ -53,7 +74,8 @@ Primary use cases:
 5. PDF ebooks and downloadable publications.
 6. Batch export of many Markdown files using one consistent publication profile.
 7. Combining multiple Markdown files into one ordered publication.
-8. AI-assisted cover artwork generation followed by deterministic title/author typography and automatic PDF assembly.
+8. AI-assisted cover artwork generation followed by deterministic title/author
+   typography and automatic PDF assembly.
 
 ---
 
@@ -73,7 +95,9 @@ Do not build these into the MVP:
 - A full design application comparable to InDesign.
 - Fine-grained freeform page-canvas editing.
 
-The application may display source file names, metadata, parsing warnings, structure, and rendered previews, but editing Markdown content itself is out of scope.
+The application may display source file names, metadata, parsing warnings,
+structure, and rendered previews, but editing Markdown content itself is out of
+scope.
 
 ---
 
@@ -121,7 +145,8 @@ post-processing / assembly
 final publication
 ```
 
-The GUI must orchestrate this pipeline. The GUI must not contain publishing logic that cannot also be invoked programmatically.
+The GUI must orchestrate this pipeline. The GUI must not contain publishing
+logic that cannot also be invoked programmatically.
 
 ---
 
@@ -129,7 +154,8 @@ The GUI must orchestrate this pipeline. The GUI must not contain publishing logi
 
 Use the desktop runtime.
 
-The decisive reason is that Chromium is part of the product's rendering architecture, not merely its GUI technology.
+The decisive reason is that Chromium is part of the product's rendering
+architecture, not merely its GUI technology.
 
 The desktop runtime provides:
 
@@ -155,7 +181,8 @@ Instead use:
 Desktop app -> internal publishing core -> hidden WebContents -> printToPDF()
 ```
 
-Puppeteer may later be added only for test automation or an explicitly justified headless/server backend.
+Puppeteer may later be added only for test automation or an explicitly justified
+headless/server backend.
 
 ---
 
@@ -175,30 +202,41 @@ Use native ESM wherever practical.
 
 Resolve latest stable versions at bootstrap:
 
-- `markdown-it` — Markdown parsing, selected for its explicit token/plugin pipeline.
-- `gray-matter` only if its active version and configuration are safe for untrusted input; otherwise use a data-only YAML front-matter parser. Never execute JavaScript front matter.
+- `markdown-it` — Markdown parsing, selected for its explicit token/plugin
+  pipeline.
+- `gray-matter` only if its active version and configuration are safe for
+  untrusted input; otherwise use a data-only YAML front-matter parser. Never
+  execute JavaScript front matter.
 - `yaml` — YAML parsing/serialization for publication manifests.
-- `zod` — runtime validation of project configuration, IPC payloads, manifests, and persisted data.
+- `zod` — runtime validation of project configuration, IPC payloads, manifests,
+  and persisted data.
 - `shiki` — publication-quality syntax highlighting.
 - `katex` — math rendering.
 - `mermaid` — diagrams.
 - `pdf-lib` — PDF merging, page insertion, metadata, and simple post-processing.
-- `chokidar` or an equally mature latest-stable file watcher — watch source documents and assets.
+- `chokidar` or an equally mature latest-stable file watcher — watch source
+  documents and assets.
 
-Do not add a database in the MVP unless actual persistence requirements exceed project-file + application-settings storage.
+Do not add a database in the MVP unless actual persistence requirements exceed
+project-file + application-settings storage.
 
 ## 5.3 UI libraries
 
-React is required, but avoid committing the core architecture to a large UI framework.
+React is required, but avoid committing the core architecture to a large UI
+framework.
 
 For the MVP:
 
 - React.
 - CSS Modules, vanilla CSS, or another lightweight style system.
-- A mature headless component library may be used if it reduces accessibility/interaction work without imposing a strong product aesthetic.
-- Use native OS dialogs through the desktop runtime for file/folder selection where appropriate.
+- A mature headless component library may be used if it reduces
+  accessibility/interaction work without imposing a strong product aesthetic.
+- Use native OS dialogs through the desktop runtime for file/folder selection
+  where appropriate.
 
-Do not install a routing framework unless multiple independent application routes genuinely appear. A desktop workspace can initially be a state-driven single-window application.
+Do not install a routing framework unless multiple independent application
+routes genuinely appear. A desktop workspace can initially be a state-driven
+single-window application.
 
 ## 5.4 Testing and quality
 
@@ -206,9 +244,11 @@ Use latest stable versions of:
 
 - Vitest — unit and integration tests.
 - React Testing Library — UI behavior tests where useful.
-- Playwright — optional but recommended for desktop E2E testing if current stable desktop runtime integration is reliable.
+- Playwright — optional but recommended for desktop E2E testing if current
+  stable desktop runtime integration is reliable.
 - ESLint — latest stable version compatible with TypeScript 7.
-- Prettier — latest stable, unless the repository adopts another deterministic formatter.
+- Prettier — latest stable, unless the repository adopts another deterministic
+  formatter.
 
 Use `tsc`/TypeScript 7 for type checking even if Vite performs transpilation.
 
@@ -216,7 +256,8 @@ Use `tsc`/TypeScript 7 for type checking even if Vite performs transpilation.
 
 # 6. Repository structure
 
-Start as a pnpm workspace even if the first implementation lives in one repository.
+Start as a pnpm workspace even if the first implementation lives in one
+repository.
 
 Recommended layout:
 
@@ -273,7 +314,8 @@ markdown-publication-studio/
 └── pnpm-lock.yaml
 ```
 
-Do not create packages only as empty architectural theater. It is acceptable to begin with fewer physical packages, but preserve these logical boundaries.
+Do not create packages only as empty architectural theater. It is acceptable to
+begin with fewer physical packages, but preserve these logical boundaries.
 
 ---
 
@@ -292,7 +334,8 @@ Owns:
 - PDF output;
 - native dialogs;
 - safe IPC implementation;
-- AI provider communication unless there is a strong reason to isolate it further.
+- AI provider communication unless there is a strong reason to isolate it
+  further.
 
 ## Preload
 
@@ -334,7 +377,8 @@ Owns only user interface concerns:
 - export queue/status;
 - warnings and errors.
 
-Do not put direct filesystem calls, PDF manipulation, AI API keys, or privileged operations in React components.
+Do not put direct filesystem calls, PDF manipulation, AI API keys, or privileged
+operations in React components.
 
 ---
 
@@ -342,7 +386,8 @@ Do not put direct filesystem calls, PDF manipulation, AI API keys, or privileged
 
 Every untrusted publication must be treated as potentially malicious input.
 
-Mandatory BrowserWindow defaults for UI and publication rendering where applicable:
+Mandatory BrowserWindow defaults for UI and publication rendering where
+applicable:
 
 ```ts
 webPreferences: {
@@ -355,13 +400,17 @@ webPreferences: {
 Additional rules:
 
 1. Never execute JavaScript supplied through Markdown/front matter.
-2. Do not expose `require`, `process`, raw `ipcRenderer`, filesystem handles, or arbitrary command execution to publication HTML.
+2. Do not expose `require`, `process`, raw `ipcRenderer`, filesystem handles, or
+   arbitrary command execution to publication HTML.
 3. Validate all IPC payloads with Zod.
 4. Restrict navigation and new-window behavior.
 5. Explicitly define policy for remote HTTP/HTTPS assets.
-6. Resolve local file references only within allowed project roots unless the user explicitly authorizes external assets.
-7. Render publication content in an isolated WebContents/BrowserWindow, separate from the application UI.
-8. Keep AI credentials in the main process / OS-backed secret storage, never in renderer state or generated HTML.
+6. Resolve local file references only within allowed project roots unless the
+   user explicitly authorizes external assets.
+7. Render publication content in an isolated WebContents/BrowserWindow, separate
+   from the application UI.
+8. Keep AI credentials in the main process / OS-backed secret storage, never in
+   renderer state or generated HTML.
 
 Create `docs/SECURITY.md` before the AI integration milestone.
 
@@ -394,7 +443,8 @@ export interface Chapter {
 }
 ```
 
-The exact AST does not need to duplicate a full Markdown AST. It must, however, be rich enough to support:
+The exact AST does not need to duplicate a full Markdown AST. It must, however,
+be rich enough to support:
 
 - ordered multi-file publications;
 - generated front matter;
@@ -408,7 +458,8 @@ The exact AST does not need to duplicate a full Markdown AST. It must, however, 
 
 # 10. Project file / manifest
 
-Every publication project must be reproducible from a machine-readable file stored with the content.
+Every publication project must be reproducible from a machine-readable file
+stored with the content.
 
 Prefer `publish.yaml` as the default manifest name.
 
@@ -418,16 +469,16 @@ Initial schema example:
 version: 1
 
 publication:
-  title: "Distributed Systems Notes"
-  subtitle: "A Practical Handbook"
-  author: "Author Name"
-  language: "en"
+  title: 'Distributed Systems Notes'
+  subtitle: 'A Practical Handbook'
+  author: 'Author Name'
+  language: 'en'
 
 source:
   mode: directory
   root: ./manuscript
   include:
-    - "**/*.md"
+    - '**/*.md'
   order:
     - 01-introduction.md
     - 02-architecture.md
@@ -449,11 +500,11 @@ layout:
   pageNumbers: true
 
 header:
-  left: "{publication.title}"
-  right: "{chapter.title}"
+  left: '{publication.title}'
+  right: '{chapter.title}'
 
 footer:
-  center: "{page}"
+  center: '{page}'
 
 theme:
   preset: technical-book
@@ -479,7 +530,8 @@ output:
 
 Load and validate this configuration with Zod.
 
-The GUI must edit this model rather than maintaining an incompatible hidden settings format.
+The GUI must edit this model rather than maintaining an incompatible hidden
+settings format.
 
 ---
 
@@ -519,7 +571,10 @@ Example:
 ```ts
 export interface MarkdownTransform {
   name: string;
-  transform(document: MarkdownDocument, context: TransformContext): Promise<void>;
+  transform(
+    document: MarkdownDocument,
+    context: TransformContext,
+  ): Promise<void>;
 }
 ```
 
@@ -531,7 +586,8 @@ Do not couple Markdown parsing directly to desktop runtime APIs.
 
 HTML is an intermediate publication format and a supported final export format.
 
-Generate complete self-contained or controlled-asset HTML documents from the publication model.
+Generate complete self-contained or controlled-asset HTML documents from the
+publication model.
 
 The renderer should have explicit layers:
 
@@ -543,7 +599,8 @@ semantic publication HTML
 + optional safe custom CSS
 ```
 
-The same base document must be used for preview and PDF rendering to minimize divergence.
+The same base document must be used for preview and PDF rendering to minimize
+divergence.
 
 Support both:
 
@@ -611,7 +668,8 @@ Preview requirements:
 - expose parsing/rendering warnings;
 - never become a Markdown editor.
 
-Do not promise pixel-perfect pagination parity until validated. Build regression fixtures to measure preview/PDF divergence.
+Do not promise pixel-perfect pagination parity until validated. Build regression
+fixtures to measure preview/PDF divergence.
 
 ---
 
@@ -630,7 +688,7 @@ export interface PrintBackend {
 }
 
 export class ChromiumPrintBackend implements PrintBackend {
-  readonly id = "chromium-desktop";
+  readonly id = 'chromium-desktop';
 }
 ```
 
@@ -666,7 +724,8 @@ Never use arbitrary sleeps as the primary readiness mechanism.
 
 # 15. PDF assembly
 
-Use `pdf-lib` or a similarly suitable latest-stable library for deterministic post-processing.
+Use `pdf-lib` or a similarly suitable latest-stable library for deterministic
+post-processing.
 
 MVP operations:
 
@@ -691,7 +750,8 @@ The first AI feature is cover artwork generation.
 
 Important design rule:
 
-**Do not rely on image-generation models to render the final title, subtitle, author name, or other precise typography inside the artwork.**
+**Do not rely on image-generation models to render the final title, subtitle,
+author name, or other precise typography inside the artwork.**
 
 Preferred pipeline:
 
@@ -760,14 +820,14 @@ Model every export as a job.
 
 ```ts
 export type ExportJobState =
-  | "queued"
-  | "preparing"
-  | "rendering"
-  | "assembling"
-  | "writing"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  | 'queued'
+  | 'preparing'
+  | 'rendering'
+  | 'assembling'
+  | 'writing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export interface ExportJob {
   id: string;
@@ -794,9 +854,11 @@ Requirements:
 - preserve logs useful for debugging;
 - avoid one failed document terminating the entire batch.
 
-Initial concurrency should be conservative because Chromium PDF rendering can consume substantial memory.
+Initial concurrency should be conservative because Chromium PDF rendering can
+consume substantial memory.
 
-Make concurrency configurable internally, even if the first GUI does not expose it.
+Make concurrency configurable internally, even if the first GUI does not expose
+it.
 
 ---
 
@@ -859,7 +921,8 @@ Theme metadata should define:
 - default cover layout;
 - optional CSS files.
 
-Advanced users may provide custom CSS, but the basic GUI should expose structured publication controls rather than requiring CSS knowledge.
+Advanced users may provide custom CSS, but the basic GUI should expose
+structured publication controls rather than requiring CSS knowledge.
 
 Ship at least three initial themes:
 
@@ -889,7 +952,8 @@ Future backends may include EPUB, but EPUB is not required for the MVP.
 
 The GUI is primary, but the publishing engine must be callable from a CLI.
 
-The CLI may be implemented after the first GUI vertical slice, but the core APIs must not make it difficult.
+The CLI may be implemented after the first GUI vertical slice, but the core APIs
+must not make it difficult.
 
 Target future commands:
 
@@ -903,7 +967,8 @@ pubmd validate ./book
 
 The intended invariant is:
 
-> The same project manifest and publishing core should produce equivalent output whether started from the GUI or CLI.
+> The same project manifest and publishing core should produce equivalent output
+> whether started from the GUI or CLI.
 
 Do not create two separate rendering implementations.
 
@@ -929,7 +994,7 @@ Define a structured diagnostic model:
 
 ```ts
 export interface PublicationDiagnostic {
-  severity: "info" | "warning" | "error";
+  severity: 'info' | 'warning' | 'error';
   code: string;
   message: string;
   sourcePath?: string;
@@ -958,9 +1023,11 @@ For a given:
 
 output should be as deterministic as reasonably possible.
 
-Record build metadata internally, including the desktop runtime/Chromium version used for PDF generation.
+Record build metadata internally, including the desktop runtime/Chromium version
+used for PDF generation.
 
-Avoid network dependencies during export unless explicitly requested by the user. Prefer downloading/caching or bundling assets when feasible.
+Avoid network dependencies during export unless explicitly requested by the
+user. Prefer downloading/caching or bundling assets when feasible.
 
 ---
 
@@ -1017,7 +1084,8 @@ No Markdown editing is required anywhere in this flow.
 - [ ] At least 3 built-in themes.
 - [ ] Local cover artwork.
 - [ ] AI cover artwork provider abstraction.
-- [ ] At least one functional AI cover provider integration, behind explicit user configuration.
+- [ ] At least one functional AI cover provider integration, behind explicit
+      user configuration.
 - [ ] Deterministic HTML/CSS cover typography.
 - [ ] PDF cover/body merge.
 - [ ] Batch queue.
@@ -1049,9 +1117,12 @@ No Markdown editing is required anywhere in this flow.
 
 ## Chromium is not a full professional typesetting engine
 
-For the MVP, “publication-grade” means high-quality technical books, reports, course materials, digital publications, and ordinary print-ready PDFs suitable for common printers.
+For the MVP, “publication-grade” means high-quality technical books, reports,
+course materials, digital publications, and ordinary print-ready PDFs suitable
+for common printers.
 
-It does **not** initially mean a complete prepress replacement for InDesign or a dedicated paged-media/typesetting engine.
+It does **not** initially mean a complete prepress replacement for InDesign or a
+dedicated paged-media/typesetting engine.
 
 Potential limits include:
 
@@ -1063,9 +1134,11 @@ Potential limits include:
 - exact commercial printing standards;
 - CMYK/PDF-X.
 
-Therefore keep the print backend abstract so a future backend can be added without replacing the publication model.
+Therefore keep the print backend abstract so a future backend can be added
+without replacing the publication model.
 
-Possible future engines may be evaluated separately; do not introduce one into the MVP unless Chromium proves inadequate for a required acceptance test.
+Possible future engines may be evaluated separately; do not introduce one into
+the MVP unless Chromium proves inadequate for a required acceptance test.
 
 ---
 
@@ -1080,7 +1153,10 @@ export interface PublicationProjectLoader {
 }
 
 export interface MarkdownCompiler {
-  compile(input: MarkdownSource, context: CompileContext): Promise<CompiledChapter>;
+  compile(
+    input: MarkdownSource,
+    context: CompileContext,
+  ): Promise<CompiledChapter>;
 }
 
 export interface PublicationBuilder {
@@ -1088,7 +1164,10 @@ export interface PublicationBuilder {
 }
 
 export interface HtmlPublicationRenderer {
-  render(publication: BuiltPublication, profile: OutputProfile): Promise<RenderedHtml>;
+  render(
+    publication: BuiltPublication,
+    profile: OutputProfile,
+  ): Promise<RenderedHtml>;
 }
 
 export interface PrintBackend {
@@ -1196,7 +1275,8 @@ Add:
 
 Acceptance:
 
-One source project can produce visibly distinct `technical-book`, `report`, and `minimal` PDFs.
+One source project can produce visibly distinct `technical-book`, `report`, and
+`minimal` PDFs.
 
 ## Milestone 4 — Batch job engine
 
@@ -1212,7 +1292,8 @@ Add:
 
 Acceptance:
 
-Export at least 25 fixture Markdown documents in one batch without UI lockup or process crash.
+Export at least 25 fixture Markdown documents in one batch without UI lockup or
+process crash.
 
 ## Milestone 5 — Cover pipeline
 
@@ -1241,7 +1322,8 @@ Add:
 
 Acceptance:
 
-A user can generate artwork, apply a cover layout, preview it, and export a combined final PDF without the AI model generating the title typography.
+A user can generate artwork, apply a cover layout, preview it, and export a
+combined final PDF without the AI model generating the title typography.
 
 ## Milestone 7 — Hardening
 
@@ -1261,7 +1343,8 @@ Add:
 
 # 29. Test fixture publication
 
-Create `examples/sample-book/` immediately and use it as the canonical regression project.
+Create `examples/sample-book/` immediately and use it as the canonical
+regression project.
 
 It must contain:
 
@@ -1300,13 +1383,15 @@ MVP targets, subject to benchmark refinement:
 - render state must be reset between documents to avoid cross-job contamination;
 - avoid retaining entire large PDFs in application state longer than necessary.
 
-Profile before optimizing. Do not prematurely introduce worker threads unless measurable CPU-bound work requires them.
+Profile before optimizing. Do not prematurely introduce worker threads unless
+measurable CPU-bound work requires them.
 
 ---
 
 # 31. Packaging and release
 
-Use the latest stable electron-builder unless implementation evidence favors another stable tool.
+Use the latest stable electron-builder unless implementation evidence favors
+another stable tool.
 
 Initial packaging targets:
 
@@ -1314,9 +1399,11 @@ Initial packaging targets:
 - Windows x64;
 - Linux x64.
 
-Signing/notarization infrastructure may be stubbed locally but the architecture must not prevent it.
+Signing/notarization infrastructure may be stubbed locally but the architecture
+must not prevent it.
 
-Do not implement automatic updates in the first vertical slice. Add it only after signed release artifacts exist.
+Do not implement automatic updates in the first vertical slice. Add it only
+after signed release artifacts exist.
 
 ---
 
@@ -1328,9 +1415,11 @@ At every major implementation milestone:
 2. Review breaking changes before upgrading.
 3. Keep prerelease versions out of production dependencies.
 4. Commit the lockfile.
-5. Run typecheck, unit tests, integration tests, rendering fixture tests, and packaging smoke tests after upgrades.
+5. Run typecheck, unit tests, integration tests, rendering fixture tests, and
+   packaging smoke tests after upgrades.
 
-Do not blindly use `latest` in production manifests. Resolve latest stable intentionally, then lock it.
+Do not blindly use `latest` in production manifests. Resolve latest stable
+intentionally, then lock it.
 
 ---
 
@@ -1338,12 +1427,14 @@ Do not blindly use `latest` in production manifests. Resolve latest stable inten
 
 The coding agent should follow these rules while implementing:
 
-1. Prefer small vertical slices over generating a large amount of untested architecture.
+1. Prefer small vertical slices over generating a large amount of untested
+   architecture.
 2. Every milestone must end in executable software.
 3. Do not create placeholder packages with no consumers.
 4. Do not add libraries without explaining the problem they solve.
 5. Do not introduce a backend server for local-only functionality.
-6. Do not duplicate Chromium by bundling Puppeteer unless a new requirement justifies it.
+6. Do not duplicate Chromium by bundling Puppeteer unless a new requirement
+   justifies it.
 7. Keep publication core independent of React.
 8. Keep Markdown pipeline independent of the desktop runtime.
 9. Keep PDF assembly independent of Markdown parsing.
@@ -1375,7 +1466,8 @@ The MVP is complete when a non-technical user can:
 12. close and reopen the project with the same settings;
 13. reproduce the same publication later using the project manifest.
 
-The MVP is **not** complete if the user must manually invoke HTML/CSS/PDF tools outside the application to obtain the intended result.
+The MVP is **not** complete if the user must manually invoke HTML/CSS/PDF tools
+outside the application to obtain the intended result.
 
 ---
 
@@ -1413,12 +1505,18 @@ The resulting PDF must contain:
 - print background;
 - A4 page configuration.
 
-Once that vertical slice passes automated and manual verification, proceed to the publication project model.
+Once that vertical slice passes automated and manual verification, proceed to
+the publication project model.
 
 ---
 
 # 36. Product principle
 
-When architectural trade-offs are unclear, prefer the option that preserves this principle:
+When architectural trade-offs are unclear, prefer the option that preserves this
+principle:
 
-> Markdown remains plain source material. The publication manifest remains portable and human-readable. The GUI makes the publishing pipeline easy to operate. Chromium is the default rendering backend, not the product's domain model. The same publishing core must eventually serve GUI, batch, and CLI workflows.
+> Markdown remains plain source material. The publication manifest remains
+> portable and human-readable. The GUI makes the publishing pipeline easy to
+> operate. Chromium is the default rendering backend, not the product's domain
+> model. The same publishing core must eventually serve GUI, batch, and CLI
+> workflows.

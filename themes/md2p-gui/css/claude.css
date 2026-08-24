@@ -57,11 +57,11 @@
   --base-text-weight-normal: 400;
   --base-text-weight-semibold: 600;
   --fontStack-monospace:
-    'JetBrainsMono Nerd Font', 'ZhuqueFangsong', 'Noto Serif SC', ui-monospace,
-    SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    'JetBrainsMono Nerd Font', 'Noto Serif SC', ui-monospace, SFMono-Regular,
+    SF Mono, Menlo, Consolas, Liberation Mono, monospace;
   --fontStack-sansSerif:
-    'Anthropic Serif Web Text', 'ZhuqueFangsong', 'Noto Serif SC', system-ui,
-    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    'Anthropic Serif Web Text', 'Noto Serif SC', system-ui, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
   --fgColor-accent: Highlight;
 }
 

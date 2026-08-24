@@ -21,5 +21,5 @@ in the manifests and lockfile.
 | electron-builder  | 26.15.3 | Desktop packaging                                     |
 | pnpm              | 11.21.0 | Workspace package manager                             |
 
-The initial implementation intentionally adds no second browser runtime.
-The desktop runtime's bundled Chromium is the production print backend.
+The initial implementation intentionally adds no second browser runtime. The
+desktop runtime's bundled Chromium is the production print backend.

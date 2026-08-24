@@ -32,7 +32,7 @@ async function createFontLoader(): Promise<
   const bytes = await readFile(
     resolve(
       process.cwd(),
-      'themes/md2p-gui/fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf',
+      'themes/fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf',
     ),
   );
   const asset: PageNumberFontAsset = {

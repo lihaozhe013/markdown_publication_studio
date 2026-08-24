@@ -57,7 +57,7 @@ const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
 const assetCache = new Map<PageNumberFontId, Promise<PageNumberFontAsset>>();
 
 function fontRoot(): string {
-  return resolve(app.getAppPath(), 'themes', 'md2p-gui');
+  return resolve(app.getAppPath(), 'themes');
 }
 
 async function loadPageNumberFontUncached(

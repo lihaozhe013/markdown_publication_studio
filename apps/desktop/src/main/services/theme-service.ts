@@ -18,7 +18,7 @@ const fontMimeTypes: Record<string, string> = {
 const stylesheetCache = new Map<ThemeId, Promise<string>>();
 
 function themeRoot(): string {
-  return resolve(app.getAppPath(), 'themes', 'md2p-gui');
+  return resolve(app.getAppPath(), 'themes');
 }
 
 function isWithinRoot(candidate: string, root: string): boolean {

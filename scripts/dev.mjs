@@ -57,7 +57,7 @@ process.once('SIGINT', () => stopChild('SIGINT'));
 process.once('SIGTERM', () => stopChild('SIGTERM'));
 
 child.on('error', (error) => {
-  const message = `${new Date().toISOString()} [ERROR] [dev] Failed to start Electron Vite: ${error.message}\n`;
+  const message = `${new Date().toISOString()} [ERROR] [dev] Failed to start the development server: ${error.message}\n`;
   debugLog.write(message);
   process.stderr.write(message);
 });

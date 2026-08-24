@@ -19,11 +19,11 @@ When this policy conflicts with an explicit task instruction from the repository
 - The root `package.json` MUST contain a pinned `packageManager` field for the repository pnpm version. The version MUST match the current repository baseline.
 - `pnpm-lock.yaml` is authoritative and MUST be committed. Dependency changes that modify `package.json` MUST include the corresponding lockfile update.
 - Use the latest stable releases required by `PROJECT_SPEC.md`. Do not introduce alpha, beta, RC, canary, nightly, `next`, or other prerelease dependencies unless the task explicitly requires them.
-- Do not downgrade Electron, TypeScript, React, Vite, pnpm, or another baseline dependency merely to work around an implementation problem without explicit approval.
+- Do not downgrade the desktop runtime, TypeScript, React, Vite, pnpm, or another baseline dependency merely to work around an implementation problem without explicit approval.
 - Pin toolchain behavior through repository configuration and the lockfile. Avoid relying on globally installed tools.
-- Add a dependency only when it provides clear value over a small, maintainable local implementation. Before adding a new runtime dependency, consider bundle size, maintenance status, security history, Electron compatibility, and whether the capability belongs in the main, preload, renderer, or shared layer.
-- Keep Electron runtime dependencies and renderer/frontend dependencies conceptually separated. Do not import Node-only packages into browser renderer code.
-- Prefer ESM for new JavaScript/TypeScript tooling and configuration unless a dependency or Electron boundary requires CommonJS.
+- Add a dependency only when it provides clear value over a small, maintainable local implementation. Before adding a new runtime dependency, consider bundle size, maintenance status, security history, desktop runtime compatibility, and whether the capability belongs in the main, preload, renderer, or shared layer.
+- Keep desktop runtime dependencies and renderer/frontend dependencies conceptually separated. Do not import Node-only packages into browser renderer code.
+- Prefer ESM for new JavaScript/TypeScript tooling and configuration unless a dependency or desktop runtime boundary requires CommonJS.
 - Do not manually edit generated dependency contents under `node_modules/`.
 
 ## 3. TypeScript Requirements
@@ -43,14 +43,14 @@ When this policy conflicts with an explicit task instruction from the repository
 - Do not use `@ts-ignore` unless no safer alternative exists. Prefer `@ts-expect-error` with a concise explanation and ensure the suppression remains testable.
 - Public interfaces across process or package boundaries MUST have explicit types. Do not depend on inferred structural shapes for IPC contracts, persisted configuration, export jobs, or publication models.
 - Runtime inputs crossing trust boundaries MUST be validated. Use Zod or the repository-standard validation layer for IPC payloads, project files, persisted configuration, external data, and AI service responses.
-- Keep environment-specific type domains separate. Electron main/preload code may use Node/Electron types; renderer code MUST NOT gain ambient Node access merely for convenience.
+- Keep environment-specific type domains separate. Desktop main/preload code may use Node/desktop runtime types; renderer code MUST NOT gain ambient Node access merely for convenience.
 - Type-only imports SHOULD use `import type` where appropriate.
 
-## 4. Electron Architecture and Security
+## 4. Desktop Architecture and Security
 
-- Electron is both the desktop shell and the default Chromium rendering/printing backend. Do not add a second bundled Chromium through Puppeteer or Playwright unless a concrete requirement cannot be satisfied by Electron and the change is explicitly approved.
+- The desktop runtime is both the application shell and the default Chromium rendering/printing backend. Do not add a second bundled Chromium through Puppeteer or Playwright unless a concrete requirement cannot be satisfied by the desktop runtime and the change is explicitly approved.
 - Preserve the process boundaries defined in `PROJECT_SPEC.md`:
-  - **main** owns privileged OS access, filesystem access, application lifecycle, job orchestration, hidden print windows, and native Electron APIs;
+  - **main** owns privileged OS access, filesystem access, application lifecycle, job orchestration, hidden print windows, and native desktop APIs;
   - **preload** exposes a minimal, typed, explicitly reviewed bridge;
   - **renderer** contains the React UI and MUST remain browser-sandboxed;
   - publishing/rendering logic SHOULD live in focused core modules rather than in React components or IPC handlers.
@@ -70,7 +70,7 @@ When this policy conflicts with an explicit task instruction from the repository
 ## 5. React and Renderer Policy
 
 - React is the renderer UI framework. Use function components and modern React APIs.
-- React components MUST NOT own filesystem, PDF, job-queue, Electron lifecycle, or other privileged business logic.
+- React components MUST NOT own filesystem, PDF, job-queue, desktop lifecycle, or other privileged business logic.
 - Keep components focused on presentation and interaction. Move reusable state transitions, domain logic, and asynchronous workflows into hooks, services, or domain modules with clear ownership.
 - Avoid global mutable state. Introduce a state-management dependency only when React's built-in state/context patterns demonstrably become insufficient.
 - Do not introduce a Markdown editor or editor-centric architecture unless the product specification is explicitly changed. The application is a publication/batch-processing tool, not a writing environment.
@@ -80,7 +80,7 @@ When this policy conflicts with an explicit task instruction from the repository
 ## 6. Vite and Build Boundaries
 
 - Vite is the development/build tool for renderer-facing code unless `PROJECT_SPEC.md` is explicitly revised.
-- Keep Electron main, preload, and renderer build targets separate enough that Node-only code cannot accidentally enter the browser bundle.
+- Keep desktop main, preload, and renderer build targets separate enough that Node-only code cannot accidentally enter the browser bundle.
 - Do not use Vite aliases or bundler configuration to bypass sound package boundaries or TypeScript errors.
 - Production builds MUST NOT depend on the Vite development server.
 - Development-only conveniences such as HMR MUST NOT change runtime security assumptions or production behavior.
@@ -95,7 +95,7 @@ When this policy conflicts with an explicit task instruction from the repository
 - **ESLint is mandatory** for JavaScript/TypeScript/React code quality checks. Use the current flat-config format (`eslint.config.*`), not legacy `.eslintrc*` configuration.
 - ESLint SHOULD use `typescript-eslint` with type-aware linting for application source where practical. Prefer the current project-service based configuration rather than maintaining redundant ESLint-only TypeScript project files unless tooling compatibility requires otherwise.
 - React-specific linting SHOULD cover hooks correctness and other high-value React invariants. Avoid large stylistic rule sets that duplicate Prettier or create low-signal churn.
-- Lint rules MUST prioritize correctness, unsafe behavior, dead code, promise handling, type safety, React hooks, import hygiene, and Electron boundary violations over subjective style preferences.
+- Lint rules MUST prioritize correctness, unsafe behavior, dead code, promise handling, type safety, React hooks, import hygiene, and desktop runtime boundary violations over subjective style preferences.
 - Do not suppress lint rules globally to make a change pass. Narrow suppressions require a nearby explanation when the reason is not self-evident.
 
 ## 8. Cross-Platform Requirements
@@ -106,7 +106,7 @@ When this policy conflicts with an explicit task instruction from the repository
 - Do not create parallel shell, PowerShell, and batch implementations when one portable script can serve all supported platforms.
 - Platform-specific packaging/notarization/signing steps are allowed inside the relevant packaging workflow, but MUST NOT become prerequisites for normal development on other platforms.
 - Use Node `path` utilities and URL APIs for filesystem/URL construction. Do not hardcode path separators, drive letters, home directories, executable suffixes, or platform-specific temp paths in shared code.
-- Use Electron/Node APIs to resolve user data, cache, logs, temporary files, and application resources. Do not assume a writable current working directory.
+- Use desktop runtime/Node APIs to resolve user data, cache, logs, temporary files, and application resources. Do not assume a writable current working directory.
 - Case sensitivity differences between Windows/macOS/Linux filesystems MUST be considered when resolving publication assets and project files.
 
 ## 9. Publication and Rendering Correctness
@@ -124,21 +124,21 @@ When this policy conflicts with an explicit task instruction from the repository
 ## 10. Logging and Debugging
 
 - Application logging MUST be available without requiring terminal stdout/stderr redirection.
-- Persistent logs SHOULD be written to an application-specific log directory resolved through Electron/OS APIs. Development console output may supplement file logs but MUST NOT be the only debugging channel.
+- Persistent logs SHOULD be written to an application-specific log directory resolved through desktop runtime/OS APIs. Development console output may supplement file logs but MUST NOT be the only debugging channel.
 - Startup MUST remain resilient if a log file cannot be created.
 - Never log API keys, authentication tokens, private publication content unnecessarily, generated secrets, credentials, or other sensitive values.
 - Logs added for a feature or investigation SHOULD use a stable, searchable subsystem prefix such as `[render]`, `[export]`, `[ipc]`, or `[cover]`.
 - Generated `*.log` files MUST remain untracked.
 - Debug-only verbose logging MUST NOT be enabled by default in production builds.
 - When handing off a debugging workflow, provide a ready-to-run command and, where useful, an `rg` filter that isolates the relevant subsystem.
-- `pnpm dev` MUST write the development session's Electron/Vite output and application logs to the root `debug.log` file. The file is regenerated at the start of each development session and is ignored by Git. Agents can filter it with `cat debug.log | rg 'xxx'`.
+- `pnpm dev` MUST write the development session's desktop/Vite output and application logs to the root `debug.log` file. The file is regenerated at the start of each development session and is ignored by Git. Agents can filter it with `cat debug.log | rg 'xxx'`.
 
 ## 11. Code Organization and File Size
 
 - Preserve established package and module boundaries unless a refactor is part of the requested change.
 - New modules MUST have one clear responsibility. Avoid circular dependencies, broad shared mutable state, barrel files that hide problematic dependency direction, and generic `utils` modules that become dumping grounds.
 - Domain code MUST NOT import from renderer UI modules.
-- Shared modules MUST remain environment-safe. A module imported by renderer code MUST NOT transitively depend on Node.js or Electron main-process APIs.
+- Shared modules MUST remain environment-safe. A module imported by renderer code MUST NOT transitively depend on Node.js or desktop main-process APIs.
 - Prefer dependency injection or explicit parameters for services that are difficult to test, including filesystem access, AI providers, print backends, clocks, and job persistence.
 - Every source file over 800 lines MUST trigger an explicit design review before more responsibilities are added. Evaluate cohesion, dependency direction, state ownership, and whether behavior belongs in focused modules.
 - Do not allow a file to cross 800 lines without recording the assessment in the change summary or commit body.
@@ -150,7 +150,7 @@ When this policy conflicts with an explicit task instruction from the repository
 - Tests SHOULD be placed at the narrowest layer that can prove the behavior:
   - unit tests for pure publication/domain logic;
   - integration tests for Markdown-to-HTML, project loading, asset resolution, IPC contracts, job orchestration, and PDF assembly;
-  - Electron/application tests only for behavior that genuinely requires Electron/Chromium.
+  - Desktop application tests only for behavior that genuinely requires the desktop runtime/Chromium.
 - Use Vitest as the default test runner unless a test requires a more specialized harness.
 - Rendering tests SHOULD prefer deterministic fixtures and structural assertions. Use snapshot tests selectively; do not treat large opaque HTML/PDF snapshots as the only proof of correctness.
 - Critical rendering fixtures SHOULD cover local images, syntax-highlighted code, tables, print backgrounds, page sizing, and asset-loading failure behavior.
@@ -169,7 +169,7 @@ pnpm typecheck
 pnpm test
 ```
 
-For changes affecting bundling, Electron startup, preload boundaries, packaging, or production-only behavior, also run:
+For changes affecting bundling, desktop startup, preload boundaries, packaging, or production-only behavior, also run:
 
 ```bash
 pnpm build

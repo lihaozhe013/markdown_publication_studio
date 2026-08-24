@@ -46,4 +46,4 @@ flowchart TD
 
 <div class="callout">This block is allowed because it is static HTML.</div>
 </details>
-| PDF          | Electron Chromium |
+| PDF          | Embedded Chromium |

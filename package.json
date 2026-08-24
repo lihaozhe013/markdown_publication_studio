@@ -2,7 +2,7 @@
   "name": "markdown-publication-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "A deterministic Markdown publication compiler with an Electron control panel.",
+  "description": "A deterministic Markdown publication compiler with a desktop control panel.",
   "type": "module",
   "main": "out/main/index.js",
   "packageManager": "pnpm@11.21.0",

@@ -9,7 +9,7 @@ in the manifests and lockfile.
 | TypeScript        | 7.0.2   | Strict application and package type checking          |
 | React / React DOM | 19.2.8  | Renderer UI                                           |
 | Vite              | 8.2.1   | Renderer bundling and development server              |
-| electron-vite     | 5.0.0   | Electron-aware Vite orchestration                     |
+| electron-vite     | 5.0.0   | Desktop-aware Vite orchestration                      |
 | Vitest            | 4.1.10  | Unit and integration tests                            |
 | Zod               | 4.4.3   | Runtime boundary validation                           |
 | markdown-it       | 15.0.0  | Markdown tokenization and HTML generation             |
@@ -22,4 +22,4 @@ in the manifests and lockfile.
 | pnpm              | 11.21.0 | Workspace package manager                             |
 
 The initial implementation intentionally adds no second browser runtime.
-Electron's bundled Chromium is the production print backend.
+The desktop runtime's bundled Chromium is the production print backend.

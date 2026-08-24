@@ -252,7 +252,7 @@ app.on('window-all-closed', () => {
 
 if (!existsSync(join(currentDirectory, '../preload/index.cjs'))) {
   appLogger.warn(
-    '[startup] preload bundle is missing; run the build before launching Electron.',
+    '[startup] preload bundle is missing; run the build before launching the application.',
   );
 }
 

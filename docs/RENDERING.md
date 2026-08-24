@@ -62,7 +62,7 @@ diagnostics as relative assets.
 
 The print backend waits for fonts and images, verifies that no Mermaid
 placeholder remains, sets the explicit `publication-render-ready` marker, and
-then calls Electron Chromium with `printBackground: true` and
+then calls the embedded Chromium with `printBackground: true` and
 `preferCSSPageSize: true`. Fixed delays are not used for synchronization.
 
 ## Page numbers

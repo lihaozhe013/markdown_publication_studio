@@ -99,7 +99,7 @@ HTML document generation
       ├──────────────► interactive preview
       │
       ▼
-hidden Electron WebContents
+hidden desktop WebContents
       │
       ▼
 Chromium print engine
@@ -125,13 +125,13 @@ The GUI must orchestrate this pipeline. The GUI must not contain publishing logi
 
 ---
 
-# 4. Why Electron is the required desktop runtime
+# 4. Why the desktop runtime is required
 
-Use Electron as the desktop runtime.
+Use the desktop runtime.
 
 The decisive reason is that Chromium is part of the product's rendering architecture, not merely its GUI technology.
 
-Electron provides:
+The desktop runtime provides:
 
 - a bundled and version-controlled Chromium engine;
 - stable HTML/CSS rendering;
@@ -146,13 +146,13 @@ Do not bundle a second Chromium via Puppeteer for the normal export path.
 Do not implement the architecture as:
 
 ```text
-Electron -> spawn md-to-pdf -> Puppeteer -> second Chromium
+Desktop app -> spawn md-to-pdf -> Puppeteer -> second Chromium
 ```
 
 Instead use:
 
 ```text
-Electron -> internal publishing core -> hidden Electron WebContents -> printToPDF()
+Desktop app -> internal publishing core -> hidden WebContents -> printToPDF()
 ```
 
 Puppeteer may later be added only for test automation or an explicitly justified headless/server backend.
@@ -163,7 +163,7 @@ Puppeteer may later be added only for test automation or an explicitly justified
 
 ## 5.1 Required foundation
 
-- Electron — desktop shell and Chromium print runtime.
+- Desktop runtime — application shell and Chromium print runtime.
 - TypeScript 7 — language for all application/core code.
 - React — renderer-process GUI.
 - Vite — renderer development/build system.
@@ -196,7 +196,7 @@ For the MVP:
 - React.
 - CSS Modules, vanilla CSS, or another lightweight style system.
 - A mature headless component library may be used if it reduces accessibility/interaction work without imposing a strong product aesthetic.
-- Use native OS dialogs through Electron for file/folder selection where appropriate.
+- Use native OS dialogs through the desktop runtime for file/folder selection where appropriate.
 
 Do not install a routing framework unless multiple independent application routes genuinely appear. A desktop workspace can initially be a state-driven single-window application.
 
@@ -206,7 +206,7 @@ Use latest stable versions of:
 
 - Vitest — unit and integration tests.
 - React Testing Library — UI behavior tests where useful.
-- Playwright — optional but recommended for Electron E2E testing if current stable Electron integration is reliable.
+- Playwright — optional but recommended for desktop E2E testing if current stable desktop runtime integration is reliable.
 - ESLint — latest stable version compatible with TypeScript 7.
 - Prettier — latest stable, unless the repository adopts another deterministic formatter.
 
@@ -279,7 +279,7 @@ Do not create packages only as empty architectural theater. It is acceptable to 
 
 # 7. Process boundaries
 
-## Electron main process
+## Desktop main process
 
 Owns:
 
@@ -338,7 +338,7 @@ Do not put direct filesystem calls, PDF manipulation, AI API keys, or privileged
 
 ---
 
-# 8. Electron security requirements
+# 8. Desktop security requirements
 
 Every untrusted publication must be treated as potentially malicious input.
 
@@ -523,7 +523,7 @@ export interface MarkdownTransform {
 }
 ```
 
-Do not couple Markdown parsing directly to Electron APIs.
+Do not couple Markdown parsing directly to desktop runtime APIs.
 
 ---
 
@@ -630,7 +630,7 @@ export interface PrintBackend {
 }
 
 export class ChromiumPrintBackend implements PrintBackend {
-  readonly id = "chromium-electron";
+  readonly id = "chromium-desktop";
 }
 ```
 
@@ -950,7 +950,7 @@ Reproducibility is a product feature.
 For a given:
 
 - application version;
-- Electron/Chromium version;
+- Desktop runtime/Chromium version;
 - project manifest;
 - theme;
 - source files;
@@ -958,7 +958,7 @@ For a given:
 
 output should be as deterministic as reasonably possible.
 
-Record build metadata internally, including the Electron/Chromium version used for PDF generation.
+Record build metadata internally, including the desktop runtime/Chromium version used for PDF generation.
 
 Avoid network dependencies during export unless explicitly requested by the user. Prefer downloading/caching or bundling assets when feasible.
 
@@ -993,7 +993,7 @@ No Markdown editing is required anywhere in this flow.
 
 ## Required
 
-- [ ] Electron desktop application on macOS, Windows, Linux.
+- [ ] Desktop application on macOS, Windows, Linux.
 - [ ] React + Vite GUI.
 - [ ] TypeScript 7 across application and core packages.
 - [ ] Open single Markdown file.
@@ -1007,7 +1007,7 @@ No Markdown editing is required anywhere in this flow.
 - [ ] KaTeX rendering.
 - [ ] Mermaid rendering.
 - [ ] HTML export.
-- [ ] PDF export using Electron Chromium.
+- [ ] PDF export using embedded Chromium.
 - [ ] Dedicated hidden export WebContents.
 - [ ] Page-size and margin configuration.
 - [ ] Page numbers.
@@ -1121,13 +1121,13 @@ Avoid god classes such as `PublicationManager` that own every stage.
 Deliverables:
 
 - pnpm workspace;
-- Electron latest stable;
+- Desktop runtime latest stable;
 - TypeScript 7;
 - React latest stable;
 - Vite latest stable;
 - strict TS config;
 - lint/format/test scripts;
-- electron-builder packaging skeleton;
+- Desktop builder packaging skeleton;
 - secure BrowserWindow + preload bridge;
 - `docs/DEPENDENCY_BASELINE.md` recording exact resolved versions.
 
@@ -1345,7 +1345,7 @@ The coding agent should follow these rules while implementing:
 5. Do not introduce a backend server for local-only functionality.
 6. Do not duplicate Chromium by bundling Puppeteer unless a new requirement justifies it.
 7. Keep publication core independent of React.
-8. Keep Markdown pipeline independent of Electron.
+8. Keep Markdown pipeline independent of the desktop runtime.
 9. Keep PDF assembly independent of Markdown parsing.
 10. Keep AI providers behind an interface.
 11. Keep privileged filesystem and secret access outside the renderer process.
@@ -1396,7 +1396,7 @@ Publication/HTML renderer
    ↓
 HTML preview
    ↓
-isolated hidden Electron WebContents
+isolated hidden desktop WebContents
    ↓
 webContents.printToPDF()
    ↓

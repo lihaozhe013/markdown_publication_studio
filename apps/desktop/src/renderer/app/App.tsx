@@ -289,7 +289,7 @@ export function App(): React.JSX.Element {
   async function exportPdf(): Promise<void> {
     if (!source) return;
     setBusy(true);
-    setStatus('Printing PDF with Electron Chromium…');
+    setStatus('Printing PDF with Chromium…');
     try {
       const result = await window.desktopApi.export.start({
         sourcePath: source.path,

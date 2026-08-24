@@ -50,6 +50,7 @@
     "files": [
       "out/**/*",
       "themes/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "win": {

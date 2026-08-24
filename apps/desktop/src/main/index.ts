@@ -27,6 +27,7 @@ import {
 import { applyWindowSecurity } from './security/window-security.js';
 import { AppSettingsService } from './services/app-settings-service.js';
 import { PageNumberPdfService } from './services/page-number-pdf-service.js';
+import { setupApplicationMenu } from './menu.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
@@ -236,6 +237,7 @@ app.whenReady().then(() => {
     logDirectory: app.getPath('logs'),
   });
   registerIpcHandlers();
+  setupApplicationMenu();
   createMainWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

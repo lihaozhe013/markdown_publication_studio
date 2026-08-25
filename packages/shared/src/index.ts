@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
-export const ThemeIdSchema = z.enum(['rose', 'github-markdown', 'claude']);
+export const ThemeIdSchema = z.enum([
+  'rose',
+  'github-markdown',
+  'modern-serif',
+  'claude',
+]);
+
+export const ThemePageCanvasModeSchema = z.enum(['inset', 'full-bleed']);
 
 export const PageNumberFontIdSchema = z.enum([
   'inter',
@@ -117,6 +124,7 @@ export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
 export type PdfExportRequest = z.infer<typeof PdfExportRequestSchema>;
 export type HtmlExportRequest = z.infer<typeof HtmlExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
+export type ThemePageCanvasMode = z.infer<typeof ThemePageCanvasModeSchema>;
 export type PageNumberSettings = z.infer<typeof PageNumberSettingsSchema>;
 export type PageNumberFontId = PageNumberSettings['fontFamily'];
 export type PageNumberStyle = PageNumberSettings['style'];
@@ -126,6 +134,7 @@ export interface PublicationTheme {
   id: ThemeId;
   name: string;
   description: string;
+  pageCanvasMode: ThemePageCanvasMode;
 }
 
 export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
@@ -133,18 +142,35 @@ export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
     id: 'rose',
     name: 'Rose',
     description: 'Soft rose palette with Github structure.',
+    pageCanvasMode: 'inset',
   },
   {
     id: 'github-markdown',
     name: 'Github',
     description: 'Clean GitHub-inspired technical documentation styling.',
+    pageCanvasMode: 'inset',
+  },
+  {
+    id: 'modern-serif',
+    name: 'Modern Serif',
+    description: 'Serif-led reading layout with elegant typography.',
+    pageCanvasMode: 'inset',
   },
   {
     id: 'claude',
-    name: 'Modern Serif',
-    description: 'Serif-led reading layout with elegant typography.',
+    name: 'Claude',
+    description: 'Warm paper, orange accents, and spacious serif typography.',
+    pageCanvasMode: 'full-bleed',
   },
 ];
+
+export function getBuiltInTheme(themeId: ThemeId): PublicationTheme {
+  const theme = BUILT_IN_THEMES.find((candidate) => candidate.id === themeId);
+  if (!theme) {
+    throw new Error(`Unknown built-in theme: ${themeId}`);
+  }
+  return theme;
+}
 
 export interface PublicationDiagnostic {
   severity: 'info' | 'warning' | 'error';

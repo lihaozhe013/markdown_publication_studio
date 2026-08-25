@@ -65,6 +65,15 @@ placeholder remains, sets the explicit `publication-render-ready` marker, and
 then calls the embedded Chromium with `printBackground: true` and
 `preferCSSPageSize: true`. Fixed delays are not used for synchronization.
 
+## Page canvas backgrounds
+
+Themes declare either an `inset` or `full-bleed` page canvas mode. Inset themes
+keep the default page margin area, while full-bleed themes keep the same content
+margins and add a CSS `@page` background that covers the complete printed page.
+Theme page backgrounds may use local image assets; the theme asset pipeline
+inlines supported fonts and images as data URLs and rejects remote or
+out-of-root references.
+
 ## Page numbers
 
 Page numbers are intentionally absent from the interactive preview and

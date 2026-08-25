@@ -1,6 +1,7 @@
 import type {
   PublicationDiagnostic,
   ThemeId,
+  ThemePageCanvasMode,
 } from '@markdown-publication/shared';
 
 export interface MarkdownSource {
@@ -38,6 +39,7 @@ export interface CompiledChapter {
 export interface PublicationHtmlOptions {
   title: string;
   themeId?: ThemeId;
+  pageCanvasMode?: ThemePageCanvasMode;
   stylesheet?: string;
   features?: PublicationFeatureOptions;
   pageSize?: 'A4' | 'Letter';

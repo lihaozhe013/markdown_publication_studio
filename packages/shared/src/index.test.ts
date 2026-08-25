@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BUILT_IN_THEMES,
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
+  getBuiltInTheme,
   HtmlExportRequestSchema,
   PdfExportRequestSchema,
   formatPageNumber,
@@ -11,9 +13,35 @@ import {
   PageNumberSettingsSchema,
   PreviewRequestSchema,
   resolveNumberedPage,
+  ThemeIdSchema,
+  ThemePageCanvasModeSchema,
   type MermaidGeometrySignature,
   type MermaidSvgMetrics,
 } from './index.js';
+
+describe('Built-in themes', () => {
+  it('exposes separate Modern Serif and Claude themes with canvas modes', () => {
+    expect(ThemeIdSchema.parse('modern-serif')).toBe('modern-serif');
+    expect(ThemeIdSchema.parse('claude')).toBe('claude');
+    expect(ThemePageCanvasModeSchema.parse('inset')).toBe('inset');
+    expect(ThemePageCanvasModeSchema.parse('full-bleed')).toBe('full-bleed');
+    expect(BUILT_IN_THEMES.map((theme) => theme.id)).toEqual([
+      'rose',
+      'github-markdown',
+      'modern-serif',
+      'claude',
+    ]);
+    expect(BUILT_IN_THEMES.map((theme) => theme.pageCanvasMode)).toEqual([
+      'inset',
+      'inset',
+      'inset',
+      'full-bleed',
+    ]);
+    expect(getBuiltInTheme('claude')).toEqual(
+      expect.objectContaining({ pageCanvasMode: 'full-bleed' }),
+    );
+  });
+});
 
 describe('Page number settings', () => {
   it('accepts the default settings and request defaults', () => {

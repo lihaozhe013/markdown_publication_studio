@@ -24,6 +24,10 @@ export function renderPublicationHtml(
   const diagnostics = chapters.flatMap((chapter) => chapter.diagnostics);
   const mathStylesheet =
     options.features?.math?.enabled === false ? '' : getKatexStylesheet();
+  const pageBackground =
+    options.pageCanvasMode === 'full-bleed'
+      ? ' background: var(--publication-page-background, white);'
+      : '';
   const body = chapters
     .map(
       (chapter) =>
@@ -39,15 +43,22 @@ export function renderPublicationHtml(
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:;">
     <title>${escapeAttribute(options.title)}</title>
     <style>
-      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
-      @page { size: ${options.pageSize ?? 'A4'}; margin: ${margins.top} ${margins.right} ${margins.bottom} ${margins.left}; }
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --publication-screen-background: #eef1f5;
+        --publication-page-background: white;
+        --publication-surface-background: white;
+      }
+      @page { size: ${options.pageSize ?? 'A4'}; margin: ${margins.top} ${margins.right} ${margins.bottom} ${margins.left};${pageBackground} }
       @media screen {
-        body { max-width: 900px; margin: 0 auto; padding: 48px 64px; background: #eef1f5; }
-        .chapter { margin: 0 0 32px; padding: 52px 64px; background: white; box-shadow: 0 12px 40px rgb(16 35 58 / 12%); }
+        html { background: var(--publication-screen-background, #eef1f5); }
+        body { max-width: 900px; margin: 0 auto; padding: 48px 64px; background: var(--publication-screen-background, #eef1f5); }
+        .chapter { margin: 0 0 32px; padding: 52px 64px; background: var(--publication-surface-background, white); box-shadow: 0 12px 40px rgb(16 35 58 / 12%); }
       }
       @media print {
-        body { margin: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .chapter { break-before: page; }
+        html, body { margin: 0; background: var(--publication-page-background, white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .chapter { break-before: page; background: var(--publication-surface-background, white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chapter:first-child { break-before: auto; }
       }
       body { color: #182230; font-size: 11pt; line-height: 1.6; }

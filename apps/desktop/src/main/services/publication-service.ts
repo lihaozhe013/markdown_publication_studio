@@ -13,6 +13,7 @@ import type {
   PreviewResult,
   ThemeId,
 } from '@markdown-publication/shared';
+import { getBuiltInTheme } from '@markdown-publication/shared';
 import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
 import { loadThemeStylesheet } from './theme-service.js';
@@ -79,9 +80,11 @@ export class PublicationService {
       html: { policy: 'safe-static' },
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
+    const theme = getBuiltInTheme(themeId);
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,
+      pageCanvasMode: theme.pageCanvasMode,
       features: {
         codeTheme: 'github-dark',
         math: { enabled: true },

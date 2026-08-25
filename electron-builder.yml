@@ -17,7 +17,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: apps/desktop/assets/icon-light.png
+  icon: apps/desktop/assets/icon.ico
 
 nsis:
   artifactName: 'Markdown-Publication-Studio-win-${arch}-${version}-setup.${ext}'

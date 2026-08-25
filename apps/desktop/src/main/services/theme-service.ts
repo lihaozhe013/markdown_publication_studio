@@ -4,9 +4,9 @@ import { app } from 'electron';
 import type { ThemeId } from '@markdown-publication/shared';
 
 const themeStylesheets: Record<ThemeId, readonly string[]> = {
-  rose: ['github-markdown.css', 'rose.css'],
-  'github-markdown': ['github-markdown.css'],
-  claude: ['claude.css'],
+  rose: ['github.css', 'rose.css'],
+  'github-markdown': ['github.css'],
+  claude: ['modern-serif.css'],
 };
 
 const fontMimeTypes: Record<string, string> = {

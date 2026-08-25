@@ -1,5 +1,5 @@
 /* ======================================================
-   Rose Theme for md-to-pdf (overlay for github-markdown.css)
+   Rose Theme for md-to-pdf (overlay for github.css)
    Based on Typora's Rose theme — adapted for PDF output
    ====================================================== */
 
@@ -89,7 +89,7 @@
   font-family: var(--fontStack-sansSerif);
   /* zoom: 85%; */
 
-  /* ── Override github-markdown.css variables ── */
+  /* ── Override github.css variables ── */
   --fgColor-default: #4a3b40;
   --fgColor-muted: #5a3a44;
   --fgColor-accent: #a14a6a;
@@ -202,7 +202,7 @@
   overflow: hidden;
 }
 
-/* Header row — override github-markdown.css tr background */
+/* Header row — override github.css tr background */
 .markdown-body table thead tr {
   background-color: #f7e9ee;
 }

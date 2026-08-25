@@ -63,6 +63,7 @@
   --fontStack-monospace:
     'JetBrains Mono', ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
     'Liberation Mono', monospace;
+  --code-font-size: 12px;
   --fontStack-sansSerif:
     'Source Serif 4', 'Source Han Serif SC', system-ui, 'Segoe UI', Roboto,
     Helvetica, Arial, sans-serif;
@@ -557,7 +558,7 @@
     Liberation Mono,
     monospace
   );
-  font-size: 12px;
+  font-size: var(--code-font-size);
 }
 
 .markdown-body pre {
@@ -573,7 +574,7 @@
     Liberation Mono,
     monospace
   );
-  font-size: 12px;
+  font-size: var(--code-font-size);
   word-wrap: break-word;
 }
 
@@ -918,7 +919,7 @@
 .markdown-body tt {
   padding: 0.2em 0.4em;
   margin: 0;
-  font-size: 85%;
+  font-size: var(--code-font-size);
   white-space: break-spaces;
   background-color: var(--bgColor-neutral-muted);
   border-radius: 6px;
@@ -934,7 +935,7 @@
 }
 
 .markdown-body samp {
-  font-size: 85%;
+  font-size: var(--code-font-size);
 }
 
 .markdown-body pre code {
@@ -963,7 +964,7 @@
 .markdown-body pre {
   padding: var(--base-size-16);
   overflow: auto;
-  font-size: 85%;
+  font-size: var(--code-font-size);
   line-height: 1.45;
   color: var(--fgColor-default);
   background-color: var(--bgColor-muted);

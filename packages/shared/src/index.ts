@@ -132,17 +132,17 @@ export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
   {
     id: 'rose',
     name: 'Rose',
-    description: 'Soft rose palette with GitHub Markdown structure.',
+    description: 'Soft rose palette with Github structure.',
   },
   {
     id: 'github-markdown',
-    name: 'GitHub Markdown',
+    name: 'Github',
     description: 'Clean GitHub-inspired technical documentation styling.',
   },
   {
     id: 'claude',
-    name: 'Claude',
-    description: 'Serif-led reading layout with Claude-inspired typography.',
+    name: 'Modern Serif',
+    description: 'Serif-led reading layout with elegant typography.',
   },
 ];
 

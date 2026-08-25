@@ -17,8 +17,8 @@ PDF export uses a hidden Chromium renderer with Electron's `printToPDF()` -- no 
 Three themes are included:
 
 - *Rose* -- a soft palette inspired by Material 3
-- *GitHub Markdown* -- a clean, technical layout
-- *Claude* -- a serif-led reading layout
+- *Github* -- a clean, technical layout
+- *Modern Serif* -- a serif-led reading layout
 
 Local theme fonts (Inter, JetBrains Mono, Source Sans Pro, Source Serif Pro, Noto Sans SC, etc.) are embedded as base64 data URIs so that exported documents render identically on any machine.
 

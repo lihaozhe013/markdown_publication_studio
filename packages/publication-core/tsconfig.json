@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "declaration": true,
+    "noEmit": false,
     "outDir": "dist"
   },
   "references": [{ "path": "../shared/tsconfig.json" }],

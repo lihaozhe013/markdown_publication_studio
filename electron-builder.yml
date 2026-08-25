@@ -1,0 +1,60 @@
+appId: com.markdownpublication.studio
+productName: Markdown Publication Studio
+directories:
+  output: release
+files:
+  - out/**/*
+  - themes/**/*
+  - assets/**/*
+  - package.json
+  - '!**/*.map'
+asar: true
+
+win:
+  executableName: Markdown Publication Studio
+  artifactName: 'Markdown-Publication-Studio-win-${arch}-${version}.${ext}'
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: apps/desktop/assets/icon-light.png
+
+nsis:
+  artifactName: 'Markdown-Publication-Studio-win-${arch}-${version}-setup.${ext}'
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+mac:
+  artifactName: 'Markdown-Publication-Studio-mac-${arch}-${version}.${ext}'
+  icon: apps/desktop/assets/icon-light.png
+  notarize: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+
+dmg:
+  artifactName: 'Markdown-Publication-Studio-mac-${arch}-${version}.${ext}'
+  contents:
+    - x: 410
+      y: 240
+      type: link
+      path: /Applications
+    - x: 130
+      y: 240
+      type: file
+
+linux:
+  artifactName: 'Markdown-Publication-Studio-linux-${version}.${ext}'
+  executableName: markdown-publication-studio
+  category: Office;TextEditor;Utility
+  target:
+    - AppImage

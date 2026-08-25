@@ -10,19 +10,28 @@
     "predev": "electron --version",
     "dev": "node scripts/dev.mjs",
     "build": "electron-vite build --config apps/desktop/electron.vite.config.ts",
+    "build:unpack": "electron-vite build --config apps/desktop/electron.vite.config.ts",
+    "build:win": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --win --x64 --publish never",
+    "build:win:x64": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --win --x64 --publish never",
+    "build:win:arm64": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --win --arm64 --publish never",
+    "build:mac": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --mac --arm64 --publish never",
+    "build:mac:x64": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --mac --x64 --publish never",
+    "build:mac:arm64": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --mac --arm64 --publish never",
+    "build:linux": "electron-vite build --config apps/desktop/electron.vite.config.ts && electron-builder --linux --publish never",
     "start": "electron .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc -b tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "package": "electron-builder"
+    "test:watch": "vitest"
+  },
+  "author": {
+    "name": "Haozhe Li"
   },
   "dependencies": {
     "@markdown-publication/publication-core": "workspace:*",
     "@markdown-publication/shared": "workspace:*",
-    "electron": "43.4.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -32,6 +41,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.5",
+    "electron": "43.4.0",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "eslint": "10.8.1",
@@ -40,27 +50,5 @@
     "typescript": "7.0.2",
     "vite": "8.2.1",
     "vitest": "4.1.10"
-  },
-  "build": {
-    "appId": "com.markdownpublication.studio",
-    "productName": "Markdown Publication Studio",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "themes/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }

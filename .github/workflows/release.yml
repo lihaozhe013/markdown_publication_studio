@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - ci
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            platform: windows
+            arch: x64
+          - name: macos-arm64
+            os: macos-15
+            platform: macos
+            arch: arm64
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4.3.1
+
+      - name: Enable Git long paths on Windows
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: git config --global core.longpaths true
+
+      - name: Setup pnpm + Node + dependencies
+        uses: ./.github/actions/setup
+        with:
+          node-version: '22.21.1'
+
+      # Cache Electron binary; key on package.json so it busts when Electron version changes.
+      - name: Cache Electron binary
+        uses: actions/cache@v4.3.0
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ matrix.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            electron-${{ matrix.os }}-
+
+      - name: build-windows
+        if: matrix.platform == 'windows'
+        run: pnpm run build:win:${{ matrix.arch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build-mac
+        if: matrix.platform == 'macos'
+        run: pnpm run build:mac:${{ matrix.arch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: mps-${{ matrix.name }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.dmg
+            release/*.blockmap
+            release/*.yml
+            release/*.yaml
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4.3.1
+
+      - name: Read version from package.json
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt
+        working-directory: release
+        run: |
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -printf '%f\n' \
+            | LC_ALL=C sort \
+            | xargs -I{} sha256sum "{}" > SHA256SUMS.txt
+          echo "---"
+          cat SHA256SUMS.txt
+
+      - name: Compose release notes body
+        run: |
+          {
+            echo "## ⚠️ Note for macOS users"
+            echo "Builds are unsigned (no Apple Developer ID). After dragging Markdown Publication Studio into Applications, clear the quarantine flag once:"
+            echo '```'
+            echo 'xattr -cr "/Applications/Markdown Publication Studio.app"'
+            echo '```'
+            echo ""
+            echo "## Verifying downloads"
+            echo "All artifacts are listed with their SHA-256 in \`SHA256SUMS.txt\`. Verify with:"
+            echo '```'
+            echo 'sha256sum -c SHA256SUMS.txt --ignore-missing'
+            echo '```'
+          } > release_body.md
+
+      - name: Create draft release with assets
+        uses: softprops/action-gh-release@v2.6.2
+        with:
+          draft: true
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body_path: release_body.md
+          fail_on_unmatched_files: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote draft to published release
+        run: gh release edit "v${{ steps.version.outputs.version }}" --draft=false --repo "${GITHUB_REPOSITORY}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

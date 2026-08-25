@@ -1,22 +1,6 @@
 @font-face {
-  font-family: 'Anthropic Serif Web Text';
-  src: url('../fonts/claude_fonts/AnthropicSerifWebText.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'ZhuqueFangsong';
-  src: url('../fonts/ZhuqueFangsong-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Noto Serif SC';
-  src: url('../fonts/claude_fonts/NotoSerifSC-VariableFont_wght.ttf')
+  font-family: 'Source Serif 4';
+  src: url('../fonts/SourceSerif4-VariableFont_opsz,wght.ttf')
     format('truetype');
   font-weight: 200 900;
   font-style: normal;
@@ -24,27 +8,47 @@
 }
 
 @font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf')
+  font-family: 'Source Serif 4';
+  src: url('../fonts/SourceSerif4-Italic-VariableFont_opsz,wght.ttf')
     format('truetype');
-  font-weight: normal;
-  font-style: normal;
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf')
+  font-family: 'Source Han Serif SC';
+  src: url('../fonts/SourceHanSerifSC-VF.ttf') format('truetype');
+  font-weight: 250 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Regular.ttf')
+    format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Bold.ttf')
     format('truetype');
   font-weight: bold;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Italic.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Italic.ttf')
     format('truetype');
   font-weight: normal;
   font-style: italic;
+  font-display: swap;
 }
 
 .markdown-body {
@@ -57,10 +61,10 @@
   --base-text-weight-normal: 400;
   --base-text-weight-semibold: 600;
   --fontStack-monospace:
-    'JetBrainsMono Nerd Font', 'Noto Serif SC', ui-monospace, SFMono-Regular,
-    SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    'JetBrains Mono', ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
+    'Liberation Mono', monospace;
   --fontStack-sansSerif:
-    'Anthropic Serif Web Text', 'Noto Serif SC', system-ui, 'Segoe UI', Roboto,
+    'Source Serif 4', 'Source Han Serif SC', system-ui, 'Segoe UI', Roboto,
     Helvetica, Arial, sans-serif;
   --fgColor-accent: Highlight;
 }

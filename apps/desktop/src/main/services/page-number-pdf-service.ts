@@ -119,7 +119,7 @@ export class PageNumberPdfService {
     const pdf = await PDFDocument.load(pdfBytes);
     pdf.registerFontkit(fontkit);
     const primaryAsset = await this.fontLoader(settings.fontFamily);
-    const fallbackAsset = await this.fontLoader('noto-sans-sc');
+    const fallbackAsset = await this.fontLoader('source-han-sans');
     const primaryFont = await embedFont(pdf, primaryAsset);
     const fallbackFont =
       primaryAsset.familyName === fallbackAsset.familyName

@@ -4,85 +4,55 @@
    ====================================================== */
 
 @font-face {
-  font-family: 'Inter';
-  src: url('../fonts/Inter/static/Inter_18pt-Regular.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'Source Sans 3';
+  src: url('../fonts/SourceSans3-VariableFont_wght.ttf') format('truetype');
+  font-weight: 200 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'Inter';
-  src: url('../fonts/Inter/static/Inter_18pt-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('../fonts/Inter/static/Inter_18pt-Italic.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'Source Sans 3';
+  src: url('../fonts/SourceSans3-Italic-VariableFont_wght.ttf')
+    format('truetype');
+  font-weight: 200 900;
   font-style: italic;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'Open Sans';
-  src: url('../fonts/Open_Sans/static/OpenSans-Regular.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'Source Han Sans SC';
+  src: url('../fonts/SourceHanSansSC-VF.ttf') format('truetype');
+  font-weight: 250 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'Open Sans';
-  src: url('../fonts/Open_Sans/static/OpenSans-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Open Sans';
-  src: url('../fonts/Open_Sans/static/OpenSans-Italic.ttf') format('truetype');
-  font-weight: normal;
-  font-style: italic;
-}
-
-@font-face {
-  font-family: 'Noto Sans SC';
-  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Regular.ttf')
     format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'Noto Sans SC';
-  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Bold.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Bold.ttf')
     format('truetype');
   font-weight: bold;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf')
-    format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf')
-    format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Italic.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Italic.ttf')
     format('truetype');
   font-weight: normal;
   font-style: italic;
+  font-display: swap;
 }
 
 .markdown-body {
@@ -107,14 +77,14 @@
   --rose-tertiary-container: #ffd8e4;
   --rose-error: #b3261e;
 
-  /* ── Fonts (exact same stack as github-markdown.css) ── */
+  /* ── Fonts ── */
   --fontStack-sansSerif:
-    'Inter', 'Open Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Source Sans 3', 'Source Han Sans SC', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
     'Segoe UI Emoji';
   --fontStack-monospace:
-    'JetBrainsMono Nerd Font', ui-monospace, SFMono-Regular, SF Mono, Menlo,
-    Consolas, Liberation Mono, monospace;
+    'JetBrains Mono', ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
+    'Liberation Mono', monospace;
   font-family: var(--fontStack-sansSerif);
   /* zoom: 85%; */
 

@@ -16,11 +16,10 @@ import {
 const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'inter', name: 'Inter' },
   { id: 'open-sans', name: 'Open Sans' },
-  { id: 'noto-sans-sc', name: 'Noto Sans SC' },
+  { id: 'source-han-sans', name: 'Source Han Sans SC' },
   { id: 'jetbrains-mono', name: 'JetBrains Mono' },
-  { id: 'anthropic-serif', name: 'Anthropic Serif' },
-  { id: 'noto-serif-sc', name: 'Noto Serif SC' },
-  { id: 'zhuque-fangsong', name: 'Zhuque Fangsong' },
+  { id: 'source-serif-4', name: 'Source Serif 4' },
+  { id: 'source-han-serif', name: 'Source Han Serif SC' },
 ];
 
 const katexFontFamilies = [

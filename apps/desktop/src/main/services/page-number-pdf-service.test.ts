@@ -11,7 +11,7 @@ import type { PageNumberFontAsset } from './page-number-font-service.js';
 
 const settings: PageNumberSettings = {
   enabled: true,
-  fontFamily: 'noto-sans-sc',
+  fontFamily: 'source-han-sans',
   fontSizePt: 10,
   style: 'bold',
   format: '第 {page} 页 / 共 {pages} 页',
@@ -30,13 +30,10 @@ async function createFontLoader(): Promise<
   (fontId: PageNumberFontId) => Promise<PageNumberFontAsset>
 > {
   const bytes = await readFile(
-    resolve(
-      process.cwd(),
-      'themes/fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf',
-    ),
+    resolve(process.cwd(), 'themes/fonts/SourceHanSansSC-VF.ttf'),
   );
   const asset: PageNumberFontAsset = {
-    familyName: 'Noto Sans SC',
+    familyName: 'Source Han Sans SC VF',
     bytes,
     allowSubsetting: false,
   };

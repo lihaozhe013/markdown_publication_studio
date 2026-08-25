@@ -5,11 +5,10 @@ export const ThemeIdSchema = z.enum(['rose', 'github-markdown', 'claude']);
 export const PageNumberFontIdSchema = z.enum([
   'inter',
   'open-sans',
-  'noto-sans-sc',
+  'source-han-sans',
   'jetbrains-mono',
-  'anthropic-serif',
-  'noto-serif-sc',
-  'zhuque-fangsong',
+  'source-serif-4',
+  'source-han-serif',
 ]);
 
 export const PageNumberStyleSchema = z.enum(['normal', 'bold', 'italic']);
@@ -57,7 +56,7 @@ export const PageNumberSettingsSchema = z.object({
 
 export const DEFAULT_PAGE_NUMBER_SETTINGS = {
   enabled: false,
-  fontFamily: 'noto-sans-sc',
+  fontFamily: 'source-han-sans',
   fontSizePt: 10,
   style: 'normal',
   format: '{page} / {pages}',

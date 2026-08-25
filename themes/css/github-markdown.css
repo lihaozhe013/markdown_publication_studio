@@ -41,43 +41,38 @@
 }
 
 @font-face {
-  font-family: 'Noto Sans SC';
-  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Regular.ttf')
+  font-family: 'Source Han Sans SC';
+  src: url('../fonts/SourceHanSansSC-VF.ttf') format('truetype');
+  font-weight: 250 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Regular.ttf')
     format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'Noto Sans SC';
-  src: url('../fonts/Noto_Sans_SC/static/NotoSansSC-Bold.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Bold.ttf')
     format('truetype');
   font-weight: bold;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf')
-    format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf')
-    format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'JetBrainsMono Nerd Font';
-  src: url('../fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Italic.ttf')
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrains_Mono/static/JetBrainsMono-Italic.ttf')
     format('truetype');
   font-weight: normal;
   font-style: italic;
+  font-display: swap;
 }
 
 .markdown-body {
@@ -90,12 +85,12 @@
   --base-text-weight-normal: 400;
   --base-text-weight-semibold: 600;
   --fontStack-monospace:
-    'JetBrainsMono Nerd Font', ui-monospace, SFMono-Regular, SF Mono, Menlo,
-    Consolas, Liberation Mono, monospace;
+    'JetBrains Mono', ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
+    'Liberation Mono', monospace;
   --fontStack-sansSerif:
-    'Inter', 'Open Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji';
+    'Inter', 'Open Sans', 'Source Han Sans SC', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
   --fgColor-accent: Highlight;
 }
 @media (prefers-color-scheme: dark) {
@@ -230,7 +225,7 @@
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    'Noto Sans',
+    'Source Han Sans SC',
     Helvetica,
     Arial,
     sans-serif,

@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
@@ -5,9 +6,17 @@ import react from '@vitejs/plugin-react';
 import { katexAssetsPlugin } from '../../scripts/katex-assets-plugin.js';
 
 const desktopRoot = fileURLToPath(new URL('./', import.meta.url));
+const commitHash = execSync('git rev-parse --short HEAD', {
+  cwd: desktopRoot,
+})
+  .toString()
+  .trim();
 
 export default defineConfig({
   main: {
+    define: {
+      __COMMIT_HASH__: JSON.stringify(commitHash),
+    },
     plugins: [
       katexAssetsPlugin(
         resolve(desktopRoot, '../../packages/publication-core'),

@@ -10,6 +10,8 @@ import { existsSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+declare const __COMMIT_HASH__: string;
+
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 const productName = 'Markdown Publication Studio';
 
@@ -195,7 +197,7 @@ contextBridge.exposeInMainWorld('aboutAPI', {
   ${closeHtml}
   ${iconHtml}
   <div class="app-name">${productName}</div>
-  <div class="version">Version ${app.getVersion()}</div>
+  <div class="version">Version ${app.getVersion()} (${__COMMIT_HASH__})</div>
   <p class="description">A deterministic Markdown publication compiler with a desktop control panel.</p>
   <div class="copyright">&copy; ${new Date().getFullYear()} ${productName}</div>
   <script>

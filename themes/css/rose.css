@@ -202,7 +202,8 @@
   overflow: hidden;
 }
 
-.markdown-body table thead {
+/* Header row — override github-markdown.css tr background */
+.markdown-body table thead tr {
   background-color: #f7e9ee;
 }
 
@@ -211,6 +212,7 @@
   padding: 10px 16px;
   border-bottom: 1px solid var(--borderColor-default);
   border-right: 1px dashed var(--borderColor-default);
+  background-color: transparent;
 }
 
 .markdown-body table td {
@@ -228,7 +230,7 @@
   border-bottom: none;
 }
 
-.markdown-body table tr:nth-child(2n) {
+.markdown-body table tbody tr:nth-child(2n) {
   background-color: #fbf1f4;
 }
 

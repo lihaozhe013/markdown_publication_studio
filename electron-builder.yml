@@ -6,6 +6,7 @@ files:
   - out/**/*
   - themes/**/*
   - assets/**/*
+  - apps/desktop/assets/**/*
   - package.json
   - '!**/*.map'
 asar: true

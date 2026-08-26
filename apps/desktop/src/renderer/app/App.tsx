@@ -18,6 +18,7 @@ const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'open-sans', name: 'Open Sans' },
   { id: 'source-han-sans', name: 'Source Han Sans SC' },
   { id: 'jetbrains-mono', name: 'JetBrains Mono' },
+  { id: 'source-sans-3', name: 'Source Sans 3' },
   { id: 'source-serif-4', name: 'Source Serif 4' },
   { id: 'source-han-serif', name: 'Source Han Serif SC' },
 ];

@@ -83,8 +83,16 @@ application bundled font to draw the configured centered footer. This keeps page
 numbering out of the body layout and allows the first page to be omitted or
 renumbered after the exact page count is known. Large CJK fonts are embedded in
 full because `pdf-lib` font subsetting can produce invalid mappings for Latin
-digits and punctuation; smaller Latin fonts remain subsetted to avoid
-unnecessary PDF size growth.
+digits and punctuation. Before embedding, `fontkit` checks the real glyph
+coverage of every character in the formatted page number. Characters missing
+from the selected font use the bundled Source Han Sans fallback; if a character
+is missing from both fonts, export fails with an actionable error instead of
+emitting a `.notdef` glyph. Inter is also embedded in full because subsetting
+the bundled Inter font can leave a complete ToUnicode map while raster output
+loses some glyphs. Open Sans and JetBrains Mono remain subsetted for
+numeric-only page numbers, but both primary and fallback fonts are embedded in
+full whenever a mixed-font page number is required. The Source Serif 4 and
+Source Sans 3 variable fonts are always embedded in full.
 
 ## Rendering diagnostics
 

@@ -30,13 +30,13 @@ Four themes are included:
 - _Modern Serif_ -- a serif-led reading layout
 - _Claude_ -- a warm paper palette with spacious serif typography
 
-Local theme fonts (Inter, JetBrains Mono, Source Sans Pro, Source Serif Pro,
+Local theme fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4,
 Noto Sans SC, etc.) are embedded as base64 data URIs so that exported documents
 render identically on any machine.
 
 **Page Numbering**
 
-A configurable page number system with six font choices (including CJK fonts),
+A configurable page number system with seven font choices (including CJK fonts),
 adjustable size and style, a customizable format template (e.g.
 `{page} / {pages}`), and policies for the first page (show all, hide and start
 numbering at 1, or hide and start at 2). Page numbers are embedded into the

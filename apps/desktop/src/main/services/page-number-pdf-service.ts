@@ -22,23 +22,78 @@ interface TextRun {
   font: PDFFont;
 }
 
-function canEncode(font: PDFFont, text: string): boolean {
-  try {
-    font.encodeText(text);
-    return true;
-  } catch {
-    return false;
+interface NumberedPageText {
+  page: PDFPage;
+  text: string;
+}
+
+function requiresFallback(
+  text: string,
+  primaryAsset: PageNumberFontAsset,
+): boolean {
+  return Array.from(text).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && !primaryAsset.hasGlyph(codePoint);
+  });
+}
+
+function findUnrenderableCharacter(
+  text: string,
+  primaryAsset: PageNumberFontAsset,
+  fallbackAsset: PageNumberFontAsset,
+): string | undefined {
+  for (const character of Array.from(text)) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined || primaryAsset.hasGlyph(codePoint)) {
+      continue;
+    }
+    if (fallbackAsset.hasGlyph(codePoint)) continue;
+    return character;
   }
+  return undefined;
+}
+
+function createMissingGlyphError(
+  character: string,
+  primaryAsset: PageNumberFontAsset,
+  fallbackAsset: PageNumberFontAsset | undefined,
+): Error {
+  const codePoint = character.codePointAt(0);
+  const codePointLabel =
+    codePoint === undefined
+      ? 'unknown code point'
+      : `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
+  const characterLabel = JSON.stringify(character);
+  return new Error(
+    `[page-number] No bundled font can render character ${characterLabel} (${codePointLabel}) in the page-number format. Selected font: ${primaryAsset.familyName}; fallback font: ${fallbackAsset?.familyName ?? 'none'}.`,
+  );
 }
 
 function createTextRuns(
   text: string,
   primaryFont: PDFFont,
-  fallbackFont: PDFFont,
+  primaryAsset: PageNumberFontAsset,
+  fallbackFont: PDFFont | undefined,
+  fallbackAsset: PageNumberFontAsset | undefined,
 ): TextRun[] {
   const runs: TextRun[] = [];
   for (const character of Array.from(text)) {
-    const font = canEncode(primaryFont, character) ? primaryFont : fallbackFont;
+    const codePoint = character.codePointAt(0);
+    const font =
+      codePoint !== undefined && primaryAsset.hasGlyph(codePoint)
+        ? primaryFont
+        : codePoint !== undefined &&
+            fallbackFont !== undefined &&
+            fallbackAsset !== undefined &&
+            fallbackAsset.hasGlyph(codePoint)
+          ? fallbackFont
+          : (() => {
+              throw createMissingGlyphError(
+                character,
+                primaryAsset,
+                fallbackAsset,
+              );
+            })();
     const previous = runs.at(-1);
     if (previous?.font === font) {
       previous.text += character;
@@ -84,11 +139,19 @@ function drawPageNumber(
   page: PDFPage,
   text: string,
   settings: PageNumberSettings,
+  primaryAsset: PageNumberFontAsset,
+  fallbackAsset: PageNumberFontAsset | undefined,
   primaryFont: PDFFont,
-  fallbackFont: PDFFont,
+  fallbackFont: PDFFont | undefined,
 ): void {
   const fontSize = settings.fontSizePt;
-  const runs = createTextRuns(text, primaryFont, fallbackFont);
+  const runs = createTextRuns(
+    text,
+    primaryFont,
+    primaryAsset,
+    fallbackFont,
+    fallbackAsset,
+  );
   const width = textWidth(runs, fontSize);
   const pageWidth = page.getWidth();
   const bottomMargin = DEFAULT_BOTTOM_MARGIN_MM * MILLIMETERS_TO_POINTS;
@@ -119,25 +182,67 @@ export class PageNumberPdfService {
     const pdf = await PDFDocument.load(pdfBytes);
     pdf.registerFontkit(fontkit);
     const primaryAsset = await this.fontLoader(settings.fontFamily);
-    const fallbackAsset = await this.fontLoader('source-han-sans');
-    const primaryFont = await embedFont(pdf, primaryAsset);
-    const fallbackFont =
-      primaryAsset.familyName === fallbackAsset.familyName
-        ? primaryFont
-        : await embedFont(pdf, fallbackAsset);
     const pageCount = pdf.getPageCount();
+    const numberedPages: NumberedPageText[] = pdf
+      .getPages()
+      .flatMap((page, pageIndex) => {
+        const numbering = resolveNumberedPage(
+          pageIndex,
+          pageCount,
+          settings.firstPageMode,
+        );
+        if (!numbering) return [];
+        return [
+          {
+            page,
+            text: formatPageNumber(
+              settings.format,
+              numbering.page,
+              numbering.pages,
+            ),
+          },
+        ];
+      });
+    const fallbackRequired = numberedPages.some(({ text }) =>
+      requiresFallback(text, primaryAsset),
+    );
+    const fallbackAsset = fallbackRequired
+      ? await this.fontLoader('source-han-sans')
+      : undefined;
 
-    pdf.getPages().forEach((page, pageIndex) => {
-      const numbering = resolveNumberedPage(
-        pageIndex,
-        pageCount,
-        settings.firstPageMode,
-      );
-      if (!numbering) return;
+    if (fallbackAsset) {
+      const unrenderable = numberedPages
+        .map(({ text }) =>
+          findUnrenderableCharacter(text, primaryAsset, fallbackAsset),
+        )
+        .find((character) => character !== undefined);
+      if (unrenderable !== undefined) {
+        throw createMissingGlyphError(
+          unrenderable,
+          primaryAsset,
+          fallbackAsset,
+        );
+      }
+    }
+
+    const primaryFont = await embedFont(
+      pdf,
+      primaryAsset,
+      primaryAsset.allowSubsetting && !fallbackRequired,
+    );
+    const fallbackFont = fallbackAsset
+      ? primaryAsset.familyName === fallbackAsset.familyName
+        ? primaryFont
+        : await embedFont(pdf, fallbackAsset, false)
+      : undefined;
+
+    numberedPages.forEach(({ page, text }) => {
       drawPageNumber(
         page,
-        formatPageNumber(settings.format, numbering.page, numbering.pages),
+        text,
         settings,
+        primaryAsset,
+        fallbackAsset,
         primaryFont,
         fallbackFont,
       );
@@ -150,6 +255,7 @@ export class PageNumberPdfService {
 async function embedFont(
   pdf: PDFDocument,
   asset: PageNumberFontAsset,
+  subset: boolean,
 ): Promise<PDFFont> {
-  return pdf.embedFont(asset.bytes, { subset: asset.allowSubsetting });
+  return pdf.embedFont(asset.bytes, { subset });
 }

@@ -49,6 +49,12 @@ describe('Page number settings', () => {
       PageNumberSettingsSchema.parse(DEFAULT_PAGE_NUMBER_SETTINGS),
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
     expect(
+      PageNumberSettingsSchema.parse({
+        ...DEFAULT_PAGE_NUMBER_SETTINGS,
+        fontFamily: 'source-sans-3',
+      }).fontFamily,
+    ).toBe('source-sans-3');
+    expect(
       PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
         .pageNumber,
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { app } from 'electron';
+import fontkit from '@pdf-lib/fontkit';
 import type { PageNumberFontId } from '@markdown-publication/shared';
 
 interface PageNumberFontDefinition {
@@ -13,13 +14,14 @@ export interface PageNumberFontAsset {
   familyName: string;
   bytes: Uint8Array;
   allowSubsetting: boolean;
+  hasGlyph(codePoint: number): boolean;
 }
 
 const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
   inter: {
     familyName: 'Inter',
     relativePath: 'fonts/Inter/static/Inter_18pt-Regular.ttf',
-    allowSubsetting: true,
+    allowSubsetting: false,
   },
   'open-sans': {
     familyName: 'Open Sans',
@@ -36,10 +38,15 @@ const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
     relativePath: 'fonts/JetBrains_Mono/static/JetBrainsMono-Regular.ttf',
     allowSubsetting: true,
   },
+  'source-sans-3': {
+    familyName: 'Source Sans 3',
+    relativePath: 'fonts/SourceSans3-VariableFont_wght.ttf',
+    allowSubsetting: false,
+  },
   'source-serif-4': {
     familyName: 'Source Serif 4',
     relativePath: 'fonts/SourceSerif4-VariableFont_opsz,wght.ttf',
-    allowSubsetting: true,
+    allowSubsetting: false,
   },
   'source-han-serif': {
     familyName: 'Source Han Serif SC VF',
@@ -59,10 +66,12 @@ async function loadPageNumberFontUncached(
 ): Promise<PageNumberFontAsset> {
   const definition = pageNumberFonts[fontId];
   const bytes = await readFile(resolve(fontRoot(), definition.relativePath));
+  const parsedFont = fontkit.create(bytes);
   return {
     familyName: definition.familyName,
     bytes,
     allowSubsetting: definition.allowSubsetting,
+    hasGlyph: (codePoint) => parsedFont.glyphForCodePoint(codePoint).id !== 0,
   };
 }
 

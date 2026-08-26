@@ -14,6 +14,7 @@ export const PageNumberFontIdSchema = z.enum([
   'open-sans',
   'source-han-sans',
   'jetbrains-mono',
+  'source-sans-3',
   'source-serif-4',
   'source-han-serif',
 ]);

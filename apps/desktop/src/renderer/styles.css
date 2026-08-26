@@ -7,6 +7,12 @@
 * {
   box-sizing: border-box;
 }
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 body {
   margin: 0;
   min-width: 980px;
@@ -30,15 +36,21 @@ button:disabled {
   opacity: 0.45;
 }
 .workspace {
-  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .topbar {
   align-items: center;
   background: #142033;
   color: white;
   display: flex;
+  gap: 24px;
   justify-content: space-between;
-  padding: 24px 34px;
+  min-height: 82px;
+  padding: 18px 28px;
 }
 .topbar h1 {
   font-size: 23px;
@@ -66,29 +78,46 @@ button:disabled {
 }
 .content-grid {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  min-height: calc(100vh - 96px);
+  grid-template-columns: 268px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 .sidebar {
   background: #f8fafc;
   border-right: 1px solid #d9e2ec;
-  padding: 28px 22px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px 18px;
+  scrollbar-gutter: stable;
 }
 .panel-block {
   border-bottom: 1px solid #d9e2ec;
-  padding: 0 0 24px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  padding: 0 0 20px;
+}
+.panel-block:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 .source-name {
   font-weight: 700;
   margin: 0 0 7px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .muted {
   color: #6b7c93;
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+.source-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .theme-label {
   display: block;
@@ -156,17 +185,6 @@ button:disabled {
   grid-column: 1 / -1;
   margin-bottom: 0;
 }
-.pipeline {
-  color: #7b8794;
-  font-size: 13px;
-  line-height: 2.2;
-  margin: 0;
-  padding-left: 18px;
-}
-.pipeline .active {
-  color: #1b64b0;
-  font-weight: 700;
-}
 .diagnostic {
   border-left: 3px solid #f6ad55;
   font-size: 12px;
@@ -178,7 +196,10 @@ button:disabled {
 .preview-shell {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .preview-toolbar {
   align-items: center;
@@ -203,7 +224,8 @@ button:disabled {
   background: #eef1f5;
   border: 0;
   flex: 1;
-  min-height: 700px;
+  height: 100%;
+  min-height: 0;
   width: 100%;
 }
 .empty-state {
@@ -216,6 +238,8 @@ button:disabled {
   flex-direction: column;
   justify-content: center;
   margin: 24px;
+  min-height: 0;
+  overflow: auto;
   padding: 56px;
   text-align: center;
   transition:

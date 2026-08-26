@@ -367,7 +367,7 @@ export function App(): React.JSX.Element {
           <div className="panel-block">
             <p className="eyebrow">SOURCE</p>
             <p className="source-name">{source?.name ?? 'No file selected'}</p>
-            <p className="muted">
+            <p className="muted source-path" title={source?.path}>
               {source?.path ?? 'The renderer never receives filesystem access.'}
             </p>
           </div>
@@ -522,15 +522,6 @@ export function App(): React.JSX.Element {
             {pageNumberError ? (
               <p className="diagnostic error">{pageNumberError}</p>
             ) : null}
-          </div>
-          <div className="panel-block">
-            <p className="eyebrow">PIPELINE</p>
-            <ol className="pipeline">
-              <li className="active">Markdown compiler</li>
-              <li className="active">Publication HTML</li>
-              <li>Hidden Chromium print</li>
-              <li>PDF output</li>
-            </ol>
           </div>
           <div className="panel-block diagnostics">
             <p className="eyebrow">DIAGNOSTICS</p>

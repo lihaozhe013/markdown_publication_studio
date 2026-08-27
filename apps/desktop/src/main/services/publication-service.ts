@@ -11,9 +11,13 @@ import type {
   ExportResult,
   PageNumberSettings,
   PreviewResult,
+  PublicationStyleOverrides,
   ThemeId,
 } from '@markdown-publication/shared';
-import { getBuiltInTheme } from '@markdown-publication/shared';
+import {
+  DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  getBuiltInTheme,
+} from '@markdown-publication/shared';
 import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
 import { loadThemeStylesheet } from './theme-service.js';
@@ -66,6 +70,7 @@ export class PublicationService {
   async buildPreview(
     sourcePath: string,
     themeId: ThemeId,
+    styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<PreviewResult> {
     if (isRenderingDebugEnabled) {
       appLogger.debug('[math-render] KaTeX stylesheet asset summary', {
@@ -91,7 +96,8 @@ export class PublicationService {
         mermaid: { enabled: true },
         html: { policy: 'safe-static' },
       },
-      stylesheet: await loadThemeStylesheet(themeId),
+      stylesheet: await loadThemeStylesheet(themeId, styleOverrides),
+      styleOverrides,
     });
     const mermaid = await this.mermaidRenderer.render(
       rendered.html,
@@ -110,8 +116,13 @@ export class PublicationService {
     outputPath: string,
     themeId: ThemeId,
     pageNumber: PageNumberSettings,
+    styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath, themeId);
+    const preview = await this.buildPreview(
+      sourcePath,
+      themeId,
+      styleOverrides,
+    );
     this.throwOnFatalDiagnostics(preview.diagnostics);
     const printedPdf = await this.printBackend.render(preview.html);
     if (pageNumber.enabled) {
@@ -136,8 +147,13 @@ export class PublicationService {
     sourcePath: string,
     outputPath: string,
     themeId: ThemeId,
+    styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(sourcePath, themeId);
+    const preview = await this.buildPreview(
+      sourcePath,
+      themeId,
+      styleOverrides,
+    );
     this.throwOnFatalDiagnostics(preview.diagnostics);
     const temporaryPath = resolve(
       dirname(outputPath),

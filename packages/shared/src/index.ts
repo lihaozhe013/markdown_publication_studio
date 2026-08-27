@@ -62,6 +62,164 @@ export const PageNumberSettingsSchema = z.object({
   firstPageMode: PageNumberFirstPageModeSchema,
 });
 
+export const PublicationFontIdSchema = PageNumberFontIdSchema;
+
+export const PublicationFontWeightSchema = z.union([
+  z.literal(300),
+  z.literal(400),
+  z.literal(500),
+  z.literal(600),
+  z.literal(700),
+  z.literal(800),
+]);
+
+export const PublicationHexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-f]{6}$/iu, 'Use a six-digit hexadecimal color.');
+
+const styleFontSizePtSchema = z.number().finite().min(6).max(72);
+const styleLineHeightSchema = z.number().finite().min(0.8).max(3);
+const styleSpacingPtSchema = z.number().finite().min(0).max(96);
+const styleBorderMetricPtSchema = z.number().finite().min(0).max(16);
+const styleLetterSpacingPtSchema = z.number().finite().min(-4).max(12);
+
+export const PublicationHeadingLevelOverrideSchema = z
+  .object({
+    fontSizePt: styleFontSizePtSchema.optional(),
+    marginTopPt: styleSpacingPtSchema.optional(),
+    marginBottomPt: styleSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationHeadingLevelsSchema = z
+  .object({
+    h1: PublicationHeadingLevelOverrideSchema.optional(),
+    h2: PublicationHeadingLevelOverrideSchema.optional(),
+    h3: PublicationHeadingLevelOverrideSchema.optional(),
+    h4: PublicationHeadingLevelOverrideSchema.optional(),
+    h5: PublicationHeadingLevelOverrideSchema.optional(),
+    h6: PublicationHeadingLevelOverrideSchema.optional(),
+  })
+  .strict();
+
+export const PublicationBodyStyleOverridesSchema = z
+  .object({
+    fontFamily: PublicationFontIdSchema.optional(),
+    fontSizePt: styleFontSizePtSchema.optional(),
+    fontWeight: PublicationFontWeightSchema.optional(),
+    color: PublicationHexColorSchema.optional(),
+    backgroundColor: PublicationHexColorSchema.optional(),
+    lineHeight: styleLineHeightSchema.optional(),
+    letterSpacingPt: styleLetterSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationHeadingStyleOverridesSchema = z
+  .object({
+    fontFamily: PublicationFontIdSchema.optional(),
+    color: PublicationHexColorSchema.optional(),
+    fontWeight: PublicationFontWeightSchema.optional(),
+    lineHeight: styleLineHeightSchema.optional(),
+    levels: PublicationHeadingLevelsSchema.optional(),
+  })
+  .strict();
+
+export const PublicationParagraphAndListStyleOverridesSchema = z
+  .object({
+    paragraphSpacingPt: styleSpacingPtSchema.optional(),
+    listIndentPt: styleSpacingPtSchema.optional(),
+    listItemSpacingPt: styleSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationLinkStyleOverridesSchema = z
+  .object({
+    color: PublicationHexColorSchema.optional(),
+    underline: z.boolean().optional(),
+  })
+  .strict();
+
+export const PublicationInlineCodeStyleOverridesSchema = z
+  .object({
+    fontFamily: PublicationFontIdSchema.optional(),
+    fontSizePt: styleFontSizePtSchema.optional(),
+    color: PublicationHexColorSchema.optional(),
+    backgroundColor: PublicationHexColorSchema.optional(),
+    borderRadiusPt: styleBorderMetricPtSchema.optional(),
+    paddingHorizontalPt: styleSpacingPtSchema.optional(),
+    paddingVerticalPt: styleSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationCodeBlockStyleOverridesSchema = z
+  .object({
+    fontFamily: PublicationFontIdSchema.optional(),
+    fontSizePt: styleFontSizePtSchema.optional(),
+    color: PublicationHexColorSchema.optional(),
+    backgroundColor: PublicationHexColorSchema.optional(),
+    lineHeight: styleLineHeightSchema.optional(),
+    borderRadiusPt: styleBorderMetricPtSchema.optional(),
+    paddingPt: styleSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationBlockquoteStyleOverridesSchema = z
+  .object({
+    color: PublicationHexColorSchema.optional(),
+    backgroundColor: PublicationHexColorSchema.optional(),
+    borderColor: PublicationHexColorSchema.optional(),
+    borderWidthPt: styleBorderMetricPtSchema.optional(),
+    borderRadiusPt: styleBorderMetricPtSchema.optional(),
+    paddingPt: styleSpacingPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationTableStyleOverridesSchema = z
+  .object({
+    color: PublicationHexColorSchema.optional(),
+    borderColor: PublicationHexColorSchema.optional(),
+    headerColor: PublicationHexColorSchema.optional(),
+    headerBackgroundColor: PublicationHexColorSchema.optional(),
+    stripeBackgroundColor: PublicationHexColorSchema.optional(),
+    cellPaddingPt: styleSpacingPtSchema.optional(),
+    borderRadiusPt: styleBorderMetricPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationMediaStyleOverridesSchema = z
+  .object({
+    imageBorderRadiusPt: styleBorderMetricPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationDividerStyleOverridesSchema = z
+  .object({
+    color: PublicationHexColorSchema.optional(),
+    thicknessPt: styleBorderMetricPtSchema.optional(),
+  })
+  .strict();
+
+export const PublicationStyleOverridesSchema = z
+  .object({
+    version: z.literal(1),
+    body: PublicationBodyStyleOverridesSchema.optional(),
+    headings: PublicationHeadingStyleOverridesSchema.optional(),
+    paragraphAndLists:
+      PublicationParagraphAndListStyleOverridesSchema.optional(),
+    links: PublicationLinkStyleOverridesSchema.optional(),
+    inlineCode: PublicationInlineCodeStyleOverridesSchema.optional(),
+    codeBlock: PublicationCodeBlockStyleOverridesSchema.optional(),
+    blockquote: PublicationBlockquoteStyleOverridesSchema.optional(),
+    table: PublicationTableStyleOverridesSchema.optional(),
+    media: PublicationMediaStyleOverridesSchema.optional(),
+    divider: PublicationDividerStyleOverridesSchema.optional(),
+  })
+  .strict();
+
+export const DEFAULT_PUBLICATION_STYLE_OVERRIDES = {
+  version: 1,
+} as const satisfies z.infer<typeof PublicationStyleOverridesSchema>;
+
 export const DEFAULT_PAGE_NUMBER_SETTINGS = {
   enabled: false,
   fontFamily: 'source-han-sans',
@@ -104,17 +262,26 @@ export function resolveNumberedPage(
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  styleOverrides: PublicationStyleOverridesSchema.default(
+    DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  ),
 });
 
 export const PdfExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  styleOverrides: PublicationStyleOverridesSchema.default(
+    DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  ),
   pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
 });
 
 export const HtmlExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  styleOverrides: PublicationStyleOverridesSchema.default(
+    DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  ),
 });
 
 export const OpenDroppedMarkdownRequestSchema = z.object({
@@ -130,6 +297,11 @@ export type PageNumberSettings = z.infer<typeof PageNumberSettingsSchema>;
 export type PageNumberFontId = PageNumberSettings['fontFamily'];
 export type PageNumberStyle = PageNumberSettings['style'];
 export type PageNumberFirstPageMode = PageNumberSettings['firstPageMode'];
+export type PublicationFontId = z.infer<typeof PublicationFontIdSchema>;
+export type PublicationFontWeight = z.infer<typeof PublicationFontWeightSchema>;
+export type PublicationStyleOverrides = z.infer<
+  typeof PublicationStyleOverridesSchema
+>;
 
 export interface PublicationTheme {
   id: ThemeId;
@@ -205,6 +377,10 @@ export interface DesktopApi {
   settings: {
     getPageNumber(): Promise<PageNumberSettings>;
     savePageNumber(settings: PageNumberSettings): Promise<PageNumberSettings>;
+    getCustomStyle(): Promise<PublicationStyleOverrides>;
+    saveCustomStyle(
+      styleOverrides: PublicationStyleOverrides,
+    ): Promise<PublicationStyleOverrides>;
   };
   project: {
     openMarkdown(): Promise<MarkdownFileReference | null>;

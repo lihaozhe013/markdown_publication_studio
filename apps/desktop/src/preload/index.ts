@@ -6,6 +6,9 @@ const api: DesktopApi = {
     getPageNumber: () => ipcRenderer.invoke('settings:get-page-number'),
     savePageNumber: (settings) =>
       ipcRenderer.invoke('settings:save-page-number', settings),
+    getCustomStyle: () => ipcRenderer.invoke('settings:get-custom-style'),
+    saveCustomStyle: (styleOverrides) =>
+      ipcRenderer.invoke('settings:save-custom-style', styleOverrides),
   },
   project: {
     openMarkdown: () => ipcRenderer.invoke('project:open-markdown'),

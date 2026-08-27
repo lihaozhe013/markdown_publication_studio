@@ -1,6 +1,7 @@
 import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import type { CompiledChapter, PublicationHtmlOptions } from './model.js';
 import { getKatexStylesheet } from './math.js';
+import { renderStyleOverrides } from './style-overrides.js';
 
 const defaultMargins = {
   top: '18mm',
@@ -24,6 +25,7 @@ export function renderPublicationHtml(
   const diagnostics = chapters.flatMap((chapter) => chapter.diagnostics);
   const mathStylesheet =
     options.features?.math?.enabled === false ? '' : getKatexStylesheet();
+  const styleOverrides = renderStyleOverrides(options.styleOverrides);
   const pageBackground =
     options.pageCanvasMode === 'full-bleed'
       ? ' background: var(--publication-page-background, white);'
@@ -97,6 +99,11 @@ export function renderPublicationHtml(
       .markdown-body .code-block.shiki code { color: inherit; background: transparent; }
       .markdown-body .code-block.shiki code span[style] { background: transparent; }
     </style>
+    ${
+      styleOverrides.length === 0
+        ? ''
+        : `<style data-publication-style-overrides="true">${styleOverrides}</style>`
+    }
   </head>
   <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="false">
     ${body}

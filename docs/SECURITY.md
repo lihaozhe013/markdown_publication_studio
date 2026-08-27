@@ -10,6 +10,10 @@ building a preview, and starting an export.
   bundled fonts are loaded by the main process and inlined before reaching the
   preview or print window; arbitrary renderer-supplied stylesheet paths are not
   supported.
+- Advanced styles are structured values validated by Zod. The renderer cannot
+  submit arbitrary CSS selectors, declarations, URLs, imports, scripts, or font
+  paths. The main process generates the fixed-selector override stylesheet from
+  the validated values and only approved bundled fonts can be selected.
 - Page-number fonts are selected from an application-owned allow-list of bundled
   font assets. The page-number format accepts only `{page}` and `{pages}`
   placeholders and is validated before entering the main-process PDF

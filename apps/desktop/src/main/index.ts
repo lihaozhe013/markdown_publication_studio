@@ -14,6 +14,7 @@ import {
   PageNumberSettingsSchema,
   PdfExportRequestSchema,
   PreviewRequestSchema,
+  PublicationStyleOverridesSchema,
   type DesktopApi,
   type MarkdownFileReference,
 } from '@markdown-publication/shared';
@@ -105,6 +106,19 @@ function registerIpcHandlers(): void {
     },
   );
 
+  ipcMain.handle('settings:get-custom-style', async () =>
+    appSettingsService.loadCustomStyle(),
+  );
+
+  ipcMain.handle(
+    'settings:save-custom-style',
+    async (_event, rawStyleOverrides: unknown) => {
+      const styleOverrides =
+        PublicationStyleOverridesSchema.parse(rawStyleOverrides);
+      return appSettingsService.saveCustomStyle(styleOverrides);
+    },
+  );
+
   ipcMain.handle(
     'project:open-markdown',
     async (event): Promise<MarkdownFileReference | null> => {
@@ -177,7 +191,11 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    return publicationService.buildPreview(request.sourcePath, request.themeId);
+    return publicationService.buildPreview(
+      request.sourcePath,
+      request.themeId,
+      request.styleOverrides,
+    );
   });
 
   ipcMain.handle('export:start', async (_event, rawRequest: unknown) => {
@@ -203,6 +221,7 @@ function registerIpcHandlers(): void {
       result.filePath,
       request.themeId,
       request.pageNumber,
+      request.styleOverrides,
     );
   });
 
@@ -228,6 +247,7 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
+      request.styleOverrides,
     );
   });
 }

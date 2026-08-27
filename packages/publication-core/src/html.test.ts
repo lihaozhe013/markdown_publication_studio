@@ -44,4 +44,31 @@ describe('publication HTML layout', () => {
     );
     expect(publication.html).toContain('print-color-adjust: exact;');
   });
+
+  it('places structured style overrides after theme and renderer helper CSS', () => {
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      stylesheet: '.markdown-body { color: #000000; }',
+      styleOverrides: {
+        version: 1,
+        body: { color: '#403630', fontSizePt: 13 },
+      },
+    });
+
+    const themeIndex = publication.html.indexOf(
+      '.markdown-body { color: #000000; }',
+    );
+    const helperIndex = publication.html.indexOf(
+      '.markdown-body .code-block.shiki code',
+    );
+    const overrideIndex = publication.html.indexOf(
+      'data-publication-style-overrides="true"',
+    );
+
+    expect(overrideIndex).toBeGreaterThan(themeIndex);
+    expect(overrideIndex).toBeGreaterThan(helperIndex);
+    expect(publication.html).toContain('font-size: 13pt !important;');
+    expect(publication.html).toContain('color: #403630 !important;');
+  });
 });

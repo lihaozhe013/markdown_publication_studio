@@ -1,17 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
   DEFAULT_PAGE_NUMBER_SETTINGS,
+  DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   PageNumberFirstPageModeSchema,
   PageNumberFontIdSchema,
   PageNumberSettingsSchema,
   PageNumberStyleSchema,
+  PublicationStyleOverridesSchema,
   ThemeIdSchema,
   type PublicationDiagnostic,
+  type PublicationStyleOverrides,
   type PageNumberFontId,
   type PageNumberSettings,
   type ThemeId,
 } from '@markdown-publication/shared';
+import { AdvancedStylePanel } from './advanced-style-panel.js';
 
 const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'inter', name: 'Inter' },
@@ -124,6 +128,18 @@ async function probePreviewRendering(
       ];
 }
 
+function hasStyleValue(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== 'object') return true;
+  return Object.values(value).some(hasStyleValue);
+}
+
+function hasStyleOverrides(style: PublicationStyleOverrides): boolean {
+  return Object.entries(style).some(
+    ([key, value]) => key !== 'version' && hasStyleValue(value),
+  );
+}
+
 export function App(): React.JSX.Element {
   const [source, setSource] = useState<{ path: string; name: string } | null>(
     null,
@@ -135,29 +151,54 @@ export function App(): React.JSX.Element {
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
+  const [customStyle, setCustomStyle] = useState<PublicationStyleOverrides>({
+    ...DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  });
+  const [styleDraft, setStyleDraft] = useState<PublicationStyleOverrides>({
+    ...DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  });
   const [pageNumberError, setPageNumberError] = useState('');
+  const [styleError, setStyleError] = useState('');
+  const [stylePanelOpen, setStylePanelOpen] = useState(false);
+  const [styleSaving, setStyleSaving] = useState(false);
+  const [settingsReady, setSettingsReady] = useState(false);
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const dragDepthRef = useRef(0);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const previewSequenceRef = useRef(0);
+
+  const styleDirty = JSON.stringify(styleDraft) !== JSON.stringify(customStyle);
+  const effectiveStyle = stylePanelOpen ? styleDraft : customStyle;
+  const customStyleActive = hasStyleOverrides(customStyle);
 
   useEffect(() => {
     let mounted = true;
-    const loadPageNumber = window.desktopApi?.settings?.getPageNumber;
-    if (!loadPageNumber) return undefined;
+    const settingsApi = window.desktopApi?.settings;
+    if (!settingsApi) {
+      setSettingsReady(true);
+      return undefined;
+    }
 
-    void loadPageNumber()
-      .then((settings) => {
+    void Promise.all([
+      settingsApi.getPageNumber(),
+      settingsApi.getCustomStyle(),
+    ])
+      .then(([loadedPageNumber, loadedStyle]) => {
         if (!mounted) return;
-        setPageNumber(settings);
+        setPageNumber(loadedPageNumber);
+        setCustomStyle(loadedStyle);
+        setStyleDraft(loadedStyle);
+        setSettingsReady(true);
       })
       .catch((error: unknown) => {
         if (!mounted) return;
+        setSettingsReady(true);
         setStatus(
           error instanceof Error
-            ? `Could not load page number settings: ${error.message}`
-            : 'Could not load page number settings.',
+            ? `Could not load application settings: ${error.message}`
+            : 'Could not load application settings.',
         );
       });
     return () => {
@@ -165,27 +206,40 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
-  async function refreshPreview(
+  const refreshPreview = useCallback(async function refreshPreview(
     path: string,
-    selectedTheme: ThemeId = themeId,
+    selectedTheme: ThemeId,
+    selectedStyle: PublicationStyleOverrides,
   ): Promise<void> {
+    const sequence = ++previewSequenceRef.current;
     setBusy(true);
     setStatus('Rendering preview…');
     try {
       const result = await window.desktopApi.preview.build({
         sourcePath: path,
         themeId: selectedTheme,
+        styleOverrides: selectedStyle,
       });
+      if (sequence !== previewSequenceRef.current) return;
       setTitle(result.title);
       setHtml(result.html);
       setDiagnostics(result.diagnostics);
       setStatus('Preview ready.');
     } catch (error) {
+      if (sequence !== previewSequenceRef.current) return;
       setStatus(error instanceof Error ? error.message : 'Preview failed.');
     } finally {
-      setBusy(false);
+      if (sequence === previewSequenceRef.current) setBusy(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!stylePanelOpen || !styleDirty || !source) return undefined;
+    const timer = window.setTimeout(() => {
+      void refreshPreview(source.path, themeId, styleDraft);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [refreshPreview, source, styleDirty, styleDraft, stylePanelOpen, themeId]);
 
   async function commitPageNumberSettings(
     nextSettings: PageNumberSettings,
@@ -222,6 +276,70 @@ export function App(): React.JSX.Element {
     void commitPageNumberSettings(nextSettings);
   }
 
+  function openStylePanel(): void {
+    setStyleDraft(customStyle);
+    setStyleError('');
+    setStylePanelOpen(true);
+  }
+
+  function updateStyleDraft(nextStyle: PublicationStyleOverrides): void {
+    const parsed = PublicationStyleOverridesSchema.safeParse(nextStyle);
+    if (!parsed.success) {
+      setStyleError(
+        parsed.error.issues[0]?.message ?? 'Invalid style settings.',
+      );
+      return;
+    }
+    setStyleError('');
+    setStyleDraft(parsed.data);
+  }
+
+  async function applyStyleDraft(): Promise<void> {
+    const parsed = PublicationStyleOverridesSchema.safeParse(styleDraft);
+    if (!parsed.success) {
+      setStyleError(
+        parsed.error.issues[0]?.message ?? 'Invalid style settings.',
+      );
+      return;
+    }
+    setStyleSaving(true);
+    setStyleError('');
+    try {
+      const saved = await window.desktopApi.settings.saveCustomStyle(
+        parsed.data,
+      );
+      setCustomStyle(saved);
+      setStyleDraft(saved);
+      setStylePanelOpen(false);
+      setStatus('Advanced styles saved.');
+      if (source) {
+        void refreshPreview(source.path, themeId, saved);
+      }
+    } catch (error) {
+      setStyleError(
+        error instanceof Error
+          ? `Could not save advanced styles: ${error.message}`
+          : 'Could not save advanced styles.',
+      );
+    } finally {
+      setStyleSaving(false);
+    }
+  }
+
+  function cancelStyleDraft(): void {
+    setStyleDraft(customStyle);
+    setStyleError('');
+    setStylePanelOpen(false);
+    if (source) {
+      void refreshPreview(source.path, themeId, customStyle);
+    }
+  }
+
+  function resetStyleDraft(): void {
+    setStyleError('');
+    setStyleDraft({ ...DEFAULT_PUBLICATION_STYLE_OVERRIDES });
+  }
+
   async function openMarkdown(): Promise<void> {
     setBusy(true);
     setStatus('Opening Markdown file…');
@@ -242,7 +360,9 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
-      await refreshPreview(selected.path);
+      setStyleDraft(customStyle);
+      setStylePanelOpen(false);
+      await refreshPreview(selected.path, themeId, customStyle);
     } catch (error) {
       console.error('[open-file] Open Markdown failed.', error);
       setStatus(
@@ -273,7 +393,9 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
-      await refreshPreview(selected.path);
+      setStyleDraft(customStyle);
+      setStylePanelOpen(false);
+      await refreshPreview(selected.path, themeId, customStyle);
     } catch (error) {
       console.error('[open-file] Open dropped Markdown failed.', error);
       setStatus(
@@ -294,6 +416,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.start({
         sourcePath: source.path,
         themeId,
+        styleOverrides: effectiveStyle,
         pageNumber,
       });
       if (!result) {
@@ -317,6 +440,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.html({
         sourcePath: source.path,
         themeId,
+        styleOverrides: effectiveStyle,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -342,7 +466,7 @@ export function App(): React.JSX.Element {
           <button
             className="secondary"
             onClick={() => void openMarkdown()}
-            disabled={busy}
+            disabled={busy || !settingsReady}
           >
             Open Markdown
           </button>
@@ -385,7 +509,7 @@ export function App(): React.JSX.Element {
                 if (!parsed.success) return;
                 setThemeId(parsed.data);
                 if (source) {
-                  void refreshPreview(source.path, parsed.data);
+                  void refreshPreview(source.path, parsed.data, effectiveStyle);
                 }
               }}
             >
@@ -401,6 +525,19 @@ export function App(): React.JSX.Element {
                   ?.description
               }
             </p>
+            <button
+              className="style-advanced-button"
+              type="button"
+              onClick={openStylePanel}
+              disabled={!settingsReady || styleSaving}
+            >
+              Advanced styles
+              <span>
+                {customStyleActive
+                  ? 'Custom overrides active'
+                  : 'Theme defaults'}
+              </span>
+            </button>
           </div>
           <div className="panel-block page-number-panel">
             <p className="eyebrow">PAGE NUMBERS</p>
@@ -618,6 +755,22 @@ export function App(): React.JSX.Element {
           )}
         </section>
       </section>
+      {stylePanelOpen ? (
+        <AdvancedStylePanel
+          styleOverrides={styleDraft}
+          dirty={styleDirty}
+          saving={styleSaving}
+          exporting={busy}
+          canExport={source !== null}
+          error={styleError}
+          onChange={updateStyleDraft}
+          onApply={() => void applyStyleDraft()}
+          onCancel={cancelStyleDraft}
+          onReset={resetStyleDraft}
+          onExportPdf={() => void exportPdf()}
+          onExportHtml={() => void exportHtml()}
+        />
+      ) : null}
     </main>
   );
 }

@@ -30,8 +30,8 @@ Four themes are included:
 - _Modern Serif_ -- a serif-led reading layout
 - _Claude_ -- a warm paper palette with spacious serif typography
 
-Local theme fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4,
-Noto Sans SC, etc.) are embedded as base64 data URIs so that exported documents
+Local theme fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4, Noto
+Sans SC, etc.) are embedded as base64 data URIs so that exported documents
 render identically on any machine.
 
 **Page Numbering**
@@ -41,6 +41,14 @@ adjustable size and style, a customizable format template (e.g.
 `{page} / {pages}`), and policies for the first page (show all, hide and start
 numbering at 1, or hide and start at 2). Page numbers are embedded into the
 final PDF via pdf-lib with automatic font fallback for CJK characters.
+
+**Advanced Styles**
+
+The advanced style panel provides structured overrides for body text, headings,
+links, code, blockquotes, tables, images, and dividers. Changes preview
+immediately, while one global style configuration is saved only when the user
+chooses Apply & Save. The generated override layer is shared by preview, PDF,
+and HTML output; arbitrary CSS is not accepted.
 
 **Mermaid Diagrams**
 
@@ -62,8 +70,9 @@ Mermaid render failures, unsafe HTML removal, and font readiness.
 
 **Application Settings**
 
-Page number preferences and other settings are persisted to the user data
-directory via atomic writes and restored on next launch.
+Page number preferences and the last saved advanced style configuration are
+persisted to the user data directory via atomic writes and restored on next
+launch.
 
 ## Architecture
 

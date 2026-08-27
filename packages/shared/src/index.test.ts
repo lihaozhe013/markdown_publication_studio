@@ -4,6 +4,7 @@ import {
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
+  DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   getBuiltInTheme,
   HtmlExportRequestSchema,
   PdfExportRequestSchema,
@@ -12,6 +13,7 @@ import {
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
   PreviewRequestSchema,
+  PublicationStyleOverridesSchema,
   resolveNumberedPage,
   ThemeIdSchema,
   ThemePageCanvasModeSchema,
@@ -91,6 +93,55 @@ describe('Page number settings', () => {
     expect(formatPageNumber('第 {page} 页 / 共 {pages} 页', 2, 8)).toBe(
       '第 2 页 / 共 8 页',
     );
+  });
+});
+
+describe('Publication style overrides', () => {
+  it('defaults preview and export requests to an empty override set', () => {
+    expect(
+      PublicationStyleOverridesSchema.parse(
+        DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+      ),
+    ).toEqual(DEFAULT_PUBLICATION_STYLE_OVERRIDES);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .styleOverrides,
+    ).toEqual(DEFAULT_PUBLICATION_STYLE_OVERRIDES);
+    expect(
+      HtmlExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .styleOverrides,
+    ).toEqual(DEFAULT_PUBLICATION_STYLE_OVERRIDES);
+    expect(
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .styleOverrides,
+    ).toEqual(DEFAULT_PUBLICATION_STYLE_OVERRIDES);
+  });
+
+  it('rejects invalid colors, fonts, ranges, and unknown fields', () => {
+    expect(() =>
+      PublicationStyleOverridesSchema.parse({
+        version: 1,
+        body: { color: 'rgb(0 0 0)' },
+      }),
+    ).toThrow();
+    expect(() =>
+      PublicationStyleOverridesSchema.parse({
+        version: 1,
+        body: { fontFamily: 'system-ui' },
+      }),
+    ).toThrow();
+    expect(() =>
+      PublicationStyleOverridesSchema.parse({
+        version: 1,
+        body: { lineHeight: 0.2 },
+      }),
+    ).toThrow();
+    expect(() =>
+      PublicationStyleOverridesSchema.parse({
+        version: 1,
+        body: { color: '#112233', arbitraryCss: 'body { color: red; }' },
+      }),
+    ).toThrow();
   });
 });
 

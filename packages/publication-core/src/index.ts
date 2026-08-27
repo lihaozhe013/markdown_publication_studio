@@ -10,6 +10,10 @@ export { compileMarkdownFile, createMarkdownCompiler } from './markdown.js';
 export { renderPublicationHtml } from './html.js';
 export { getKatexFontAssetSummary, getKatexStylesheet } from './math.js';
 export {
+  collectStyleOverrideFontIds,
+  renderStyleOverrides,
+} from './style-overrides.js';
+export {
   removedSvgStructure,
   summarizeSvgMarkup,
   type SvgMarkupSummary,

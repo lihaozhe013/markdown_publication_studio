@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import {
   PublicationFontWeightSchema,
@@ -154,6 +154,24 @@ interface ColorFieldProps extends FieldProps {
   onChange(value: string | undefined): void;
 }
 
+export function parseNumberFieldValue(
+  rawValue: string,
+  min: number,
+  max: number,
+  allowIncompleteValue = false,
+): number | undefined {
+  const normalized = rawValue.trim();
+  if (normalized === '') return undefined;
+  if (!allowIncompleteValue && /(?:[eE][+-]?|\.)$/u.test(normalized)) {
+    return undefined;
+  }
+
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : undefined;
+}
+
 function FieldLabel({ id, label, hint }: FieldProps): ReactElement {
   return (
     <label className="style-field-label" htmlFor={id}>
@@ -204,32 +222,61 @@ export function NumberField({
   unit,
   onChange,
 }: NumberFieldProps): ReactElement {
+  const [textValue, setTextValue] = useState(
+    value === undefined ? '' : String(value),
+  );
+  const isEditingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setTextValue(value === undefined ? '' : String(value));
+    }
+  }, [value]);
+
   return (
     <div className="style-field">
       <FieldLabel id={id} label={label} hint={hint} />
       <div className="style-number-input">
         <input
           id={id}
-          type="number"
-          value={value ?? ''}
-          min={min}
-          max={max}
-          step={step}
+          type="text"
+          inputMode={step % 1 === 0 ? 'numeric' : 'decimal'}
+          value={textValue}
           placeholder="Theme default"
+          onFocus={() => {
+            isEditingRef.current = true;
+          }}
           onChange={(event) => {
-            const rawValue = event.target.value.trim();
+            const rawValue = event.target.value;
+            setTextValue(rawValue);
             if (rawValue === '') {
               onChange(undefined);
               return;
             }
-            const nextValue = Number(rawValue);
-            if (
-              Number.isFinite(nextValue) &&
-              nextValue >= min &&
-              nextValue <= max
-            ) {
+            const nextValue = parseNumberFieldValue(rawValue, min, max);
+            if (nextValue !== undefined) {
               onChange(nextValue);
             }
+          }}
+          onBlur={(event) => {
+            isEditingRef.current = false;
+            const rawValue = event.currentTarget.value;
+            if (rawValue.trim() === '') {
+              onChange(undefined);
+              setTextValue('');
+              return;
+            }
+
+            const nextValue = parseNumberFieldValue(rawValue, min, max, true);
+            if (nextValue === undefined) {
+              setTextValue(value === undefined ? '' : String(value));
+              return;
+            }
+            onChange(nextValue);
+            setTextValue(String(nextValue));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
           }}
         />
         <span>{unit}</span>

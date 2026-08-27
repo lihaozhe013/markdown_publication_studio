@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
+  DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   PageNumberFirstPageModeSchema,
@@ -9,13 +10,22 @@ import {
   PageNumberStyleSchema,
   PublicationStyleOverridesSchema,
   ThemeIdSchema,
+  type CoverSelection,
   type PublicationDiagnostic,
   type PublicationStyleOverrides,
   type PageNumberFontId,
   type PageNumberSettings,
+  type PageSizeId,
   type ThemeId,
 } from '@markdown-publication/shared';
 import { AdvancedStylePanel } from './advanced-style-panel.js';
+import {
+  PublicationFormatControls,
+  coverSlotLabels,
+  getCoverSizeError,
+  type CoverSlot,
+} from './publication-format-controls.js';
+import { probePreviewRendering } from './preview-probe.js';
 
 const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'inter', name: 'Inter' },
@@ -26,107 +36,6 @@ const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'source-serif-4', name: 'Source Serif 4' },
   { id: 'source-han-serif', name: 'Source Han Serif SC' },
 ];
-
-const katexFontFamilies = [
-  'KaTeX_Main',
-  'KaTeX_Math',
-  'KaTeX_Size1',
-  'KaTeX_Size2',
-  'KaTeX_Size3',
-  'KaTeX_Size4',
-];
-
-async function probePreviewRendering(
-  frame: HTMLIFrameElement,
-): Promise<PublicationDiagnostic[]> {
-  if (window.location.hostname !== 'localhost') return [];
-  const document = frame.contentDocument;
-  const previewWindow = frame.contentWindow;
-  if (!document || !previewWindow) return [];
-
-  await document.fonts.ready;
-  const stylesheet = [...document.querySelectorAll('style')]
-    .map((style) => style.textContent ?? '')
-    .join('\n');
-  const mathElement = document.querySelector<HTMLElement>('.katex .mord');
-  const delimiterElement = document.querySelector<HTMLElement>(
-    '.katex .delimsizing',
-  );
-  const fonts = Object.fromEntries(
-    katexFontFamilies.map((family) => [
-      family,
-      document.fonts.check(`16px "${family}"`, '∫[]'),
-    ]),
-  );
-  console.info(
-    `[math-render] Preview font probe ${JSON.stringify({
-      mathElementCount: document.querySelectorAll('.katex').length,
-      relativeFontUrlCount: (stylesheet.match(/url\((?!data:)/gu) ?? []).length,
-      dataFontUrlCount: (stylesheet.match(/url\(data:/gu) ?? []).length,
-      fonts,
-      mathFontFamily: mathElement
-        ? previewWindow.getComputedStyle(mathElement).fontFamily
-        : undefined,
-      delimiterFontFamily: delimiterElement
-        ? previewWindow.getComputedStyle(delimiterElement).fontFamily
-        : undefined,
-    })}`,
-  );
-
-  const diagrams = [
-    ...document.querySelectorAll<SVGSVGElement>('svg.mermaid-diagram'),
-  ].map((svg) => {
-    const rectangle = svg.getBoundingClientRect();
-    const viewBox = svg.viewBox.baseVal;
-    let bounds: DOMRect | undefined;
-    try {
-      bounds = svg.getBBox();
-    } catch {
-      bounds = undefined;
-    }
-    const expectedHeight =
-      viewBox.width > 0
-        ? (rectangle.width * viewBox.height) / viewBox.width
-        : 0;
-    const next = svg.closest('.mermaid-container')?.nextElementSibling;
-    const nextTop = next?.getBoundingClientRect().top;
-    return {
-      id: svg.closest<HTMLElement>('.mermaid-container')?.dataset.mermaidId,
-      viewBox: `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`,
-      clientRect: { width: rectangle.width, height: rectangle.height },
-      expectedHeight,
-      heightError: Math.abs(rectangle.height - expectedHeight),
-      overlapsNextBlock: nextTop !== undefined && rectangle.bottom > nextTop,
-      bounds: bounds
-        ? {
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-          }
-        : undefined,
-    };
-  });
-  console.info(
-    `[mermaid-render] Preview layout probe ${JSON.stringify({ diagrams })}`,
-  );
-
-  const missingMathFonts =
-    mathElement === null
-      ? []
-      : katexFontFamilies.filter((family) => !fonts[family]);
-  return missingMathFonts.length === 0
-    ? []
-    : [
-        {
-          severity: 'warning',
-          code: 'math-font-unavailable',
-          message: `KaTeX fonts are not ready in the preview: ${missingMathFonts.join(', ')}.`,
-          feature: 'math',
-          details: { missingFonts: missingMathFonts },
-        },
-      ];
-}
 
 function hasStyleValue(value: unknown): boolean {
   if (value === undefined || value === null) return false;
@@ -148,6 +57,8 @@ export function App(): React.JSX.Element {
   const [html, setHtml] = useState('');
   const [diagnostics, setDiagnostics] = useState<PublicationDiagnostic[]>([]);
   const [themeId, setThemeId] = useState<ThemeId>('rose');
+  const [pageSize, setPageSize] = useState<PageSizeId>(DEFAULT_PAGE_SIZE);
+  const [covers, setCovers] = useState<CoverSelection>({});
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
@@ -172,6 +83,7 @@ export function App(): React.JSX.Element {
   const styleDirty = JSON.stringify(styleDraft) !== JSON.stringify(customStyle);
   const effectiveStyle = stylePanelOpen ? styleDraft : customStyle;
   const customStyleActive = hasStyleOverrides(customStyle);
+  const coverSizeError = getCoverSizeError(covers, pageSize);
 
   useEffect(() => {
     let mounted = true;
@@ -209,6 +121,7 @@ export function App(): React.JSX.Element {
   const refreshPreview = useCallback(async function refreshPreview(
     path: string,
     selectedTheme: ThemeId,
+    selectedPageSize: PageSizeId,
     selectedStyle: PublicationStyleOverrides,
   ): Promise<void> {
     const sequence = ++previewSequenceRef.current;
@@ -218,6 +131,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.preview.build({
         sourcePath: path,
         themeId: selectedTheme,
+        pageSize: selectedPageSize,
         styleOverrides: selectedStyle,
       });
       if (sequence !== previewSequenceRef.current) return;
@@ -236,10 +150,18 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (!stylePanelOpen || !styleDirty || !source) return undefined;
     const timer = window.setTimeout(() => {
-      void refreshPreview(source.path, themeId, styleDraft);
+      void refreshPreview(source.path, themeId, pageSize, styleDraft);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [refreshPreview, source, styleDirty, styleDraft, stylePanelOpen, themeId]);
+  }, [
+    pageSize,
+    refreshPreview,
+    source,
+    styleDirty,
+    styleDraft,
+    stylePanelOpen,
+    themeId,
+  ]);
 
   async function commitPageNumberSettings(
     nextSettings: PageNumberSettings,
@@ -313,7 +235,7 @@ export function App(): React.JSX.Element {
       setStylePanelOpen(false);
       setStatus('Advanced styles saved.');
       if (source) {
-        void refreshPreview(source.path, themeId, saved);
+        void refreshPreview(source.path, themeId, pageSize, saved);
       }
     } catch (error) {
       setStyleError(
@@ -331,13 +253,63 @@ export function App(): React.JSX.Element {
     setStyleError('');
     setStylePanelOpen(false);
     if (source) {
-      void refreshPreview(source.path, themeId, customStyle);
+      void refreshPreview(source.path, themeId, pageSize, customStyle);
     }
   }
 
   function resetStyleDraft(): void {
     setStyleError('');
     setStyleDraft({ ...DEFAULT_PUBLICATION_STYLE_OVERRIDES });
+  }
+
+  function updatePageSize(nextPageSize: PageSizeId): void {
+    setPageSize(nextPageSize);
+    if (source) {
+      void refreshPreview(source.path, themeId, nextPageSize, effectiveStyle);
+    }
+  }
+
+  async function chooseCoverAsset(slot: CoverSlot): Promise<void> {
+    setBusy(true);
+    setStatus(`Choosing ${coverSlotLabels[slot].toLowerCase()}…`);
+    console.info('[cover] Cover asset selection requested.', { slot });
+    try {
+      if (!window.desktopApi?.project?.chooseCoverAsset) {
+        throw new Error(
+          'The desktop bridge is unavailable. Restart the application after building it.',
+        );
+      }
+      const selected = await window.desktopApi.project.chooseCoverAsset();
+      if (!selected) {
+        setStatus('Cover selection cancelled.');
+        return;
+      }
+      setCovers((current) => ({ ...current, [slot]: selected }));
+      setStatus(`${coverSlotLabels[slot]} selected.`);
+      console.info('[cover] Cover asset selected.', {
+        slot,
+        fileName: selected.name,
+        kind: selected.kind,
+      });
+    } catch (error) {
+      console.error('[cover] Cover asset selection failed.', error);
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Could not choose the cover asset.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearCoverAsset(slot: CoverSlot): void {
+    setCovers((current) => {
+      const next = { ...current };
+      delete next[slot];
+      return next;
+    });
+    setStatus(`${coverSlotLabels[slot]} cleared.`);
   }
 
   async function openMarkdown(): Promise<void> {
@@ -360,9 +332,10 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
+      setCovers({});
       setStyleDraft(customStyle);
       setStylePanelOpen(false);
-      await refreshPreview(selected.path, themeId, customStyle);
+      await refreshPreview(selected.path, themeId, pageSize, customStyle);
     } catch (error) {
       console.error('[open-file] Open Markdown failed.', error);
       setStatus(
@@ -393,9 +366,10 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
+      setCovers({});
       setStyleDraft(customStyle);
       setStylePanelOpen(false);
-      await refreshPreview(selected.path, themeId, customStyle);
+      await refreshPreview(selected.path, themeId, pageSize, customStyle);
     } catch (error) {
       console.error('[open-file] Open dropped Markdown failed.', error);
       setStatus(
@@ -410,14 +384,20 @@ export function App(): React.JSX.Element {
 
   async function exportPdf(): Promise<void> {
     if (!source) return;
+    if (coverSizeError) {
+      setStatus(coverSizeError);
+      return;
+    }
     setBusy(true);
     setStatus('Printing PDF with Chromium…');
     try {
       const result = await window.desktopApi.export.start({
         sourcePath: source.path,
         themeId,
+        pageSize,
         styleOverrides: effectiveStyle,
         pageNumber,
+        covers,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -440,6 +420,7 @@ export function App(): React.JSX.Element {
       const result = await window.desktopApi.export.html({
         sourcePath: source.path,
         themeId,
+        pageSize,
         styleOverrides: effectiveStyle,
       });
       if (!result) {
@@ -473,7 +454,8 @@ export function App(): React.JSX.Element {
           <button
             className="primary"
             onClick={() => void exportPdf()}
-            disabled={!source || busy}
+            disabled={!source || busy || Boolean(coverSizeError)}
+            title={coverSizeError}
           >
             Export PDF
           </button>
@@ -509,7 +491,12 @@ export function App(): React.JSX.Element {
                 if (!parsed.success) return;
                 setThemeId(parsed.data);
                 if (source) {
-                  void refreshPreview(source.path, parsed.data, effectiveStyle);
+                  void refreshPreview(
+                    source.path,
+                    parsed.data,
+                    pageSize,
+                    effectiveStyle,
+                  );
                 }
               }}
             >
@@ -539,6 +526,14 @@ export function App(): React.JSX.Element {
               </span>
             </button>
           </div>
+          <PublicationFormatControls
+            covers={covers}
+            disabled={!source || busy}
+            pageSize={pageSize}
+            onChooseCover={(slot) => void chooseCoverAsset(slot)}
+            onClearCover={clearCoverAsset}
+            onPageSizeChange={updatePageSize}
+          />
           <div className="panel-block page-number-panel">
             <p className="eyebrow">PAGE NUMBERS</p>
             <label className="toggle-row" htmlFor="page-number-enabled">

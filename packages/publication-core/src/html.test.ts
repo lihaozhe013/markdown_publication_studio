@@ -45,6 +45,18 @@ describe('publication HTML layout', () => {
     expect(publication.html).toContain('print-color-adjust: exact;');
   });
 
+  it('uses the selected page size in the print page rule', () => {
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      pageSize: 'Letter',
+    });
+
+    expect(publication.html).toContain(
+      '@page { size: Letter; margin: 18mm 16mm 20mm 16mm; }',
+    );
+  });
+
   it('places structured style overrides after theme and renderer helper CSS', () => {
     const publication = renderPublicationHtml([chapter], {
       title: 'Book',

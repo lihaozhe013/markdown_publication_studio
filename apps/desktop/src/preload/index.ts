@@ -21,6 +21,7 @@ const api: DesktopApi = {
         sourcePath,
       });
     },
+    chooseCoverAsset: () => ipcRenderer.invoke('project:choose-cover-asset'),
   },
   preview: {
     build: (request) => ipcRenderer.invoke('preview:build', request),

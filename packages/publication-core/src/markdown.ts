@@ -64,7 +64,12 @@ function escapeAttribute(value: string): string {
 }
 
 function isLocalReference(value: string): boolean {
-  return isAbsolute(value) || !/^(?:[a-z][a-z\d+.-]*:|\/\/)/iu.test(value);
+  return (
+    isAbsolute(value) ||
+    /^[a-z]:[\\/]/iu.test(value) ||
+    /^[a-z]:%5c/iu.test(value) ||
+    !/^(?:[a-z][a-z\d+.-]*:|\/\/)/iu.test(value)
+  );
 }
 
 function decodeLocalReference(
@@ -84,6 +89,61 @@ function isWithinRoot(candidate: string, root: string): boolean {
   return (
     relativePath === '' ||
     (!relativePath.startsWith('..') && !isAbsolute(relativePath))
+  );
+}
+
+interface ProtectedImageReference {
+  placeholder: string;
+  reference: string;
+}
+
+function protectLocalImageReferences(html: string): {
+  html: string;
+  references: ProtectedImageReference[];
+} {
+  const matches = Array.from(
+    html.matchAll(/(<img\b[^>]*\bsrc=)(["'])(.*?)\2/giu),
+  );
+  const references: ProtectedImageReference[] = [];
+  let protectedHtml = html;
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches[index];
+    const rawReference = match?.[3];
+    if (
+      !match ||
+      !rawReference ||
+      !isLocalReference(rawReference) ||
+      match.index === undefined ||
+      !match[0] ||
+      !match[1] ||
+      !match[2]
+    ) {
+      continue;
+    }
+
+    const placeholder = `data:image/gif;base64,${Buffer.from(
+      `markdown-publication-local-image-${index}`,
+    ).toString('base64')}`;
+    const replacement = `${match[1]}${match[2]}${placeholder}${match[2]}`;
+    protectedHtml =
+      protectedHtml.slice(0, match.index) +
+      replacement +
+      protectedHtml.slice(match.index + match[0].length);
+    references.push({ placeholder, reference: rawReference });
+  }
+
+  return { html: protectedHtml, references };
+}
+
+function restoreLocalImageReferences(
+  html: string,
+  references: readonly ProtectedImageReference[],
+): string {
+  return references.reduce(
+    (current, { placeholder, reference }) =>
+      current.replaceAll(placeholder, reference),
+    html,
   );
 }
 
@@ -295,7 +355,8 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
         math.placeholders,
         diagnostics,
       );
-      const sanitized = sanitizePublicationHtml(renderedMath);
+      const protectedImages = protectLocalImageReferences(renderedMath);
+      const sanitized = sanitizePublicationHtml(protectedImages.html);
       if (sanitized.removedContent) {
         diagnostics.push({
           severity: 'warning',
@@ -307,7 +368,7 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
         });
       }
       const embedded = await embedLocalImages(
-        sanitized.html,
+        restoreLocalImageReferences(sanitized.html, protectedImages.references),
         input.path,
         context.projectRoot,
       );

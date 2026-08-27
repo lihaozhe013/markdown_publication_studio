@@ -10,16 +10,22 @@ import {
 import type {
   ExportResult,
   PageNumberSettings,
+  PageSizeId,
   PreviewResult,
   PublicationStyleOverrides,
   ThemeId,
 } from '@markdown-publication/shared';
 import {
+  DEFAULT_PAGE_SIZE,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   getBuiltInTheme,
 } from '@markdown-publication/shared';
 import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
+import type {
+  PdfAssemblyCovers,
+  PdfAssembler,
+} from './pdf-assembly-service.js';
 import { loadThemeStylesheet } from './theme-service.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
 import { PageNumberPdfService } from './page-number-pdf-service.js';
@@ -65,11 +71,13 @@ export class PublicationService {
     private readonly printBackend: PrintBackend,
     private readonly mermaidRenderer: MermaidRenderer,
     private readonly pageNumberPdfService: PageNumberPdfService,
+    private readonly pdfAssembler: PdfAssembler,
   ) {}
 
   async buildPreview(
     sourcePath: string,
     themeId: ThemeId,
+    pageSize: PageSizeId = DEFAULT_PAGE_SIZE,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<PreviewResult> {
     if (isRenderingDebugEnabled) {
@@ -89,6 +97,7 @@ export class PublicationService {
     const rendered = renderPublicationHtml([chapter], {
       title: chapter.title,
       themeId,
+      pageSize,
       pageCanvasMode: theme.pageCanvasMode,
       features: {
         codeTheme: 'github-dark',
@@ -115,12 +124,15 @@ export class PublicationService {
     sourcePath: string,
     outputPath: string,
     themeId: ThemeId,
+    pageSize: PageSizeId,
     pageNumber: PageNumberSettings,
+    covers: PdfAssemblyCovers,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<ExportResult> {
     const preview = await this.buildPreview(
       sourcePath,
       themeId,
+      pageSize,
       styleOverrides,
     );
     this.throwOnFatalDiagnostics(preview.diagnostics);
@@ -133,7 +145,22 @@ export class PublicationService {
         firstPageMode: pageNumber.firstPageMode,
       });
     }
-    const pdf = await this.pageNumberPdfService.apply(printedPdf, pageNumber);
+    const numberedBodyPdf = await this.pageNumberPdfService.apply(
+      printedPdf,
+      pageNumber,
+    );
+    if (covers.front || covers.back) {
+      appLogger.info('[cover] Assembling selected cover assets', {
+        front: covers.front?.name,
+        back: covers.back?.name,
+        pageSize,
+      });
+    }
+    const pdf = await this.pdfAssembler.assemble({
+      bodyPdf: numberedBodyPdf,
+      pageSize,
+      covers,
+    });
     const temporaryPath = resolve(
       dirname(outputPath),
       `.${randomUUID()}${extname(outputPath) || '.pdf'}`,
@@ -147,11 +174,13 @@ export class PublicationService {
     sourcePath: string,
     outputPath: string,
     themeId: ThemeId,
+    pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<ExportResult> {
     const preview = await this.buildPreview(
       sourcePath,
       themeId,
+      pageSize,
       styleOverrides,
     );
     this.throwOnFatalDiagnostics(preview.diagnostics);

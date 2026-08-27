@@ -1,6 +1,7 @@
 import type {
   PublicationDiagnostic,
   PublicationStyleOverrides,
+  PageSizeId,
   ThemeId,
   ThemePageCanvasMode,
 } from '@markdown-publication/shared';
@@ -44,7 +45,7 @@ export interface PublicationHtmlOptions {
   stylesheet?: string;
   styleOverrides?: PublicationStyleOverrides;
   features?: PublicationFeatureOptions;
-  pageSize?: 'A4' | 'Letter';
+  pageSize?: PageSizeId;
   margins?: {
     top: string;
     right: string;

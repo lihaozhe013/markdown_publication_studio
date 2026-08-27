@@ -41,6 +41,11 @@ building a preview, and starting an export.
   `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.
 - Page-number PDF post-processing runs in the main process after Chromium
   printing and never exposes PDF or font filesystem access to the renderer.
+- Cover and back-cover assets are selected through a native file dialog and are
+  represented in the renderer by opaque in-memory handles. The main process
+  re-reads and validates each asset immediately before assembly. Only PNG, JPEG,
+  and single-page PDF assets are accepted; cover PDFs are checked for rotation
+  and exact A4/Letter page dimensions before their pages are copied.
 - The print window denies new windows and unrestricted navigation.
 - AI credentials and AI provider code are not part of this milestone.
 

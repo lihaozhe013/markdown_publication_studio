@@ -8,17 +8,20 @@ describe('Claude theme stylesheet', () => {
       resolve(process.cwd(), 'themes/css/claude.css'),
       'utf8',
     );
+    const normalizedStylesheet = stylesheet.replaceAll('\r\n', '\n');
 
-    expect(stylesheet).toContain('--claude-paper: #f7f5f2;');
-    expect(stylesheet).toContain('--claude-orange: #d97757;');
-    expect(stylesheet).toContain(
+    expect(normalizedStylesheet).toContain('--claude-paper: #f7f5f2;');
+    expect(normalizedStylesheet).toContain('--claude-orange: #d97757;');
+    expect(normalizedStylesheet).toContain(
       '--publication-page-background: var(--claude-paper);',
     );
-    expect(stylesheet).toContain('font-weight: 400;');
-    expect(stylesheet).toContain(
+    expect(normalizedStylesheet).toContain('font-weight: 400;');
+    expect(normalizedStylesheet).toContain(
       'html,\n  body.markdown-body,\n  .markdown-body .chapter',
     );
-    expect(stylesheet).toContain('-webkit-print-color-adjust: exact;');
-    expect(stylesheet).toContain('print-color-adjust: exact;');
+    expect(normalizedStylesheet).toContain(
+      '-webkit-print-color-adjust: exact;',
+    );
+    expect(normalizedStylesheet).toContain('print-color-adjust: exact;');
   });
 });

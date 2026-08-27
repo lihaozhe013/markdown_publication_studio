@@ -134,6 +134,62 @@ button:disabled {
 .theme-description {
   margin-bottom: 0;
 }
+.page-size-help,
+.covers-help {
+  margin-bottom: 0;
+}
+.covers-help {
+  margin-top: 0;
+}
+.cover-asset-control {
+  background: #f8fafc;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  margin-top: 10px;
+  padding: 10px;
+}
+.cover-asset-heading {
+  align-items: center;
+  color: #243b53;
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  justify-content: space-between;
+}
+.cover-asset-name {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 9px 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cover-asset-details {
+  margin: 0 0 8px;
+}
+.cover-choose-button {
+  background: #e6f2ff;
+  border: 1px solid #b8d8f5;
+  color: #1b4f80;
+  font-size: 11px;
+  padding: 8px 9px;
+  width: 100%;
+}
+.cover-clear-button {
+  background: transparent;
+  color: #829ab1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 4px;
+}
+.cover-clear-button:hover:not(:disabled) {
+  color: #d64545;
+  transform: none;
+}
+.cover-size-error {
+  margin-bottom: 0;
+  margin-top: 10px;
+}
 .toggle-row {
   align-items: center;
   color: #142033;

@@ -5,10 +5,13 @@ import {
   ipcMain,
   type OpenDialogOptions,
 } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  type CoverAssetReference,
+  type CoverSelection,
   HtmlExportRequestSchema,
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
@@ -28,6 +31,14 @@ import {
 import { applyWindowSecurity } from './security/window-security.js';
 import { AppSettingsService } from './services/app-settings-service.js';
 import { PageNumberPdfService } from './services/page-number-pdf-service.js';
+import {
+  inspectCoverAsset,
+  type CoverAssetFile,
+} from './services/cover-asset-service.js';
+import {
+  PdfAssemblyService,
+  type PdfAssemblyCovers,
+} from './services/pdf-assembly-service.js';
 import { setupApplicationMenu } from './menu.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
@@ -43,9 +54,33 @@ const publicationService = new PublicationService(
   new ElectronPrintBackend(),
   new ElectronMermaidRenderer(mermaidRendererPage),
   new PageNumberPdfService(),
+  new PdfAssemblyService(),
 );
 const appSettingsService = new AppSettingsService();
 const approvedSourcePaths = new Set<string>();
+const approvedCoverAssets = new Map<string, CoverAssetFile>();
+
+function resolveCoverAsset(reference: CoverAssetReference): CoverAssetFile {
+  const asset = approvedCoverAssets.get(reference.id);
+  if (!asset) {
+    throw new Error(
+      '[cover] The cover asset must be selected through the application first.',
+    );
+  }
+  if (asset.kind !== reference.kind) {
+    throw new Error(
+      `[cover] Cover asset "${asset.name}" changed type after it was selected. Choose it again.`,
+    );
+  }
+  return asset;
+}
+
+function resolveRequestedCovers(selection: CoverSelection): PdfAssemblyCovers {
+  return {
+    ...(selection.front ? { front: resolveCoverAsset(selection.front) } : {}),
+    ...(selection.back ? { back: resolveCoverAsset(selection.back) } : {}),
+  };
+}
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -183,6 +218,58 @@ function registerIpcHandlers(): void {
     },
   );
 
+  ipcMain.handle(
+    'project:choose-cover-asset',
+    async (event): Promise<CoverAssetReference | null> => {
+      appLogger.info('[cover] Cover asset selection requested', {
+        rendererId: event.sender.id,
+      });
+      try {
+        const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+        const dialogOptions: OpenDialogOptions = {
+          title: 'Choose cover image or PDF',
+          properties: ['openFile'],
+          filters: [
+            {
+              name: 'Cover assets',
+              extensions: ['png', 'jpg', 'jpeg', 'pdf'],
+            },
+          ],
+        };
+        const result = ownerWindow
+          ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+        const selectedPath = result.filePaths[0];
+        if (result.canceled || !selectedPath) {
+          appLogger.info('[cover] Cover asset selection cancelled.');
+          return null;
+        }
+
+        const normalizedPath = resolve(selectedPath);
+        const assetId = randomUUID();
+        const reference = await inspectCoverAsset(normalizedPath, assetId);
+        const asset: CoverAssetFile = {
+          id: reference.id,
+          path: normalizedPath,
+          name: reference.name,
+          kind: reference.kind,
+        };
+        approvedCoverAssets.set(asset.id, asset);
+        appLogger.info('[cover] Cover asset approved', {
+          fileName: asset.name,
+          kind: asset.kind,
+          pageCount: reference.pageCount,
+          widthPt: reference.widthPt,
+          heightPt: reference.heightPt,
+        });
+        return reference;
+      } catch (error) {
+        appLogger.error('[cover] Failed to choose cover asset', error);
+        throw error;
+      }
+    },
+  );
+
   ipcMain.handle('preview:build', async (_event, rawRequest: unknown) => {
     const request = PreviewRequestSchema.parse(rawRequest);
     if (!approvedSourcePaths.has(request.sourcePath)) {
@@ -194,6 +281,7 @@ function registerIpcHandlers(): void {
     return publicationService.buildPreview(
       request.sourcePath,
       request.themeId,
+      request.pageSize,
       request.styleOverrides,
     );
   });
@@ -206,6 +294,7 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
+    const covers = resolveRequestedCovers(request.covers);
     const result = await dialog.showSaveDialog({
       defaultPath: join(
         process.cwd(),
@@ -220,7 +309,9 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
+      request.pageSize,
       request.pageNumber,
+      covers,
       request.styleOverrides,
     );
   });
@@ -247,6 +338,7 @@ function registerIpcHandlers(): void {
       request.sourcePath,
       result.filePath,
       request.themeId,
+      request.pageSize,
       request.styleOverrides,
     );
   });

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_THEMES,
+  CoverAssetReferenceSchema,
+  CoverSelectionSchema,
+  DEFAULT_PAGE_SIZE,
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   getBuiltInTheme,
   HtmlExportRequestSchema,
+  PageSizeIdSchema,
+  PAGE_SIZE_DEFINITIONS,
   PdfExportRequestSchema,
   formatPageNumber,
   isValidPageNumberFormat,
@@ -64,8 +69,27 @@ describe('Page number settings', () => {
       PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
     ).not.toHaveProperty('pageNumber');
     expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageSize,
+    ).toBe('A4');
+    expect(
       HtmlExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
-    ).not.toHaveProperty('pageNumber');
+    ).toEqual(expect.objectContaining({ pageSize: 'A4' }));
+  });
+
+  it('defaults export page size to A4 and exposes supported dimensions', () => {
+    expect(DEFAULT_PAGE_SIZE).toBe('A4');
+    expect(PageSizeIdSchema.parse('Letter')).toBe('Letter');
+    expect(() => PageSizeIdSchema.parse('A5')).toThrow();
+    expect(
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageSize,
+    ).toBe('A4');
+    expect(PAGE_SIZE_DEFINITIONS.A4.widthPt).toBeCloseTo(595.28, 2);
+    expect(PAGE_SIZE_DEFINITIONS.A4.heightPt).toBeCloseTo(841.89, 2);
+    expect(PAGE_SIZE_DEFINITIONS.Letter).toEqual(
+      expect.objectContaining({ widthPt: 612, heightPt: 792 }),
+    );
   });
 
   it('accepts supported placeholders and rejects unknown tokens', () => {
@@ -93,6 +117,53 @@ describe('Page number settings', () => {
     expect(formatPageNumber('第 {page} 页 / 共 {pages} 页', 2, 8)).toBe(
       '第 2 页 / 共 8 页',
     );
+  });
+});
+
+describe('Cover asset settings', () => {
+  it('accepts independent front and back asset references', () => {
+    const front = {
+      id: 'front-asset',
+      name: 'front.png',
+      kind: 'image' as const,
+    };
+    const back = {
+      id: 'back-asset',
+      name: 'back.pdf',
+      kind: 'pdf' as const,
+      pageCount: 1,
+      widthPt: 595.28,
+      heightPt: 841.89,
+    };
+
+    expect(CoverAssetReferenceSchema.parse(front)).toEqual(front);
+    expect(CoverSelectionSchema.parse({ front, back })).toEqual({
+      front,
+      back,
+    });
+    expect(
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .covers,
+    ).toEqual({});
+  });
+
+  it('rejects unknown cover fields and non-positive PDF metadata', () => {
+    expect(() =>
+      CoverAssetReferenceSchema.parse({
+        id: 'front-asset',
+        name: 'front.png',
+        kind: 'image',
+        arbitraryPath: 'C:\\secret.txt',
+      }),
+    ).toThrow();
+    expect(() =>
+      CoverAssetReferenceSchema.parse({
+        id: 'back-asset',
+        name: 'back.pdf',
+        kind: 'pdf',
+        widthPt: 0,
+      }),
+    ).toThrow();
   });
 });
 

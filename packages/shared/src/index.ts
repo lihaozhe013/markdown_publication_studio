@@ -9,6 +9,66 @@ export const ThemeIdSchema = z.enum([
 
 export const ThemePageCanvasModeSchema = z.enum(['inset', 'full-bleed']);
 
+export const PageSizeIdSchema = z.enum(['A4', 'Letter']);
+
+export type PageSizeId = z.infer<typeof PageSizeIdSchema>;
+
+export interface PageSizeDefinition {
+  id: PageSizeId;
+  label: string;
+  widthPt: number;
+  heightPt: number;
+}
+
+export const PAGE_SIZE_DEFINITIONS: Readonly<
+  Record<PageSizeId, PageSizeDefinition>
+> = {
+  A4: {
+    id: 'A4',
+    label: 'A4',
+    widthPt: (210 * 72) / 25.4,
+    heightPt: (297 * 72) / 25.4,
+  },
+  Letter: {
+    id: 'Letter',
+    label: 'Letter',
+    widthPt: 612,
+    heightPt: 792,
+  },
+};
+
+export function getPageSizeDefinition(
+  pageSize: PageSizeId,
+): PageSizeDefinition {
+  const definition = PAGE_SIZE_DEFINITIONS[pageSize];
+  if (!definition) {
+    throw new Error(`Unknown page size: ${pageSize}`);
+  }
+  return definition;
+}
+
+export const DEFAULT_PAGE_SIZE: PageSizeId = 'A4';
+
+export const CoverAssetKindSchema = z.enum(['image', 'pdf']);
+
+export const CoverAssetReferenceSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    kind: CoverAssetKindSchema,
+    pageCount: z.number().int().positive().optional(),
+    widthPt: z.number().finite().positive().optional(),
+    heightPt: z.number().finite().positive().optional(),
+  })
+  .strict();
+
+export const CoverSelectionSchema = z
+  .object({
+    front: CoverAssetReferenceSchema.optional(),
+    back: CoverAssetReferenceSchema.optional(),
+  })
+  .strict();
+
 export const PageNumberFontIdSchema = z.enum([
   'inter',
   'open-sans',
@@ -262,6 +322,7 @@ export function resolveNumberedPage(
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -270,15 +331,18 @@ export const PreviewRequestSchema = z.object({
 export const PdfExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
   pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+  covers: CoverSelectionSchema.default({}),
 });
 
 export const HtmlExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
+  pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -293,6 +357,9 @@ export type PdfExportRequest = z.infer<typeof PdfExportRequestSchema>;
 export type HtmlExportRequest = z.infer<typeof HtmlExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
 export type ThemePageCanvasMode = z.infer<typeof ThemePageCanvasModeSchema>;
+export type CoverAssetKind = z.infer<typeof CoverAssetKindSchema>;
+export type CoverAssetReference = z.infer<typeof CoverAssetReferenceSchema>;
+export type CoverSelection = z.infer<typeof CoverSelectionSchema>;
 export type PageNumberSettings = z.infer<typeof PageNumberSettingsSchema>;
 export type PageNumberFontId = PageNumberSettings['fontFamily'];
 export type PageNumberStyle = PageNumberSettings['style'];
@@ -353,7 +420,14 @@ export interface PublicationDiagnostic {
   line?: number;
   chapterId?: string;
   feature?:
-    'asset' | 'code' | 'html' | 'math' | 'mermaid' | 'page-number' | 'render';
+    | 'asset'
+    | 'code'
+    | 'cover'
+    | 'html'
+    | 'math'
+    | 'mermaid'
+    | 'page-number'
+    | 'render';
   details?: Record<string, unknown>;
 }
 
@@ -385,6 +459,7 @@ export interface DesktopApi {
   project: {
     openMarkdown(): Promise<MarkdownFileReference | null>;
     openDroppedMarkdown(file: File): Promise<MarkdownFileReference>;
+    chooseCoverAsset(): Promise<CoverAssetReference | null>;
   };
   preview: {
     build(request: PreviewRequest): Promise<PreviewResult>;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderPublicationHtml } from './html.js';
+import type { PublicationTocOptions } from './model.js';
 
 describe('publication HTML layout', () => {
   const chapter = {
@@ -7,6 +8,7 @@ describe('publication HTML layout', () => {
     sourcePath: '/manuscripts/book.md',
     title: 'Book',
     html: '<h1>Book</h1>',
+    tocEntries: [],
     diagnostics: [],
     mermaidDiagramCount: 0,
   };
@@ -82,5 +84,59 @@ describe('publication HTML layout', () => {
     expect(overrideIndex).toBeGreaterThan(helperIndex);
     expect(publication.html).toContain('font-size: 13pt !important;');
     expect(publication.html).toContain('color: #403630 !important;');
+  });
+
+  it('renders both table-of-contents presets with or without page references', () => {
+    const entries = [
+      {
+        id: 'heading-book-intro',
+        level: 1 as const,
+        title: 'Introduction & goals',
+        searchText: 'introduction&goals',
+        order: 0,
+        chapterId: 'book',
+        sourcePath: '/manuscripts/book.md',
+      },
+      {
+        id: 'heading-book-details',
+        level: 2 as const,
+        title: 'Details',
+        searchText: 'details',
+        order: 1,
+        chapterId: 'book',
+        sourcePath: '/manuscripts/book.md',
+      },
+    ];
+    const toc: PublicationTocOptions = {
+      preset: 'classic-book',
+      entries,
+      showPageNumbers: true,
+      pageNumbers: {
+        'heading-book-intro': '2',
+        'heading-book-details': '3',
+      },
+    };
+    const classic = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      toc,
+    });
+    const modern = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      toc: { ...toc, preset: 'modern-technical', showPageNumbers: false },
+    });
+
+    expect(classic.html).toContain('data-toc="true"');
+    expect(classic.html).toContain('publication-toc--classic-book');
+    expect(classic.html).toContain('data-toc-page-for="heading-book-intro">2');
+    expect(classic.html).toContain('href="#heading-book-intro"');
+    expect(classic.html).toContain('publication-toc-leader');
+    expect(modern.html).toContain('publication-toc--modern-technical');
+    expect(modern.html).toContain('data-toc-show-pages="false"');
+    expect(modern.html).not.toContain('data-toc-page-for=');
+    expect(modern.html.indexOf('data-toc="true"')).toBeLessThan(
+      modern.html.indexOf('<article'),
+    );
   });
 });

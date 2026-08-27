@@ -2,6 +2,7 @@ import type {
   PublicationDiagnostic,
   PublicationStyleOverrides,
   PageSizeId,
+  TocPresetId,
   ThemeId,
   ThemePageCanvasMode,
 } from '@markdown-publication/shared';
@@ -34,8 +35,28 @@ export interface CompiledChapter {
   sourcePath: string;
   title: string;
   html: string;
+  tocEntries: TocEntry[];
   diagnostics: PublicationDiagnostic[];
   mermaidDiagramCount: number;
+}
+
+export type TocHeadingLevel = 1 | 2 | 3;
+
+export interface TocEntry {
+  id: string;
+  level: TocHeadingLevel;
+  title: string;
+  searchText: string;
+  order: number;
+  chapterId: string;
+  sourcePath: string;
+}
+
+export interface PublicationTocOptions {
+  preset: TocPresetId;
+  entries: readonly TocEntry[];
+  showPageNumbers: boolean;
+  pageNumbers?: Readonly<Record<string, string>>;
 }
 
 export interface PublicationHtmlOptions {
@@ -46,6 +67,7 @@ export interface PublicationHtmlOptions {
   styleOverrides?: PublicationStyleOverrides;
   features?: PublicationFeatureOptions;
   pageSize?: PageSizeId;
+  toc?: PublicationTocOptions;
   margins?: {
     top: string;
     right: string;

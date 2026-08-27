@@ -1,4 +1,10 @@
-import type { PublicationDiagnostic } from '@markdown-publication/shared';
+import {
+  PAGE_SIZE_DEFINITIONS,
+  resolveNumberedPage,
+  type PageNumberFirstPageMode,
+  type PageSizeId,
+  type PublicationDiagnostic,
+} from '@markdown-publication/shared';
 
 const katexFontFamilies = [
   'KaTeX_Main',
@@ -11,13 +17,15 @@ const katexFontFamilies = [
 
 export async function probePreviewRendering(
   frame: HTMLIFrameElement,
+  pageSize: PageSizeId,
+  pageNumberFirstPageMode: PageNumberFirstPageMode,
 ): Promise<PublicationDiagnostic[]> {
-  if (window.location.hostname !== 'localhost') return [];
   const document = frame.contentDocument;
   const previewWindow = frame.contentWindow;
   if (!document || !previewWindow) return [];
 
   await document.fonts.ready;
+  updateTocPageEstimates(document, pageSize, pageNumberFirstPageMode);
   const stylesheet = [...document.querySelectorAll('style')]
     .map((style) => style.textContent ?? '')
     .join('\n');
@@ -31,20 +39,23 @@ export async function probePreviewRendering(
       document.fonts.check(`16px "${family}"`, '∫[]'),
     ]),
   );
-  console.info(
-    `[math-render] Preview font probe ${JSON.stringify({
-      mathElementCount: document.querySelectorAll('.katex').length,
-      relativeFontUrlCount: (stylesheet.match(/url\((?!data:)/gu) ?? []).length,
-      dataFontUrlCount: (stylesheet.match(/url\(data:/gu) ?? []).length,
-      fonts,
-      mathFontFamily: mathElement
-        ? previewWindow.getComputedStyle(mathElement).fontFamily
-        : undefined,
-      delimiterFontFamily: delimiterElement
-        ? previewWindow.getComputedStyle(delimiterElement).fontFamily
-        : undefined,
-    })}`,
-  );
+  if (window.location.hostname === 'localhost') {
+    console.info(
+      `[math-render] Preview font probe ${JSON.stringify({
+        mathElementCount: document.querySelectorAll('.katex').length,
+        relativeFontUrlCount: (stylesheet.match(/url\((?!data:)/gu) ?? [])
+          .length,
+        dataFontUrlCount: (stylesheet.match(/url\(data:/gu) ?? []).length,
+        fonts,
+        mathFontFamily: mathElement
+          ? previewWindow.getComputedStyle(mathElement).fontFamily
+          : undefined,
+        delimiterFontFamily: delimiterElement
+          ? previewWindow.getComputedStyle(delimiterElement).fontFamily
+          : undefined,
+      })}`,
+    );
+  }
 
   const diagrams = [
     ...document.querySelectorAll<SVGSVGElement>('svg.mermaid-diagram'),
@@ -80,9 +91,11 @@ export async function probePreviewRendering(
         : undefined,
     };
   });
-  console.info(
-    `[mermaid-render] Preview layout probe ${JSON.stringify({ diagrams })}`,
-  );
+  if (window.location.hostname === 'localhost') {
+    console.info(
+      `[mermaid-render] Preview layout probe ${JSON.stringify({ diagrams })}`,
+    );
+  }
 
   const missingMathFonts =
     mathElement === null
@@ -99,4 +112,59 @@ export async function probePreviewRendering(
           details: { missingFonts: missingMathFonts },
         },
       ];
+}
+
+function updateTocPageEstimates(
+  document: Document,
+  pageSize: PageSizeId,
+  pageNumberFirstPageMode: PageNumberFirstPageMode,
+): void {
+  const pageHeightPx = PAGE_SIZE_DEFINITIONS[pageSize].heightPt * (96 / 72);
+  const toc = document.querySelector<HTMLElement>('[data-toc="true"]');
+  const tocBottom = toc
+    ? toc.getBoundingClientRect().bottom + document.defaultView!.scrollY
+    : 0;
+  const estimatedTocPages = toc
+    ? Math.max(1, Math.ceil(toc.getBoundingClientRect().height / pageHeightPx))
+    : 0;
+  const documentHeight = Math.max(
+    document.documentElement.scrollHeight,
+    document.body.scrollHeight,
+  );
+  const estimatedPageCount = Math.max(
+    1,
+    Math.ceil(documentHeight / pageHeightPx),
+  );
+
+  for (const pageElement of document.querySelectorAll<HTMLElement>(
+    '[data-toc-page-for]',
+  )) {
+    const headingId = pageElement.dataset.tocPageFor;
+    if (!headingId) continue;
+    const heading = document.getElementById(headingId);
+    if (!heading) {
+      pageElement.textContent = '—';
+      continue;
+    }
+    const headingTop =
+      heading.getBoundingClientRect().top + document.defaultView!.scrollY;
+    const bodyOffset = Math.max(0, headingTop - tocBottom);
+    const pageIndex = estimatedTocPages + Math.floor(bodyOffset / pageHeightPx);
+    const numbered = resolveNumberedPage(
+      pageIndex,
+      Math.max(estimatedPageCount, pageIndex + 1),
+      pageNumberFirstPageMode,
+    );
+    pageElement.textContent = numbered ? `~${numbered.page}` : '—';
+  }
+
+  if (toc && window.location.hostname === 'localhost') {
+    console.info(
+      `[toc] Preview page estimates ${JSON.stringify({
+        estimatedTocPages,
+        estimatedPageCount,
+        entryCount: document.querySelectorAll('[data-toc-page-for]').length,
+      })}`,
+    );
+  }
 }

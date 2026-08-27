@@ -112,6 +112,7 @@ const commonAttributes = [
   'data-mermaid-id',
   'data-mermaid-source',
   'data-publication-math',
+  'data-toc-id',
   'data-language',
   'style',
   'width',

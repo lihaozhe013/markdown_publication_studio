@@ -41,6 +41,11 @@ building a preview, and starting an export.
   `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.
 - Page-number PDF post-processing runs in the main process after Chromium
   printing and never exposes PDF or font filesystem access to the renderer.
+- Table-of-contents extraction runs only in the main process. `pdfjs-dist`
+  receives the in-memory Chromium PDF and heading metadata through an internal
+  service; no PDF parser, filesystem path, or arbitrary page-location operation
+  is exposed through preload or renderer APIs. The renderer only receives the
+  generated preview HTML and validated TOC settings.
 - Cover and back-cover assets are selected through a native file dialog and are
   represented in the renderer by opaque in-memory handles. The main process
   re-reads and validates each asset immediately before assembly. Only PNG, JPEG,

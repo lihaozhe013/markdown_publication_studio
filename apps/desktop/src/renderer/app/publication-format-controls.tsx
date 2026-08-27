@@ -1,9 +1,13 @@
 import {
   PAGE_SIZE_DEFINITIONS,
   PageSizeIdSchema,
+  TOC_PRESET_DEFINITIONS,
+  TocPresetIdSchema,
+  TocSettingsSchema,
   type CoverAssetReference,
   type CoverSelection,
   type PageSizeId,
+  type TocSettings,
 } from '@markdown-publication/shared';
 
 export type CoverSlot = 'front' | 'back';
@@ -92,18 +96,22 @@ interface PublicationFormatControlsProps {
   covers: CoverSelection;
   disabled: boolean;
   pageSize: PageSizeId;
+  toc: TocSettings;
   onChooseCover: (slot: CoverSlot) => void;
   onClearCover: (slot: CoverSlot) => void;
   onPageSizeChange: (pageSize: PageSizeId) => void;
+  onTocChange: (settings: TocSettings) => void;
 }
 
 export function PublicationFormatControls({
   covers,
   disabled,
   pageSize,
+  toc,
   onChooseCover,
   onClearCover,
   onPageSizeChange,
+  onTocChange,
 }: PublicationFormatControlsProps): React.JSX.Element {
   const coverSizeError = getCoverSizeError(covers, pageSize);
 
@@ -138,6 +146,54 @@ export function PublicationFormatControls({
           Cover PDFs must match this portrait page size. Images are stretched to
           fill it.
         </p>
+      </div>
+      <div className="panel-block toc-panel">
+        <p className="eyebrow">TABLE OF CONTENTS</p>
+        <label className="toggle-row" htmlFor="toc-enabled">
+          <input
+            id="toc-enabled"
+            type="checkbox"
+            checked={toc.enabled}
+            disabled={disabled}
+            onChange={(event) =>
+              onTocChange({ ...toc, enabled: event.target.checked })
+            }
+          />
+          <span>Include table of contents</span>
+        </label>
+        <fieldset className="toc-controls" disabled={disabled || !toc.enabled}>
+          <label htmlFor="toc-preset">Preset</label>
+          <select
+            id="toc-preset"
+            value={toc.preset}
+            onChange={(event) => {
+              const parsed = TocPresetIdSchema.safeParse(event.target.value);
+              if (parsed.success) onTocChange({ ...toc, preset: parsed.data });
+            }}
+          >
+            {TOC_PRESET_DEFINITIONS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </fieldset>
+        <p className="muted toc-preset-description">
+          {
+            TOC_PRESET_DEFINITIONS.find((preset) => preset.id === toc.preset)
+              ?.description
+          }
+        </p>
+        <p className="muted toc-help">
+          H1-H3 only. PDF export and this preview include the contents page;
+          HTML export remains body-only. Page references follow the page-number
+          setting; preview references are estimates.
+        </p>
+        {!TocSettingsSchema.safeParse(toc).success ? (
+          <p className="diagnostic error">
+            Invalid table of contents settings.
+          </p>
+        ) : null}
       </div>
       <div className="panel-block covers-panel">
         <p className="eyebrow">COVERS</p>

@@ -4,18 +4,17 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
-  PageNumberFirstPageModeSchema,
-  PageNumberFontIdSchema,
+  DEFAULT_TOC_SETTINGS,
   PageNumberSettingsSchema,
-  PageNumberStyleSchema,
   PublicationStyleOverridesSchema,
+  TocSettingsSchema,
   ThemeIdSchema,
   type CoverSelection,
   type PublicationDiagnostic,
   type PublicationStyleOverrides,
-  type PageNumberFontId,
   type PageNumberSettings,
   type PageSizeId,
+  type TocSettings,
   type ThemeId,
 } from '@markdown-publication/shared';
 import { AdvancedStylePanel } from './advanced-style-panel.js';
@@ -26,16 +25,7 @@ import {
   type CoverSlot,
 } from './publication-format-controls.js';
 import { probePreviewRendering } from './preview-probe.js';
-
-const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
-  { id: 'inter', name: 'Inter' },
-  { id: 'open-sans', name: 'Open Sans' },
-  { id: 'source-han-sans', name: 'Source Han Sans SC' },
-  { id: 'jetbrains-mono', name: 'JetBrains Mono' },
-  { id: 'source-sans-3', name: 'Source Sans 3' },
-  { id: 'source-serif-4', name: 'Source Serif 4' },
-  { id: 'source-han-serif', name: 'Source Han Serif SC' },
-];
+import { PageNumberControls } from './page-number-controls.js';
 
 function hasStyleValue(value: unknown): boolean {
   if (value === undefined || value === null) return false;
@@ -59,6 +49,9 @@ export function App(): React.JSX.Element {
   const [themeId, setThemeId] = useState<ThemeId>('rose');
   const [pageSize, setPageSize] = useState<PageSizeId>(DEFAULT_PAGE_SIZE);
   const [covers, setCovers] = useState<CoverSelection>({});
+  const [toc, setToc] = useState<TocSettings>({
+    ...DEFAULT_TOC_SETTINGS,
+  });
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
@@ -123,6 +116,8 @@ export function App(): React.JSX.Element {
     selectedTheme: ThemeId,
     selectedPageSize: PageSizeId,
     selectedStyle: PublicationStyleOverrides,
+    selectedToc: TocSettings,
+    selectedPageNumbersEnabled: boolean,
   ): Promise<void> {
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
@@ -132,6 +127,8 @@ export function App(): React.JSX.Element {
         sourcePath: path,
         themeId: selectedTheme,
         pageSize: selectedPageSize,
+        toc: selectedToc,
+        pageNumbersEnabled: selectedPageNumbersEnabled,
         styleOverrides: selectedStyle,
       });
       if (sequence !== previewSequenceRef.current) return;
@@ -147,10 +144,33 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  function refreshCurrentPreview(
+    path: string,
+    selectedTheme: ThemeId,
+    selectedPageSize: PageSizeId,
+    selectedStyle: PublicationStyleOverrides,
+  ): void {
+    void refreshPreview(
+      path,
+      selectedTheme,
+      selectedPageSize,
+      selectedStyle,
+      toc,
+      pageNumber.enabled,
+    );
+  }
+
   useEffect(() => {
     if (!stylePanelOpen || !styleDirty || !source) return undefined;
     const timer = window.setTimeout(() => {
-      void refreshPreview(source.path, themeId, pageSize, styleDraft);
+      void refreshPreview(
+        source.path,
+        themeId,
+        pageSize,
+        styleDraft,
+        toc,
+        pageNumber.enabled,
+      );
     }, 250);
     return () => window.clearTimeout(timer);
   }, [
@@ -161,6 +181,8 @@ export function App(): React.JSX.Element {
     styleDraft,
     stylePanelOpen,
     themeId,
+    toc,
+    pageNumber.enabled,
   ]);
 
   async function commitPageNumberSettings(
@@ -196,6 +218,16 @@ export function App(): React.JSX.Element {
     const nextSettings = { ...pageNumber, [key]: value };
     setPageNumber(nextSettings);
     void commitPageNumberSettings(nextSettings);
+    if (source && (key === 'enabled' || key === 'firstPageMode')) {
+      void refreshPreview(
+        source.path,
+        themeId,
+        pageSize,
+        effectiveStyle,
+        toc,
+        nextSettings.enabled,
+      );
+    }
   }
 
   function openStylePanel(): void {
@@ -235,7 +267,7 @@ export function App(): React.JSX.Element {
       setStylePanelOpen(false);
       setStatus('Advanced styles saved.');
       if (source) {
-        void refreshPreview(source.path, themeId, pageSize, saved);
+        refreshCurrentPreview(source.path, themeId, pageSize, saved);
       }
     } catch (error) {
       setStyleError(
@@ -253,7 +285,7 @@ export function App(): React.JSX.Element {
     setStyleError('');
     setStylePanelOpen(false);
     if (source) {
-      void refreshPreview(source.path, themeId, pageSize, customStyle);
+      refreshCurrentPreview(source.path, themeId, pageSize, customStyle);
     }
   }
 
@@ -265,7 +297,26 @@ export function App(): React.JSX.Element {
   function updatePageSize(nextPageSize: PageSizeId): void {
     setPageSize(nextPageSize);
     if (source) {
-      void refreshPreview(source.path, themeId, nextPageSize, effectiveStyle);
+      refreshCurrentPreview(source.path, themeId, nextPageSize, effectiveStyle);
+    }
+  }
+
+  function updateToc(nextToc: TocSettings): void {
+    const parsed = TocSettingsSchema.safeParse(nextToc);
+    if (!parsed.success) {
+      setStatus('Invalid table of contents settings.');
+      return;
+    }
+    setToc(parsed.data);
+    if (source) {
+      void refreshPreview(
+        source.path,
+        themeId,
+        pageSize,
+        effectiveStyle,
+        parsed.data,
+        pageNumber.enabled,
+      );
     }
   }
 
@@ -333,9 +384,17 @@ export function App(): React.JSX.Element {
       });
       setSource(selected);
       setCovers({});
+      setToc({ ...DEFAULT_TOC_SETTINGS });
       setStyleDraft(customStyle);
       setStylePanelOpen(false);
-      await refreshPreview(selected.path, themeId, pageSize, customStyle);
+      await refreshPreview(
+        selected.path,
+        themeId,
+        pageSize,
+        customStyle,
+        DEFAULT_TOC_SETTINGS,
+        pageNumber.enabled,
+      );
     } catch (error) {
       console.error('[open-file] Open Markdown failed.', error);
       setStatus(
@@ -367,9 +426,17 @@ export function App(): React.JSX.Element {
       });
       setSource(selected);
       setCovers({});
+      setToc({ ...DEFAULT_TOC_SETTINGS });
       setStyleDraft(customStyle);
       setStylePanelOpen(false);
-      await refreshPreview(selected.path, themeId, pageSize, customStyle);
+      await refreshPreview(
+        selected.path,
+        themeId,
+        pageSize,
+        customStyle,
+        DEFAULT_TOC_SETTINGS,
+        pageNumber.enabled,
+      );
     } catch (error) {
       console.error('[open-file] Open dropped Markdown failed.', error);
       setStatus(
@@ -398,6 +465,7 @@ export function App(): React.JSX.Element {
         styleOverrides: effectiveStyle,
         pageNumber,
         covers,
+        toc,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -491,7 +559,7 @@ export function App(): React.JSX.Element {
                 if (!parsed.success) return;
                 setThemeId(parsed.data);
                 if (source) {
-                  void refreshPreview(
+                  refreshCurrentPreview(
                     source.path,
                     parsed.data,
                     pageSize,
@@ -530,131 +598,24 @@ export function App(): React.JSX.Element {
             covers={covers}
             disabled={!source || busy}
             pageSize={pageSize}
+            toc={toc}
             onChooseCover={(slot) => void chooseCoverAsset(slot)}
             onClearCover={clearCoverAsset}
             onPageSizeChange={updatePageSize}
+            onTocChange={updateToc}
           />
-          <div className="panel-block page-number-panel">
-            <p className="eyebrow">PAGE NUMBERS</p>
-            <label className="toggle-row" htmlFor="page-number-enabled">
-              <input
-                id="page-number-enabled"
-                type="checkbox"
-                checked={pageNumber.enabled}
-                disabled={busy}
-                onChange={(event) =>
-                  updatePageNumberField('enabled', event.target.checked)
-                }
-              />
-              <span>Enable page numbers</span>
-            </label>
-            <fieldset
-              className="page-number-controls"
-              disabled={busy || !pageNumber.enabled}
-            >
-              <label htmlFor="page-number-font">Font</label>
-              <select
-                id="page-number-font"
-                value={pageNumber.fontFamily}
-                onChange={(event) => {
-                  const parsed = PageNumberFontIdSchema.safeParse(
-                    event.target.value,
-                  );
-                  if (parsed.success) {
-                    updatePageNumberField('fontFamily', parsed.data);
-                  }
-                }}
-              >
-                {pageNumberFonts.map((font) => (
-                  <option key={font.id} value={font.id}>
-                    {font.name}
-                  </option>
-                ))}
-              </select>
-
-              <label htmlFor="page-number-size">Size (pt)</label>
-              <input
-                id="page-number-size"
-                type="number"
-                min="6"
-                max="24"
-                step="0.5"
-                value={pageNumber.fontSizePt}
-                onChange={(event) =>
-                  updatePageNumberField(
-                    'fontSizePt',
-                    Number(event.target.value),
-                  )
-                }
-              />
-
-              <label htmlFor="page-number-style">Style</label>
-              <select
-                id="page-number-style"
-                value={pageNumber.style}
-                onChange={(event) => {
-                  const parsed = PageNumberStyleSchema.safeParse(
-                    event.target.value,
-                  );
-                  if (parsed.success) {
-                    updatePageNumberField('style', parsed.data);
-                  }
-                }}
-              >
-                <option value="normal">Regular</option>
-                <option value="bold">Bold</option>
-                <option value="italic">Italic</option>
-              </select>
-
-              <label htmlFor="page-number-format">Format</label>
-              <input
-                id="page-number-format"
-                type="text"
-                value={pageNumber.format}
-                maxLength={160}
-                onChange={(event) =>
-                  setPageNumber((current) => ({
-                    ...current,
-                    format: event.target.value,
-                  }))
-                }
-                onBlur={() => void commitPageNumberSettings(pageNumber)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
-              <p className="muted page-number-help">
-                Use {'{page}'} and {'{pages}'}. Applied to PDF export only.
-              </p>
-
-              <label htmlFor="page-number-first-page">First page</label>
-              <select
-                id="page-number-first-page"
-                value={pageNumber.firstPageMode}
-                onChange={(event) => {
-                  const parsed = PageNumberFirstPageModeSchema.safeParse(
-                    event.target.value,
-                  );
-                  if (parsed.success) {
-                    updatePageNumberField('firstPageMode', parsed.data);
-                  }
-                }}
-              >
-                <option value="all-pages">Show every page from 1</option>
-                <option value="hide-first-start-at-1">
-                  Hide first page, then start at 1
-                </option>
-                <option value="hide-first-start-at-2">
-                  Hide first page, then start at 2
-                </option>
-              </select>
-            </fieldset>
-            {pageNumberError ? (
-              <p className="diagnostic error">{pageNumberError}</p>
-            ) : null}
-          </div>
+          <PageNumberControls
+            disabled={busy}
+            error={pageNumberError}
+            settings={pageNumber}
+            onCommitFormat={(settings) => {
+              void commitPageNumberSettings(settings);
+            }}
+            onFieldChange={updatePageNumberField}
+            onFormatChange={(format) =>
+              setPageNumber((current) => ({ ...current, format }))
+            }
+          />
           <div className="panel-block diagnostics">
             <p className="eyebrow">DIAGNOSTICS</p>
             {diagnostics.length === 0 ? (
@@ -685,17 +646,19 @@ export function App(): React.JSX.Element {
               ref={previewFrameRef}
               onLoad={() => {
                 if (previewFrameRef.current) {
-                  void probePreviewRendering(previewFrameRef.current).then(
-                    (probeDiagnostics) => {
-                      setDiagnostics((current) => [
-                        ...current.filter(
-                          (diagnostic) =>
-                            diagnostic.code !== 'math-font-unavailable',
-                        ),
-                        ...probeDiagnostics,
-                      ]);
-                    },
-                  );
+                  void probePreviewRendering(
+                    previewFrameRef.current,
+                    pageSize,
+                    pageNumber.firstPageMode,
+                  ).then((probeDiagnostics) => {
+                    setDiagnostics((current) => [
+                      ...current.filter(
+                        (diagnostic) =>
+                          diagnostic.code !== 'math-font-unavailable',
+                      ),
+                      ...probeDiagnostics,
+                    ]);
+                  });
                 }
               }}
             />

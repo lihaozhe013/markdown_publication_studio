@@ -42,6 +42,13 @@ adjustable size and style, a customizable format template (e.g.
 numbering at 1, or hide and start at 2). Page numbers are embedded into the
 final PDF via pdf-lib with automatic font fallback for CJK characters.
 
+**Table of Contents**
+
+PDF export can add a `Contents` page with automatically extracted H1-H3
+headings. Choose between the Classic Book and Modern Technical presets, see
+estimated references in the preview, and receive page-accurate references in the
+final PDF when page numbers are enabled. HTML export remains body-only.
+
 **Advanced Styles**
 
 The advanced style panel provides structured overrides for body text, headings,
@@ -102,7 +109,9 @@ Markdown file
   -> Local image embedding (base64 data URIs)
   -> Full HTML assembly with inline CSS, KaTeX, and theme stylesheets
   -> Mermaid rendering (isolated BrowserWindow) and SVG injection
+  -> Optional Contents page (preview/PDF; H1-H3)
   -> Preview (sandboxed iframe) or PDF (hidden BrowserWindow + printToPDF)
+  -> Optional two-pass PDF Contents page-reference resolution
   -> Page number overlay via pdf-lib
   -> Atomic file write
 ```
@@ -110,7 +119,7 @@ Markdown file
 ## Tech Stack
 
 Electron 43, React 19, TypeScript 7, Vite 8, markdown-it, Shiki, KaTeX, Mermaid,
-pdf-lib, Zod, Vitest.
+pdf-lib, pdfjs-dist, Zod, Vitest.
 
 ## Development
 

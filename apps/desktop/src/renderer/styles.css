@@ -190,6 +190,40 @@ button:disabled {
   margin-bottom: 0;
   margin-top: 10px;
 }
+.toc-controls {
+  border: 0;
+  display: grid;
+  gap: 7px 8px;
+  grid-template-columns: 1fr 1.4fr;
+  margin: 14px 0 0;
+  min-width: 0;
+  padding: 0;
+}
+.toc-controls label {
+  align-self: center;
+  color: #52606d;
+  font-size: 11px;
+  font-weight: 700;
+}
+.toc-controls select {
+  background: white;
+  border: 1px solid #bcccdc;
+  border-radius: 7px;
+  color: #142033;
+  font: inherit;
+  min-width: 0;
+  padding: 7px 8px;
+  width: 100%;
+}
+.toc-controls:disabled {
+  opacity: 0.55;
+}
+.toc-help {
+  margin-bottom: 0;
+}
+.toc-preset-description {
+  margin: 8px 0 0;
+}
 .toggle-row {
   align-items: center;
   color: #142033;

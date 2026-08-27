@@ -20,7 +20,10 @@ import type {
   CompileContext,
   MarkdownSource,
   PublicationFeatureOptions,
+  TocEntry,
+  TocHeadingLevel,
 } from './model.js';
+import { normalizeTocText } from './toc.js';
 import { renderMathPlaceholders, prepareMath } from './math.js';
 import { sanitizePublicationHtml } from './sanitizer.js';
 
@@ -61,6 +64,59 @@ function escapeHtml(value: string): string {
 
 function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("'", '&#39;');
+}
+
+interface InlineTokenLike {
+  children: InlineTokenLike[] | null;
+  content: string;
+  type: string;
+}
+
+function getInlineText(token: InlineTokenLike | undefined): string {
+  if (!token) return '';
+  const text = (token.children ?? [])
+    .map((child) => {
+      if (child.type === 'softbreak' || child.type === 'hardbreak') {
+        return ' ';
+      }
+      return child.children && child.children.length > 0
+        ? getInlineText(child)
+        : child.content;
+    })
+    .join('');
+  return text.replace(/<[^>]*>/gu, '').trim();
+}
+
+function headingLevel(tag: string): number | undefined {
+  const level = Number.parseInt(tag.slice(1), 10);
+  return level >= 1 && level <= 6 ? level : undefined;
+}
+
+function headingSlug(value: string, headingIndex: number): string {
+  const slug = value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');
+  return slug || `section-${headingIndex + 1}`;
+}
+
+function uniqueHeadingId(
+  title: string,
+  headingIndex: number,
+  usedIds: Set<string>,
+  chapterId: string,
+): string {
+  const chapterSlug = headingSlug(chapterId, 0);
+  const base = `heading-${chapterSlug}-${headingSlug(title, headingIndex)}`;
+  let id = base;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
+  return id;
 }
 
 function isLocalReference(value: string): boolean {
@@ -291,6 +347,10 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
       const features = getFeatures(context.features);
       const diagnostics: PublicationDiagnostic[] = [];
       let mermaidDiagramCount = 0;
+      let headingIndex = 0;
+      const usedHeadingIds = new Set<string>();
+      const tocEntries: TocEntry[] = [];
+      const chapterId = basename(input.path, extname(input.path));
       const math = prepareMath(input.content, features.math.enabled);
       const markdown = new MarkdownIt({
         html: features.html.policy === 'safe-static',
@@ -348,6 +408,51 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
           }
         },
       });
+      const defaultHeadingOpen = markdown.renderer.rules.heading_open;
+      markdown.renderer.rules.heading_open = (
+        tokens,
+        index,
+        options,
+        env,
+        renderer,
+      ) => {
+        const token = tokens[index];
+        if (!token) {
+          return '';
+        }
+        const level = headingLevel(token.tag);
+        if (level === undefined) {
+          return defaultHeadingOpen
+            ? defaultHeadingOpen(tokens, index, options, env, renderer)
+            : renderer.renderToken(tokens, index, options);
+        }
+
+        const title = getInlineText(tokens[index + 1]);
+        const id = uniqueHeadingId(
+          title,
+          headingIndex,
+          usedHeadingIds,
+          chapterId,
+        );
+        headingIndex += 1;
+        token.attrSet('id', id);
+        token.attrSet('data-toc-id', id);
+        if (level <= 3 && title.length > 0) {
+          tocEntries.push({
+            id,
+            level: level as TocHeadingLevel,
+            title,
+            searchText: normalizeTocText(title),
+            order: tocEntries.length,
+            chapterId,
+            sourcePath: input.path,
+          });
+        }
+
+        return defaultHeadingOpen
+          ? defaultHeadingOpen(tokens, index, options, env, renderer)
+          : renderer.renderToken(tokens, index, options);
+      };
 
       const renderedMarkdown = markdown.render(math.source);
       const renderedMath = renderMathPlaceholders(
@@ -377,10 +482,11 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
         titleMatch?.[1]?.replace(/<[^>]+>/gu, '').trim() ||
         basename(input.path, extname(input.path));
       return {
-        id: basename(input.path, extname(input.path)),
+        id: chapterId,
         sourcePath: input.path,
         title,
         html: embedded.html,
+        tocEntries,
         diagnostics: [...diagnostics, ...embedded.diagnostics],
         mermaidDiagramCount,
       };

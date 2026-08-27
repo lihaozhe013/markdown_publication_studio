@@ -8,6 +8,7 @@ import {
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  DEFAULT_TOC_SETTINGS,
   getBuiltInTheme,
   HtmlExportRequestSchema,
   PageSizeIdSchema,
@@ -20,6 +21,8 @@ import {
   PreviewRequestSchema,
   PublicationStyleOverridesSchema,
   resolveNumberedPage,
+  TocPresetIdSchema,
+  TocSettingsSchema,
   ThemeIdSchema,
   ThemePageCanvasModeSchema,
   type MermaidGeometrySignature,
@@ -117,6 +120,44 @@ describe('Page number settings', () => {
     expect(formatPageNumber('第 {page} 页 / 共 {pages} 页', 2, 8)).toBe(
       '第 2 页 / 共 8 页',
     );
+  });
+});
+
+describe('Table of contents settings', () => {
+  it('defaults requests to a disabled classic-book table of contents', () => {
+    expect(TocSettingsSchema.parse(DEFAULT_TOC_SETTINGS)).toEqual(
+      DEFAULT_TOC_SETTINGS,
+    );
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }).toc,
+    ).toEqual(DEFAULT_TOC_SETTINGS);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageNumbersEnabled,
+    ).toBe(false);
+    expect(
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }).toc,
+    ).toEqual(DEFAULT_TOC_SETTINGS);
+  });
+
+  it('accepts both presets and rejects invalid or unknown settings', () => {
+    expect(TocPresetIdSchema.parse('modern-technical')).toBe(
+      'modern-technical',
+    );
+    expect(
+      TocSettingsSchema.parse({
+        enabled: true,
+        preset: 'modern-technical',
+      }),
+    ).toEqual({ enabled: true, preset: 'modern-technical' });
+    expect(() => TocPresetIdSchema.parse('minimal')).toThrow();
+    expect(() =>
+      TocSettingsSchema.parse({
+        enabled: true,
+        preset: 'classic-book',
+        arbitrary: true,
+      }),
+    ).toThrow();
   });
 });
 

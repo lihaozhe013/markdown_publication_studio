@@ -2,6 +2,7 @@ import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import type { CompiledChapter, PublicationHtmlOptions } from './model.js';
 import { getKatexStylesheet } from './math.js';
 import { renderStyleOverrides } from './style-overrides.js';
+import { getTableOfContentsStylesheet, renderTableOfContents } from './toc.js';
 
 const defaultMargins = {
   top: '18mm',
@@ -36,6 +37,10 @@ export function renderPublicationHtml(
         `<article class="chapter" data-source-path="${escapeAttribute(chapter.sourcePath)}">${chapter.html}</article>`,
     )
     .join('\n');
+  const tableOfContents = options.toc ? renderTableOfContents(options.toc) : '';
+  const tableOfContentsStylesheet = options.toc
+    ? getTableOfContentsStylesheet()
+    : '';
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -92,6 +97,7 @@ export function renderPublicationHtml(
       .markdown-body > p > .katex { vertical-align: middle; }
       .math-error { color: #b42318; background: #fff1f0; padding: 2pt 4pt; }
       @media print { .code-block, .mermaid-diagram, .math-block { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      ${tableOfContentsStylesheet}
     </style>
     <style>${options.stylesheet ?? ''}</style>
     <style>${mathStylesheet}</style>
@@ -106,7 +112,7 @@ export function renderPublicationHtml(
     }
   </head>
   <body class="markdown-body" data-theme="${escapeAttribute(options.themeId ?? 'default')}" data-publication-render-ready="false">
-    ${body}
+    ${tableOfContents}${body}
   </body>
 </html>`;
   return { html, diagnostics };

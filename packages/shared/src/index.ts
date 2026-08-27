@@ -13,6 +13,43 @@ export const PageSizeIdSchema = z.enum(['A4', 'Letter']);
 
 export type PageSizeId = z.infer<typeof PageSizeIdSchema>;
 
+export const TocPresetIdSchema = z.enum(['classic-book', 'modern-technical']);
+
+export type TocPresetId = z.infer<typeof TocPresetIdSchema>;
+
+export interface TocPresetDefinition {
+  id: TocPresetId;
+  label: string;
+  description: string;
+}
+
+export const TOC_PRESET_DEFINITIONS: readonly TocPresetDefinition[] = [
+  {
+    id: 'classic-book',
+    label: 'Classic Book',
+    description: 'Serif-led hierarchy with dotted leaders and page references.',
+  },
+  {
+    id: 'modern-technical',
+    label: 'Modern Technical',
+    description: 'Compact sans-serif entries with a theme-colored accent rail.',
+  },
+];
+
+export const TocSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    preset: TocPresetIdSchema,
+  })
+  .strict();
+
+export type TocSettings = z.infer<typeof TocSettingsSchema>;
+
+export const DEFAULT_TOC_SETTINGS = {
+  enabled: false,
+  preset: 'classic-book',
+} as const satisfies TocSettings;
+
 export interface PageSizeDefinition {
   id: PageSizeId;
   label: string;
@@ -323,6 +360,8 @@ export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
+  toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
+  pageNumbersEnabled: z.boolean().default(false),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -332,6 +371,7 @@ export const PdfExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
+  toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -427,6 +467,7 @@ export interface PublicationDiagnostic {
     | 'math'
     | 'mermaid'
     | 'page-number'
+    | 'toc'
     | 'render';
   details?: Record<string, unknown>;
 }

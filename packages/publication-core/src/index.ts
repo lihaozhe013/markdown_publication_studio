@@ -4,10 +4,18 @@ export type {
   MarkdownSource,
   PublicationFeatureOptions,
   PublicationHtmlOptions,
+  PublicationTocOptions,
+  TocEntry,
+  TocHeadingLevel,
 } from './model.js';
 export type { MarkdownCompiler } from './markdown.js';
 export { compileMarkdownFile, createMarkdownCompiler } from './markdown.js';
 export { renderPublicationHtml } from './html.js';
+export {
+  getTableOfContentsStylesheet,
+  normalizeTocText,
+  renderTableOfContents,
+} from './toc.js';
 export { getKatexFontAssetSummary, getKatexStylesheet } from './math.js';
 export {
   collectStyleOverrideFontIds,

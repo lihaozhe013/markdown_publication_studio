@@ -34,7 +34,9 @@ describe('publication core', () => {
       stylesheet: '.markdown-body { --test-theme: enabled; }',
     });
 
-    expect(publication.html).toContain('<h1>Sample</h1>');
+    expect(publication.html).toContain(
+      '<h1 id="heading-sample-sample" data-toc-id="heading-sample-sample">Sample</h1>',
+    );
     expect(publication.html).toContain('data:image/svg+xml;base64,');
     expect(publication.html).toContain('class="shiki');
     expect(publication.html).toContain('<table>');
@@ -43,6 +45,35 @@ describe('publication core', () => {
     expect(publication.html).toContain('--test-theme: enabled');
     expect(publication.html).toContain('.code-block.shiki code');
     expect(publication.diagnostics).toEqual([]);
+  });
+
+  it('extracts H1-H3 headings with unique anchors and keeps deeper anchors', async () => {
+    const compiler = await createMarkdownCompiler();
+    const chapter = await compiler.compile(
+      {
+        path: '/tmp/guide.md',
+        content: `# Getting Started [guide](https://example.com)
+
+## 中文 \`示例\`
+
+#### Deep detail
+
+## Getting Started [guide](https://example.com)`,
+      },
+      { projectRoot: '/tmp' },
+    );
+
+    expect(chapter.tocEntries).toHaveLength(3);
+    expect(chapter.tocEntries.map((entry) => entry.level)).toEqual([1, 2, 2]);
+    expect(chapter.tocEntries.map((entry) => entry.title)).toEqual([
+      'Getting Started guide',
+      '中文 示例',
+      'Getting Started guide',
+    ]);
+    expect(chapter.tocEntries[0]?.id).not.toBe(chapter.tocEntries[2]?.id);
+    expect(chapter.tocEntries[0]?.searchText).toBe('gettingstartedguide');
+    expect(chapter.html).toContain('id="heading-guide-deep-detail"');
+    expect(chapter.html).toContain('data-toc-id="heading-guide-deep-detail"');
   });
 
   it('does not render page numbers in preview or HTML export', async () => {

@@ -55,8 +55,6 @@ export interface TocEntry {
 export interface PublicationTocOptions {
   preset: TocPresetId;
   entries: readonly TocEntry[];
-  showPageNumbers: boolean;
-  pageNumbers?: Readonly<Record<string, string>>;
 }
 
 export interface PublicationHtmlOptions {

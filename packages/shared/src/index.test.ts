@@ -132,9 +132,8 @@ describe('Table of contents settings', () => {
       PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }).toc,
     ).toEqual(DEFAULT_TOC_SETTINGS);
     expect(
-      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
-        .pageNumbersEnabled,
-    ).toBe(false);
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
+    ).not.toHaveProperty('pageNumbersEnabled');
     expect(
       PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }).toc,
     ).toEqual(DEFAULT_TOC_SETTINGS);

@@ -117,7 +117,6 @@ export function App(): React.JSX.Element {
     selectedPageSize: PageSizeId,
     selectedStyle: PublicationStyleOverrides,
     selectedToc: TocSettings,
-    selectedPageNumbersEnabled: boolean,
   ): Promise<void> {
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
@@ -128,7 +127,6 @@ export function App(): React.JSX.Element {
         themeId: selectedTheme,
         pageSize: selectedPageSize,
         toc: selectedToc,
-        pageNumbersEnabled: selectedPageNumbersEnabled,
         styleOverrides: selectedStyle,
       });
       if (sequence !== previewSequenceRef.current) return;
@@ -156,21 +154,13 @@ export function App(): React.JSX.Element {
       selectedPageSize,
       selectedStyle,
       toc,
-      pageNumber.enabled,
     );
   }
 
   useEffect(() => {
     if (!stylePanelOpen || !styleDirty || !source) return undefined;
     const timer = window.setTimeout(() => {
-      void refreshPreview(
-        source.path,
-        themeId,
-        pageSize,
-        styleDraft,
-        toc,
-        pageNumber.enabled,
-      );
+      void refreshPreview(source.path, themeId, pageSize, styleDraft, toc);
     }, 250);
     return () => window.clearTimeout(timer);
   }, [
@@ -182,7 +172,6 @@ export function App(): React.JSX.Element {
     stylePanelOpen,
     themeId,
     toc,
-    pageNumber.enabled,
   ]);
 
   async function commitPageNumberSettings(
@@ -218,16 +207,6 @@ export function App(): React.JSX.Element {
     const nextSettings = { ...pageNumber, [key]: value };
     setPageNumber(nextSettings);
     void commitPageNumberSettings(nextSettings);
-    if (source && (key === 'enabled' || key === 'firstPageMode')) {
-      void refreshPreview(
-        source.path,
-        themeId,
-        pageSize,
-        effectiveStyle,
-        toc,
-        nextSettings.enabled,
-      );
-    }
   }
 
   function openStylePanel(): void {
@@ -315,7 +294,6 @@ export function App(): React.JSX.Element {
         pageSize,
         effectiveStyle,
         parsed.data,
-        pageNumber.enabled,
       );
     }
   }
@@ -393,7 +371,6 @@ export function App(): React.JSX.Element {
         pageSize,
         customStyle,
         DEFAULT_TOC_SETTINGS,
-        pageNumber.enabled,
       );
     } catch (error) {
       console.error('[open-file] Open Markdown failed.', error);
@@ -435,7 +412,6 @@ export function App(): React.JSX.Element {
         pageSize,
         customStyle,
         DEFAULT_TOC_SETTINGS,
-        pageNumber.enabled,
       );
     } catch (error) {
       console.error('[open-file] Open dropped Markdown failed.', error);
@@ -646,19 +622,17 @@ export function App(): React.JSX.Element {
               ref={previewFrameRef}
               onLoad={() => {
                 if (previewFrameRef.current) {
-                  void probePreviewRendering(
-                    previewFrameRef.current,
-                    pageSize,
-                    pageNumber.firstPageMode,
-                  ).then((probeDiagnostics) => {
-                    setDiagnostics((current) => [
-                      ...current.filter(
-                        (diagnostic) =>
-                          diagnostic.code !== 'math-font-unavailable',
-                      ),
-                      ...probeDiagnostics,
-                    ]);
-                  });
+                  void probePreviewRendering(previewFrameRef.current).then(
+                    (probeDiagnostics) => {
+                      setDiagnostics((current) => [
+                        ...current.filter(
+                          (diagnostic) =>
+                            diagnostic.code !== 'math-font-unavailable',
+                        ),
+                        ...probeDiagnostics,
+                      ]);
+                    },
+                  );
                 }
               }}
             />

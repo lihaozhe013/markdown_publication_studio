@@ -16,13 +16,11 @@ import {
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   type PageNumberSettings,
 } from '@markdown-publication/shared';
-import type { TocEntry } from '@markdown-publication/publication-core';
 import type { PrintBackend } from './electron-print-backend.js';
 import type { MermaidRenderer } from './mermaid-renderer.js';
 import type { PageNumberPdfService } from './page-number-pdf-service.js';
 import { PublicationService } from './publication-service.js';
 import type { PdfAssembler } from './pdf-assembly-service.js';
-import type { TocPageLocation, TocPageLocator } from './toc-page-locator.js';
 
 vi.mock('electron', () => ({
   app: {
@@ -37,8 +35,6 @@ let noHeadingSourcePath: string;
 let bodyPdf: Uint8Array;
 let service: PublicationService;
 let renderedHtml: string[];
-let locateCalls: Uint8Array[];
-let pageLocator: TocPageLocator;
 let pageNumberApply: ReturnType<typeof vi.fn>;
 
 beforeAll(async () => {
@@ -57,7 +53,6 @@ beforeAll(async () => {
   bodyPdf = await document.save();
 
   renderedHtml = [];
-  locateCalls = [];
   const printBackend: PrintBackend = {
     render: vi.fn(async (html: string) => {
       renderedHtml.push(html);
@@ -74,26 +69,11 @@ beforeAll(async () => {
   const pdfAssembler: PdfAssembler = {
     assemble: vi.fn(async ({ bodyPdf: assembledBody }) => assembledBody),
   };
-  pageLocator = {
-    locate: vi.fn(
-      async (
-        _bytes: Uint8Array,
-        entries: readonly TocEntry[],
-      ): Promise<TocPageLocation> => {
-        locateCalls.push(_bytes);
-        return {
-          pageCount: 3,
-          pages: new Map(entries.map((entry, index) => [entry.id, index + 2])),
-        };
-      },
-    ),
-  };
   service = new PublicationService(
     printBackend,
     mermaidRenderer,
     pageNumberPdfService,
     pdfAssembler,
-    pageLocator,
   );
 });
 
@@ -103,19 +83,6 @@ afterAll(async () => {
 
 beforeEach(() => {
   renderedHtml.length = 0;
-  locateCalls.length = 0;
-  vi.mocked(pageLocator.locate).mockImplementation(
-    async (
-      _bytes: Uint8Array,
-      entries: readonly TocEntry[],
-    ): Promise<TocPageLocation> => {
-      locateCalls.push(_bytes);
-      return {
-        pageCount: 3,
-        pages: new Map(entries.map((entry, index) => [entry.id, index + 2])),
-      };
-    },
-  );
   pageNumberApply.mockClear();
 });
 
@@ -127,7 +94,7 @@ const enabledPageNumbers = (overrides?: Partial<PageNumberSettings>) => ({
 });
 
 describe('PublicationService table-of-contents export', () => {
-  it('resolves placeholder page references in a second Chromium render', async () => {
+  it('renders a structure-only contents page in one Chromium pass', async () => {
     const outputPath = join(fixtureDirectory, 'contents.pdf');
     await service.exportPdf(
       sourcePath,
@@ -140,12 +107,11 @@ describe('PublicationService table-of-contents export', () => {
       { enabled: true, preset: 'classic-book' },
     );
 
-    expect(renderedHtml).toHaveLength(2);
-    expect(renderedHtml[0]).toContain('>0000</span>');
-    expect(renderedHtml[1]).toContain('data-toc-page-for=');
-    expect(renderedHtml[1]).toContain('>2</span>');
-    expect(renderedHtml[1]).toContain('>3</span>');
-    expect(locateCalls).toHaveLength(2);
+    expect(renderedHtml).toHaveLength(1);
+    expect(renderedHtml[0]).toContain('data-toc="true"');
+    expect(renderedHtml[0]).toContain('href="#heading-book-introduction"');
+    expect(renderedHtml[0]).not.toContain('data-toc-page-for=');
+    expect(renderedHtml[0]).not.toContain('0000');
     expect(pageNumberApply).toHaveBeenCalledTimes(1);
     await expect(readFile(outputPath)).resolves.toEqual(Buffer.from(bodyPdf));
   });
@@ -165,9 +131,8 @@ describe('PublicationService table-of-contents export', () => {
 
     expect(renderedHtml).toHaveLength(1);
     expect(renderedHtml[0]).toContain('publication-toc--modern-technical');
-    expect(renderedHtml[0]).toContain('data-toc-show-pages="false"');
     expect(renderedHtml[0]).not.toContain('data-toc-page-for=');
-    expect(locateCalls).toHaveLength(0);
+    expect(renderedHtml[0]).not.toContain('publication-toc-leader');
     expect(pageNumberApply).toHaveBeenCalledTimes(1);
   });
 
@@ -193,7 +158,6 @@ describe('PublicationService table-of-contents export', () => {
       'A4',
       DEFAULT_PUBLICATION_STYLE_OVERRIDES,
       { enabled: true, preset: 'classic-book' },
-      true,
     );
 
     expect(preview.html).not.toContain('data-toc="true"');
@@ -204,40 +168,5 @@ describe('PublicationService table-of-contents export', () => {
         feature: 'toc',
       }),
     ]);
-  });
-
-  it('blocks export when the second pagination pass changes heading pages', async () => {
-    let locateCount = 0;
-    vi.mocked(pageLocator.locate).mockImplementation(
-      async (
-        _bytes: Uint8Array,
-        entries: readonly TocEntry[],
-      ): Promise<TocPageLocation> => {
-        locateCount += 1;
-        return {
-          pageCount: 3,
-          pages: new Map(
-            entries.map((entry, index) => [
-              entry.id,
-              index + 2 + (locateCount > 1 ? 1 : 0),
-            ]),
-          ),
-        };
-      },
-    );
-
-    await expect(
-      service.exportPdf(
-        sourcePath,
-        join(fixtureDirectory, 'unstable.pdf'),
-        'rose',
-        'A4',
-        enabledPageNumbers(),
-        {},
-        DEFAULT_PUBLICATION_STYLE_OVERRIDES,
-        { enabled: true, preset: 'classic-book' },
-      ),
-    ).rejects.toThrow('pagination changed');
-    expect(locateCount).toBe(2);
   });
 });

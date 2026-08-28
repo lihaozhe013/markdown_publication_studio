@@ -27,7 +27,8 @@ export const TOC_PRESET_DEFINITIONS: readonly TocPresetDefinition[] = [
   {
     id: 'classic-book',
     label: 'Classic Book',
-    description: 'Serif-led hierarchy with dotted leaders and page references.',
+    description:
+      'Editorial hierarchy with serif-led section titles and open spacing.',
   },
   {
     id: 'modern-technical',
@@ -361,7 +362,6 @@ export const PreviewRequestSchema = z.object({
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
-  pageNumbersEnabled: z.boolean().default(false),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),

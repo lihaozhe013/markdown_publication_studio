@@ -39,7 +39,6 @@ import {
   PdfAssemblyService,
   type PdfAssemblyCovers,
 } from './services/pdf-assembly-service.js';
-import { PdfTocPageLocator } from './services/toc-page-locator.js';
 import { setupApplicationMenu } from './menu.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
@@ -56,7 +55,6 @@ const publicationService = new PublicationService(
   new ElectronMermaidRenderer(mermaidRendererPage),
   new PageNumberPdfService(),
   new PdfAssemblyService(),
-  new PdfTocPageLocator(),
 );
 const appSettingsService = new AppSettingsService();
 const approvedSourcePaths = new Set<string>();
@@ -286,7 +284,6 @@ function registerIpcHandlers(): void {
       request.pageSize,
       request.styleOverrides,
       request.toc,
-      request.pageNumbersEnabled,
     );
   });
 

@@ -1,10 +1,4 @@
-import {
-  PAGE_SIZE_DEFINITIONS,
-  resolveNumberedPage,
-  type PageNumberFirstPageMode,
-  type PageSizeId,
-  type PublicationDiagnostic,
-} from '@markdown-publication/shared';
+import type { PublicationDiagnostic } from '@markdown-publication/shared';
 
 const katexFontFamilies = [
   'KaTeX_Main',
@@ -17,15 +11,13 @@ const katexFontFamilies = [
 
 export async function probePreviewRendering(
   frame: HTMLIFrameElement,
-  pageSize: PageSizeId,
-  pageNumberFirstPageMode: PageNumberFirstPageMode,
 ): Promise<PublicationDiagnostic[]> {
   const document = frame.contentDocument;
   const previewWindow = frame.contentWindow;
   if (!document || !previewWindow) return [];
 
   await document.fonts.ready;
-  updateTocPageEstimates(document, pageSize, pageNumberFirstPageMode);
+  logTocLayout(document);
   const stylesheet = [...document.querySelectorAll('style')]
     .map((style) => style.textContent ?? '')
     .join('\n');
@@ -114,56 +106,13 @@ export async function probePreviewRendering(
       ];
 }
 
-function updateTocPageEstimates(
-  document: Document,
-  pageSize: PageSizeId,
-  pageNumberFirstPageMode: PageNumberFirstPageMode,
-): void {
-  const pageHeightPx = PAGE_SIZE_DEFINITIONS[pageSize].heightPt * (96 / 72);
+function logTocLayout(document: Document): void {
   const toc = document.querySelector<HTMLElement>('[data-toc="true"]');
-  const tocBottom = toc
-    ? toc.getBoundingClientRect().bottom + document.defaultView!.scrollY
-    : 0;
-  const estimatedTocPages = toc
-    ? Math.max(1, Math.ceil(toc.getBoundingClientRect().height / pageHeightPx))
-    : 0;
-  const documentHeight = Math.max(
-    document.documentElement.scrollHeight,
-    document.body.scrollHeight,
-  );
-  const estimatedPageCount = Math.max(
-    1,
-    Math.ceil(documentHeight / pageHeightPx),
-  );
-
-  for (const pageElement of document.querySelectorAll<HTMLElement>(
-    '[data-toc-page-for]',
-  )) {
-    const headingId = pageElement.dataset.tocPageFor;
-    if (!headingId) continue;
-    const heading = document.getElementById(headingId);
-    if (!heading) {
-      pageElement.textContent = '—';
-      continue;
-    }
-    const headingTop =
-      heading.getBoundingClientRect().top + document.defaultView!.scrollY;
-    const bodyOffset = Math.max(0, headingTop - tocBottom);
-    const pageIndex = estimatedTocPages + Math.floor(bodyOffset / pageHeightPx);
-    const numbered = resolveNumberedPage(
-      pageIndex,
-      Math.max(estimatedPageCount, pageIndex + 1),
-      pageNumberFirstPageMode,
-    );
-    pageElement.textContent = numbered ? `~${numbered.page}` : '—';
-  }
-
   if (toc && window.location.hostname === 'localhost') {
     console.info(
-      `[toc] Preview page estimates ${JSON.stringify({
-        estimatedTocPages,
-        estimatedPageCount,
-        entryCount: document.querySelectorAll('[data-toc-page-for]').length,
+      `[toc] Preview layout ${JSON.stringify({
+        entryCount: toc.querySelectorAll('.publication-toc-entry').length,
+        heightPx: Math.round(toc.getBoundingClientRect().height),
       })}`,
     );
   }

@@ -186,8 +186,8 @@ export function PublicationFormatControls({
         </p>
         <p className="muted toc-help">
           H1-H3 only. PDF export and this preview include the contents page;
-          HTML export remains body-only. Page references follow the page-number
-          setting; preview references are estimates.
+          HTML export remains body-only. The contents page uses hierarchy and
+          links without page references for stable Markdown exports.
         </p>
         {!TocSettingsSchema.safeParse(toc).success ? (
           <p className="diagnostic error">

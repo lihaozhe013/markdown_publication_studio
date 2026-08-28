@@ -86,7 +86,7 @@ describe('publication HTML layout', () => {
     expect(publication.html).toContain('color: #403630 !important;');
   });
 
-  it('renders both table-of-contents presets with or without page references', () => {
+  it('renders both table-of-contents presets without page references', () => {
     const entries = [
       {
         id: 'heading-book-intro',
@@ -110,11 +110,6 @@ describe('publication HTML layout', () => {
     const toc: PublicationTocOptions = {
       preset: 'classic-book',
       entries,
-      showPageNumbers: true,
-      pageNumbers: {
-        'heading-book-intro': '2',
-        'heading-book-details': '3',
-      },
     };
     const classic = renderPublicationHtml([chapter], {
       title: 'Book',
@@ -124,16 +119,15 @@ describe('publication HTML layout', () => {
     const modern = renderPublicationHtml([chapter], {
       title: 'Book',
       themeId: 'rose',
-      toc: { ...toc, preset: 'modern-technical', showPageNumbers: false },
+      toc: { ...toc, preset: 'modern-technical' },
     });
 
     expect(classic.html).toContain('data-toc="true"');
     expect(classic.html).toContain('publication-toc--classic-book');
-    expect(classic.html).toContain('data-toc-page-for="heading-book-intro">2');
     expect(classic.html).toContain('href="#heading-book-intro"');
-    expect(classic.html).toContain('publication-toc-leader');
+    expect(classic.html).not.toContain('data-toc-page-for=');
+    expect(classic.html).not.toContain('publication-toc-leader');
     expect(modern.html).toContain('publication-toc--modern-technical');
-    expect(modern.html).toContain('data-toc-show-pages="false"');
     expect(modern.html).not.toContain('data-toc-page-for=');
     expect(modern.html.indexOf('data-toc="true"')).toBeLessThan(
       modern.html.indexOf('<article'),

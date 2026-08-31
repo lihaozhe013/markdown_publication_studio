@@ -425,6 +425,66 @@ export function App(): React.JSX.Element {
     }
   }
 
+  async function closeMarkdown(): Promise<void> {
+    if (!source) {
+      setStatus('No publication is open.');
+      return;
+    }
+    const closed = source;
+    previewSequenceRef.current += 1;
+    setBusy(false);
+    setSource(null);
+    setTitle('No publication loaded');
+    setHtml('');
+    setDiagnostics([]);
+    setCovers({});
+    setToc({ ...DEFAULT_TOC_SETTINGS });
+    setStyleDraft(customStyle);
+    setStylePanelOpen(false);
+    setStatus(`Closed ${closed.name}.`);
+    console.info('[close-file] Markdown closed.', { fileName: closed.name });
+    try {
+      if (!window.desktopApi?.project?.closeMarkdown) {
+        return;
+      }
+      await window.desktopApi.project.closeMarkdown({
+        sourcePath: closed.path,
+      });
+    } catch (error) {
+      console.error(
+        '[close-file] Failed to revoke the closed Markdown approval.',
+        error,
+      );
+    }
+  }
+
+  const menuCommandsRef = useRef({
+    open: (): Promise<void> => openMarkdown(),
+    close: (): Promise<void> => closeMarkdown(),
+  });
+
+  useEffect(() => {
+    menuCommandsRef.current = {
+      open: (): Promise<void> => openMarkdown(),
+      close: (): Promise<void> => closeMarkdown(),
+    };
+  });
+
+  useEffect(() => {
+    const menuApi = window.desktopApi?.menu;
+    if (!menuApi) return undefined;
+    const unsubscribeOpen = menuApi.onOpenMarkdownRequest(() => {
+      void menuCommandsRef.current.open();
+    });
+    const unsubscribeClose = menuApi.onCloseMarkdownRequest(() => {
+      void menuCommandsRef.current.close();
+    });
+    return () => {
+      unsubscribeOpen();
+      unsubscribeClose();
+    };
+  }, []);
+
   async function exportPdf(): Promise<void> {
     if (!source) return;
     if (coverSizeError) {

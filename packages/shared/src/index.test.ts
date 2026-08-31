@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_THEMES,
+  CloseMarkdownRequestSchema,
   CoverAssetReferenceSchema,
   CoverSelectionSchema,
   DEFAULT_PAGE_SIZE,
@@ -268,6 +269,28 @@ describe('Dropped Markdown request validation', () => {
   it('rejects an empty source path', () => {
     expect(() =>
       OpenDroppedMarkdownRequestSchema.parse({ sourcePath: '' }),
+    ).toThrow();
+  });
+});
+
+describe('Close Markdown request validation', () => {
+  it('accepts a non-empty source path', () => {
+    expect(
+      CloseMarkdownRequestSchema.parse({
+        sourcePath: '/manuscripts/book.md',
+      }),
+    ).toEqual({ sourcePath: '/manuscripts/book.md' });
+  });
+
+  it('rejects an empty source path and unknown fields', () => {
+    expect(() =>
+      CloseMarkdownRequestSchema.parse({ sourcePath: '' }),
+    ).toThrow();
+    expect(() =>
+      CloseMarkdownRequestSchema.parse({
+        sourcePath: '/manuscripts/book.md',
+        force: true,
+      }),
     ).toThrow();
   });
 });

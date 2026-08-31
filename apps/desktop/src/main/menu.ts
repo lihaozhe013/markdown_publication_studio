@@ -9,6 +9,7 @@ import {
 import { existsSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { appLogger } from './services/app-logger.js';
 
 declare const __COMMIT_HASH__: string;
 
@@ -28,6 +29,24 @@ function findIconPath(): string | undefined {
 
 let aboutWindow: BrowserWindow | null = null;
 const ABOUT_CLOSE_CHANNEL = 'about:close';
+const MENU_OPEN_MARKDOWN_CHANNEL = 'menu:open-markdown';
+const MENU_CLOSE_MARKDOWN_CHANNEL = 'menu:close-markdown';
+
+let menuTargetWindow: BrowserWindow | null = null;
+
+/**
+ * Registers the browser window whose renderer receives application menu
+ * commands. The about window and other auxiliary windows never receive them.
+ */
+export function setMenuTargetWindow(window: BrowserWindow): void {
+  menuTargetWindow = window;
+}
+
+function sendMenuCommandToRenderer(channel: string): void {
+  if (menuTargetWindow && !menuTargetWindow.isDestroyed()) {
+    menuTargetWindow.webContents.send(channel);
+  }
+}
 
 function showAboutWindow(): void {
   if (aboutWindow && !aboutWindow.isDestroyed()) {
@@ -265,6 +284,27 @@ export function setupApplicationMenu(): void {
       ],
     });
   }
+
+  template.push({
+    label: 'File',
+    submenu: [
+      {
+        label: 'Open Markdown…',
+        accelerator: 'CmdOrCtrl+O',
+        click: () => {
+          appLogger.info('[menu] Open Markdown command triggered.');
+          sendMenuCommandToRenderer(MENU_OPEN_MARKDOWN_CHANNEL);
+        },
+      },
+      {
+        label: 'Close Current Publication',
+        click: () => {
+          appLogger.info('[menu] Close command triggered.');
+          sendMenuCommandToRenderer(MENU_CLOSE_MARKDOWN_CHANNEL);
+        },
+      },
+    ],
+  });
 
   template.push({ role: 'editMenu' }, { role: 'viewMenu' });
 

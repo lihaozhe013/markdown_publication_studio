@@ -13,6 +13,7 @@ import {
   type CoverAssetReference,
   type CoverSelection,
   HtmlExportRequestSchema,
+  CloseMarkdownRequestSchema,
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
   PdfExportRequestSchema,
@@ -39,7 +40,7 @@ import {
   PdfAssemblyService,
   type PdfAssemblyCovers,
 } from './services/pdf-assembly-service.js';
-import { setupApplicationMenu } from './menu.js';
+import { setupApplicationMenu, setMenuTargetWindow } from './menu.js';
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
@@ -96,6 +97,7 @@ function createMainWindow(): BrowserWindow {
       navigateOnDragDrop: false,
     },
   });
+  setMenuTargetWindow(window);
   applyWindowSecurity(window);
   window.webContents.on('preload-error', (_event, preloadPath, error) => {
     appLogger.error('[startup] Preload failed', error, {
@@ -215,6 +217,18 @@ function registerIpcHandlers(): void {
         );
         throw error;
       }
+    },
+  );
+
+  ipcMain.handle(
+    'project:close-markdown',
+    async (_event, rawRequest: unknown): Promise<void> => {
+      const request = CloseMarkdownRequestSchema.parse(rawRequest);
+      const revoked = approvedSourcePaths.delete(request.sourcePath);
+      appLogger.info('[close-file] Markdown close request processed', {
+        fileName: basename(request.sourcePath),
+        approvalRevoked: revoked,
+      });
     },
   );
 

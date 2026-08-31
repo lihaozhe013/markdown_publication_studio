@@ -392,6 +392,14 @@ export const OpenDroppedMarkdownRequestSchema = z.object({
   sourcePath: z.string().min(1),
 });
 
+export const CloseMarkdownRequestSchema = z
+  .object({
+    sourcePath: z.string().min(1),
+  })
+  .strict();
+
+export type CloseMarkdownRequest = z.infer<typeof CloseMarkdownRequestSchema>;
+
 export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
 export type PdfExportRequest = z.infer<typeof PdfExportRequestSchema>;
 export type HtmlExportRequest = z.infer<typeof HtmlExportRequestSchema>;
@@ -501,6 +509,11 @@ export interface DesktopApi {
     openMarkdown(): Promise<MarkdownFileReference | null>;
     openDroppedMarkdown(file: File): Promise<MarkdownFileReference>;
     chooseCoverAsset(): Promise<CoverAssetReference | null>;
+    closeMarkdown(request: CloseMarkdownRequest): Promise<void>;
+  };
+  menu: {
+    onOpenMarkdownRequest(listener: () => void): () => void;
+    onCloseMarkdownRequest(listener: () => void): () => void;
   };
   preview: {
     build(request: PreviewRequest): Promise<PreviewResult>;

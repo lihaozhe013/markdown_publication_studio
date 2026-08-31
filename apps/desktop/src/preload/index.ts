@@ -1,5 +1,21 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import {
+  contextBridge,
+  ipcRenderer,
+  webUtils,
+  type IpcRendererEvent,
+} from 'electron';
 import type { DesktopApi } from '@markdown-publication/shared';
+
+function subscribeToMenuCommand(
+  channel: string,
+  listener: () => void,
+): () => void {
+  const handler = (_event: IpcRendererEvent): void => listener();
+  ipcRenderer.on(channel, handler);
+  return () => {
+    ipcRenderer.removeListener(channel, handler);
+  };
+}
 
 const api: DesktopApi = {
   settings: {
@@ -22,6 +38,14 @@ const api: DesktopApi = {
       });
     },
     chooseCoverAsset: () => ipcRenderer.invoke('project:choose-cover-asset'),
+    closeMarkdown: (request) =>
+      ipcRenderer.invoke('project:close-markdown', request),
+  },
+  menu: {
+    onOpenMarkdownRequest: (listener) =>
+      subscribeToMenuCommand('menu:open-markdown', listener),
+    onCloseMarkdownRequest: (listener) =>
+      subscribeToMenuCommand('menu:close-markdown', listener),
   },
   preview: {
     build: (request) => ipcRenderer.invoke('preview:build', request),

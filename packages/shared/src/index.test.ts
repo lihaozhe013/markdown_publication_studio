@@ -48,8 +48,17 @@ describe('Built-in themes', () => {
       'inset',
       'full-bleed',
     ]);
+    expect(BUILT_IN_THEMES.map((theme) => theme.codeTheme)).toEqual([
+      'github-light',
+      'github-dark',
+      'github-dark',
+      'github-light',
+    ]);
     expect(getBuiltInTheme('claude')).toEqual(
-      expect.objectContaining({ pageCanvasMode: 'full-bleed' }),
+      expect.objectContaining({
+        pageCanvasMode: 'full-bleed',
+        codeTheme: 'github-light',
+      }),
     );
   });
 });

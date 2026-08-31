@@ -340,6 +340,28 @@ plain text
     expect(publication.html).not.toContain('.math-block .katex {');
   });
 
+  it('applies the requested code theme to highlighted code blocks', async () => {
+    const compiler = await createMarkdownCompiler();
+    const source = {
+      path: '/tmp/code-theme.md',
+      content: '```typescript\nconst answer = 42;\n```',
+    };
+
+    const dark = await compiler.compile(source, {
+      projectRoot: '/tmp',
+      features: { codeTheme: 'github-dark' },
+    });
+    const light = await compiler.compile(source, {
+      projectRoot: '/tmp',
+      features: { codeTheme: 'github-light' },
+    });
+
+    expect(dark.html).toMatch(/background-color:#24292e/u);
+    expect(dark.html).toContain('#F97583');
+    expect(light.html).toMatch(/background-color:#fff/u);
+    expect(light.html).toContain('#D73A49');
+  });
+
   it('removes dangerous HTML while preserving the safe static subset', () => {
     const result = sanitizePublicationHtml(
       '<div class="safe">ok</div><script>alert(1)</script><iframe src="https://example.com"></iframe><a href="javascript:alert(1)">bad</a>',

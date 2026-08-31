@@ -105,14 +105,14 @@ export class PublicationService {
       });
     }
     const compiler = await this.compilerPromise;
+    const theme = getBuiltInTheme(themeId);
     const chapter = await compileMarkdownFile(compiler, sourcePath, {
-      codeTheme: 'github-dark',
+      codeTheme: theme.codeTheme,
       math: { enabled: true },
       mermaid: { enabled: true },
       html: { policy: 'safe-static' },
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
-    const theme = getBuiltInTheme(themeId);
     const tocEntries = tocSettings.enabled ? chapter.tocEntries : [];
     const tocOptions =
       tocEntries.length > 0
@@ -127,7 +127,7 @@ export class PublicationService {
       pageSize,
       pageCanvasMode: theme.pageCanvasMode,
       features: {
-        codeTheme: 'github-dark',
+        codeTheme: theme.codeTheme,
         math: { enabled: true },
         mermaid: { enabled: true },
         html: { policy: 'safe-static' },

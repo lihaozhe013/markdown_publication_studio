@@ -175,7 +175,8 @@
   font-size: var(--code-font-size);
   line-height: 1.45;
   color: var(--fgColor-default);
-  background-color: #f4e9ee;
+  /* !important beats the inline background emitted by the Shiki highlighter */
+  background-color: #f4e9ee !important;
   border-radius: 8px;
   border: 1px solid #f6dce4;
   word-wrap: break-word;

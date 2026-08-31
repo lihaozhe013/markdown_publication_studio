@@ -3,6 +3,7 @@ import type {
   PublicationStyleOverrides,
   PageSizeId,
   TocPresetId,
+  ThemeCodeTheme,
   ThemeId,
   ThemePageCanvasMode,
 } from '@markdown-publication/shared';
@@ -13,7 +14,7 @@ export interface MarkdownSource {
 }
 
 export interface PublicationFeatureOptions {
-  codeTheme?: 'github-dark' | 'github-light';
+  codeTheme?: ThemeCodeTheme;
   math?: {
     enabled: boolean;
   };

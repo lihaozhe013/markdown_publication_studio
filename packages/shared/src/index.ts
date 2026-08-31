@@ -9,6 +9,8 @@ export const ThemeIdSchema = z.enum([
 
 export const ThemePageCanvasModeSchema = z.enum(['inset', 'full-bleed']);
 
+export const ThemeCodeThemeSchema = z.enum(['github-dark', 'github-light']);
+
 export const PageSizeIdSchema = z.enum(['A4', 'Letter']);
 
 export type PageSizeId = z.infer<typeof PageSizeIdSchema>;
@@ -405,6 +407,7 @@ export type PdfExportRequest = z.infer<typeof PdfExportRequestSchema>;
 export type HtmlExportRequest = z.infer<typeof HtmlExportRequestSchema>;
 export type ThemeId = PreviewRequest['themeId'];
 export type ThemePageCanvasMode = z.infer<typeof ThemePageCanvasModeSchema>;
+export type ThemeCodeTheme = z.infer<typeof ThemeCodeThemeSchema>;
 export type CoverAssetKind = z.infer<typeof CoverAssetKindSchema>;
 export type CoverAssetReference = z.infer<typeof CoverAssetReferenceSchema>;
 export type CoverSelection = z.infer<typeof CoverSelectionSchema>;
@@ -423,6 +426,7 @@ export interface PublicationTheme {
   name: string;
   description: string;
   pageCanvasMode: ThemePageCanvasMode;
+  codeTheme: ThemeCodeTheme;
 }
 
 export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
@@ -431,24 +435,28 @@ export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
     name: 'Rose',
     description: 'Soft rose palette with Github structure.',
     pageCanvasMode: 'inset',
+    codeTheme: 'github-light',
   },
   {
     id: 'github-markdown',
     name: 'Github',
     description: 'Clean GitHub-inspired technical documentation styling.',
     pageCanvasMode: 'inset',
+    codeTheme: 'github-dark',
   },
   {
     id: 'modern-serif',
     name: 'Modern Serif',
     description: 'Serif-led reading layout with elegant typography.',
     pageCanvasMode: 'inset',
+    codeTheme: 'github-dark',
   },
   {
     id: 'claude',
     name: 'Claude',
     description: 'Warm paper, orange accents, and spacious serif typography.',
     pageCanvasMode: 'full-bleed',
+    codeTheme: 'github-light',
   },
 ];
 

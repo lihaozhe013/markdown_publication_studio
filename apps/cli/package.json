@@ -9,7 +9,8 @@
   },
   "files": [
     "dist/**",
-    "skills/**"
+    "skills/**",
+    "prompts/**"
   ],
   "scripts": {
     "build": "vite build --config vite.config.ts",

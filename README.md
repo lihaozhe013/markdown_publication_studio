@@ -113,6 +113,10 @@ mps skill install --agent claude
 mps skill install --dir /path/to/agent/skills
 ```
 
+The npm package also includes a standalone
+[agent prompt for installing `mps` from a local tarball](apps/cli/prompts/install-mps-cli.md).
+It is distributed separately from the Agent Skill.
+
 ## Architecture
 
 The project is a pnpm workspace monorepo:

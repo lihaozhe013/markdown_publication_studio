@@ -5,9 +5,10 @@ import {
   ipcMain,
   type OpenDialogOptions,
 } from 'electron';
+import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { basename, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   type CoverAssetReference,
@@ -41,6 +42,23 @@ import {
   type PdfAssemblyCovers,
 } from './services/pdf-assembly-service.js';
 import { setupApplicationMenu, setMenuTargetWindow } from './menu.js';
+import { runCliWorker } from './cli-worker.js';
+import { registerCliRuntime } from './services/cli-runtime-registry.js';
+
+const cliWorkerArgumentIndex = process.argv.indexOf('--mps-worker');
+const cliWorkerRequested = cliWorkerArgumentIndex >= 0;
+const cliWorkerRequestPath = cliWorkerRequested
+  ? process.argv[cliWorkerArgumentIndex + 1]
+  : undefined;
+
+if (cliWorkerRequestPath) {
+  const workerDataDirectory = join(dirname(cliWorkerRequestPath), 'user-data');
+  mkdirSync(join(workerDataDirectory, 'session'), { recursive: true });
+  mkdirSync(join(workerDataDirectory, 'logs'), { recursive: true });
+  app.setPath('userData', workerDataDirectory);
+  app.setPath('sessionData', join(workerDataDirectory, 'session'));
+  app.setPath('logs', join(workerDataDirectory, 'logs'));
+}
 
 const currentDirectory = fileURLToPath(new URL('.', import.meta.url));
 const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
@@ -360,10 +378,20 @@ function registerIpcHandlers(): void {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (cliWorkerRequested) {
+    if (!cliWorkerRequestPath) {
+      app.exit(2);
+      return;
+    }
+    await runCliWorker(cliWorkerRequestPath);
+    return;
+  }
+
   appLogger.info('[startup] Application is ready', {
     logDirectory: app.getPath('logs'),
   });
+  await registerCliRuntime();
   registerIpcHandlers();
   setupApplicationMenu();
   createMainWindow();
@@ -375,7 +403,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (!cliWorkerRequested && process.platform !== 'darwin') {
     app.quit();
   }
 });

@@ -33,10 +33,18 @@ building a preview, and starting an export.
 - Relative local images are resolved relative to the selected Markdown file and
   embedded as data URLs only when they stay inside that project root.
 - Absolute filesystem image references are read and embedded as data URLs after
-  the user selects the Markdown file through the native file dialog. This is an
-  explicit product authorization for external local assets, but it means users
-  should not open untrusted Markdown files because their image references may
-  read arbitrary local files.
+  the user selects the Markdown file through the native file dialog. The CLI
+  reads them after the user explicitly invokes `mps build` for that source. This
+  authorizes external local assets, but it means users should not publish
+  untrusted Markdown because image references can read arbitrary local files.
+- The CLI runs as the invoking OS user and never elevates privileges. It accepts
+  strict Zod-validated configuration and launches a versioned worker with an
+  argument array rather than a shell command. The worker uses a task-local
+  Electron user-data directory; source Markdown is still treated as untrusted
+  content and is never executed.
+- Desktop runtime registration contains only the product ID, executable path,
+  app version, and worker protocol. The CLI rejects missing or incompatible
+  runtime metadata before launching a process.
 - PDF output is rendered in a separate hidden `BrowserWindow` with
   `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.
 - Page-number PDF post-processing runs in the main process after Chromium

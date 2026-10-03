@@ -70,9 +70,11 @@ async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
 }
 
 export class ElectronPrintBackend implements PrintBackend {
+  constructor(private readonly temporaryDirectory = tmpdir()) {}
+
   async render(html: string): Promise<Uint8Array> {
     const htmlPath = join(
-      tmpdir(),
+      this.temporaryDirectory,
       `markdown-publication-${randomUUID()}.html`,
     );
     await writeFile(htmlPath, html, 'utf8');

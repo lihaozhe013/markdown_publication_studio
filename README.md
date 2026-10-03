@@ -81,12 +81,45 @@ Page number preferences and the last saved advanced style configuration are
 persisted to the user data directory via atomic writes and restored on next
 launch.
 
+## CLI and Agent Skill
+
+The `mps` command exports or validates a single Markdown file through the same
+desktop Chromium, themes, and PDF pipeline. It needs Node.js 22.21.1 or newer
+and a compatible installed desktop application; run the desktop app once after
+installation so the CLI can discover its location.
+
+```bash
+npm install --global @markdown-publication/cli
+mps doctor --json
+mps build ./report.md --format pdf --output ./report.pdf --json
+mps build ./report.md --format html --output ./report.html --json
+mps validate --config publish.yaml --json
+mps describe --json
+```
+
+`publish.yaml` uses `version: 1` with optional source, output format, output
+path, theme, page size, PDF table of contents, page numbers, covers, and
+structured style overrides. Configuration paths are relative to the YAML file.
+The command can override config values; an existing output is preserved unless
+`--force` is given. Use `--strict` to fail on warnings. `--json` writes one
+result to stdout and sends diagnostics to stderr.
+
+Install the bundled Agent Skill for Codex, Claude Code, or another Agent Skills
+compatible agent:
+
+```bash
+mps skill install --agent codex
+mps skill install --agent claude
+mps skill install --dir /path/to/agent/skills
+```
+
 ## Architecture
 
 The project is a pnpm workspace monorepo:
 
 ```
 markdown-publication-studio/
+  apps/cli/                    -- `mps` command and Agent Skill
   apps/desktop/                -- Electron desktop application
   packages/publication-core/   -- Markdown compilation pipeline
   packages/shared/             -- Shared types, Zod schemas, IPC contracts

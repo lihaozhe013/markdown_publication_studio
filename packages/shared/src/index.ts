@@ -88,6 +88,7 @@ export function getPageSizeDefinition(
 }
 
 export const DEFAULT_PAGE_SIZE: PageSizeId = 'A4';
+export { CLI_WORKER_PROTOCOL_VERSION } from './cli-protocol.js';
 
 export const CoverAssetKindSchema = z.enum(['image', 'pdf']);
 
@@ -389,6 +390,104 @@ export const HtmlExportRequestSchema = z.object({
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
 });
+
+export const PublishConfigurationSchema = z
+  .object({
+    version: z.literal(1),
+    source: z.string().min(1).optional(),
+    format: z.enum(['pdf', 'html']).optional(),
+    output: z.string().min(1).optional(),
+    themeId: ThemeIdSchema.optional(),
+    pageSize: PageSizeIdSchema.optional(),
+    toc: TocSettingsSchema.optional(),
+    pageNumber: PageNumberSettingsSchema.optional(),
+    covers: z
+      .object({
+        front: z.string().min(1).optional(),
+        back: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    styleOverrides: PublicationStyleOverridesSchema.optional(),
+  })
+  .strict();
+
+export const CliWorkerRequestSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    command: z.enum(['build', 'validate']),
+    sourcePath: z.string().min(1),
+    outputPath: z.string().min(1).optional(),
+    format: z.enum(['pdf', 'html']).default('pdf'),
+    themeId: ThemeIdSchema.default('rose'),
+    pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
+    toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
+    pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+    covers: z
+      .object({
+        front: z
+          .object({ path: z.string().min(1) })
+          .strict()
+          .optional(),
+        back: z
+          .object({ path: z.string().min(1) })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .default({}),
+    styleOverrides: PublicationStyleOverridesSchema.default(
+      DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+    ),
+    strict: z.boolean().default(false),
+    force: z.boolean().default(false),
+  })
+  .strict();
+
+export const CliWorkerResponseSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    command: z.enum(['build', 'validate']),
+    ok: z.boolean(),
+    data: z.object({ outputPath: z.string().optional() }).strict().optional(),
+    diagnostics: z.array(
+      z.object({
+        severity: z.enum(['info', 'warning', 'error']),
+        code: z.string(),
+        message: z.string(),
+        sourcePath: z.string().optional(),
+        line: z.number().optional(),
+        chapterId: z.string().optional(),
+        feature: z
+          .enum([
+            'asset',
+            'code',
+            'cover',
+            'html',
+            'math',
+            'mermaid',
+            'page-number',
+            'toc',
+            'render',
+          ])
+          .optional(),
+        details: z.record(z.string(), z.unknown()).optional(),
+      }),
+    ),
+    error: z.string().optional(),
+    errorCode: z.enum(['usage', 'io', 'publish']).optional(),
+    versions: z
+      .object({
+        desktop: z.string(),
+        workerProtocol: z.literal(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export type PublishConfiguration = z.infer<typeof PublishConfigurationSchema>;
+export type CliWorkerRequest = z.infer<typeof CliWorkerRequestSchema>;
+export type CliWorkerResponse = z.infer<typeof CliWorkerResponseSchema>;
 
 export const OpenDroppedMarkdownRequestSchema = z.object({
   sourcePath: z.string().min(1),

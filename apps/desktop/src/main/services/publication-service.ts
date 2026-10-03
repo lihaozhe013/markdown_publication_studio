@@ -16,6 +16,7 @@ import type {
   TocSettings,
   ThemeId,
 } from '@markdown-publication/shared';
+import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
@@ -169,6 +170,33 @@ export class PublicationService {
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
   ): Promise<ExportResult> {
+    const { pdf, diagnostics } = await this.renderPdf(
+      sourcePath,
+      themeId,
+      pageSize,
+      pageNumber,
+      covers,
+      styleOverrides,
+      tocSettings,
+    );
+    const temporaryPath = resolve(
+      dirname(outputPath),
+      `.${randomUUID()}${extname(outputPath) || '.pdf'}`,
+    );
+    await writeFile(temporaryPath, pdf);
+    await rename(temporaryPath, outputPath);
+    return { outputPath, diagnostics };
+  }
+
+  async renderPdf(
+    sourcePath: string,
+    themeId: ThemeId,
+    pageSize: PageSizeId,
+    pageNumber: PageNumberSettings,
+    covers: PdfAssemblyCovers,
+    styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+    tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
+  ): Promise<{ pdf: Uint8Array; diagnostics: PreviewResult['diagnostics'] }> {
     const publication = await this.buildPublication(
       sourcePath,
       themeId,
@@ -202,13 +230,7 @@ export class PublicationService {
       pageSize,
       covers,
     });
-    const temporaryPath = resolve(
-      dirname(outputPath),
-      `.${randomUUID()}${extname(outputPath) || '.pdf'}`,
-    );
-    await writeFile(temporaryPath, pdf);
-    await rename(temporaryPath, outputPath);
-    return { outputPath, diagnostics: publication.diagnostics };
+    return { pdf, diagnostics: publication.diagnostics };
   }
 
   async exportHtml(
@@ -218,21 +240,36 @@ export class PublicationService {
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ): Promise<ExportResult> {
-    const preview = await this.buildPreview(
+    const { html, diagnostics } = await this.renderHtml(
+      sourcePath,
+      themeId,
+      pageSize,
+      styleOverrides,
+    );
+    const temporaryPath = resolve(
+      dirname(outputPath),
+      `.${randomUUID()}${extname(outputPath) || '.html'}`,
+    );
+    await writeFile(temporaryPath, html, 'utf8');
+    await rename(temporaryPath, outputPath);
+    return { outputPath, diagnostics };
+  }
+
+  async renderHtml(
+    sourcePath: string,
+    themeId: ThemeId,
+    pageSize: PageSizeId,
+    styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  ): Promise<{ html: string; diagnostics: PreviewResult['diagnostics'] }> {
+    const publication = await this.buildPreview(
       sourcePath,
       themeId,
       pageSize,
       styleOverrides,
       DEFAULT_TOC_SETTINGS,
     );
-    this.throwOnFatalDiagnostics(preview.diagnostics);
-    const temporaryPath = resolve(
-      dirname(outputPath),
-      `.${randomUUID()}${extname(outputPath) || '.html'}`,
-    );
-    await writeFile(temporaryPath, preview.html, 'utf8');
-    await rename(temporaryPath, outputPath);
-    return { outputPath, diagnostics: preview.diagnostics };
+    this.throwOnFatalDiagnostics(publication.diagnostics);
+    return { html: publication.html, diagnostics: publication.diagnostics };
   }
 
   private throwOnFatalDiagnostics(
@@ -242,8 +279,18 @@ export class PublicationService {
       (diagnostic) => diagnostic.severity === 'error',
     );
     if (fatal) {
-      throw new Error(fatal.message);
+      throw new PublicationDiagnosticsError(fatal.message, diagnostics);
     }
+  }
+}
+
+export class PublicationDiagnosticsError extends Error {
+  constructor(
+    message: string,
+    readonly diagnostics: PublicationDiagnostic[],
+  ) {
+    super(message);
+    this.name = 'PublicationDiagnosticsError';
   }
 }
 

@@ -37,6 +37,8 @@ professional float placement, and advanced footnotes are deferred.
 
 Current boundaries:
 
+- `apps/cli`: portable Node.js CLI, configuration parsing, runtime discovery,
+  JSON output, and Agent Skill distribution.
 - `apps/desktop`: main, preload, and renderer targets.
 - `packages/publication-core`: publication model and publishing stages.
 - `packages/shared`: environment-safe contracts and validation.
@@ -68,6 +70,9 @@ when they have consumers and a useful independent responsibility.
   external assets require explicit authorization. Account for filesystem case
   sensitivity and platform differences.
 - Keep credentials in main/OS-backed secret storage and out of logs or exports.
+- The local CLI runs with the invoking user's filesystem permissions. It sends a
+  validated request to a version-compatible desktop worker without enabling
+  Node.js access in publication windows.
 - Persist projects through the application storage layer, not localStorage.
 - Production builds run independently of the Vite development server.
 
@@ -108,6 +113,13 @@ stores:
 GUI configuration updates this model. Paths and asset resolution must not depend
 on the process working directory. Preserve portable, scriptable project files.
 
+CLI v1 accepts a strict single-source subset of `publish.yaml` with
+`version: 1`, `source`, `format`, `output`, `themeId`, `pageSize`, `toc`,
+`pageNumber`, `covers`, and `styleOverrides`. It uses the same Zod definitions
+and publishing services as the desktop app. CLI paths resolve from the
+configuration file or the command working directory; Markdown images remain
+relative to their source file. CLI configuration never reads desktop settings.
+
 ### Markdown and HTML
 
 Support headings/anchors, fenced code, tables, task lists, links, local images,
@@ -129,10 +141,10 @@ Preview supports page-size-aware rendering, zoom, diagnostics, and debounced
 rebuilds after source, asset, theme, or configuration changes. Measure
 pagination differences with fixtures before promising exact preview/PDF parity.
 
-Ship `technical-book`, `report`, and `minimal` themes. Theme definitions contain
-identity/version, supported page profiles, typography/spacing tokens, code
-style, cover layouts, CSS, and assets. Common layout controls are available in
-the GUI. Interactive controls are keyboard accessible and use semantic
+Ship the Rose, GitHub, Modern Serif, and Claude themes. Theme definitions
+contain identity/version, supported page profiles, typography/spacing tokens,
+code style, cover layouts, CSS, and assets. Common layout controls are available
+in the GUI. Interactive controls are keyboard accessible and use semantic
 HTML/ARIA.
 
 ### PDF printing and assembly
@@ -167,6 +179,22 @@ branding. Render the cover and assemble it with the body. Local/non-AI projects
 remain exportable offline subject to their asset requirements.
 
 ## Jobs, diagnostics, and reproducibility
+
+The `mps` executable is provided by the `@markdown-publication/cli` npm package.
+It locates a compatible installed desktop application and launches one hidden
+worker process per request. The worker uses an isolated user-data directory,
+exchanges versioned JSON request/result files in a temporary task directory, and
+exits after the job. `mps doctor` reports runtime discovery and protocol
+compatibility; `mps describe --json` returns the configuration schema and
+supported values. The `markdown-publication` Agent Skill is shipped in that
+package using the standard `SKILL.md` format and can be copied to Codex, Claude
+Code, or another compatible skill directory.
+
+CLI v1 builds or validates one Markdown source. It does not merge chapters,
+process directories, or require a running GUI. Build writes an output only after
+rendering succeeds; validation checks configuration, assets, Markdown, and
+Mermaid rendering without writing a publication. HTML remains body-only; TOC,
+page numbering, and cover settings affect PDF only.
 
 Every export is a job:
 
@@ -219,9 +247,11 @@ assertions and focused rendering regressions rather than only large snapshots.
 MVP acceptance:
 
 - The complete product workflow works through the GUI, including save/reopen.
+- The `mps` CLI exports and validates one Markdown source with JSON diagnostics,
+  and the packaged Agent Skill installs idempotently for supported skill roots.
 - PDF and HTML render the sample publication with resolved assets and
   diagnostics.
-- All three themes, layout controls, cover composition, and numbering work.
+- All four themes, layout controls, cover composition, and numbering work.
 - Combine export and a batch of at least 25 fixture documents complete without
   UI lockup or failure propagation; cancellation behaves predictably.
 - AI integration works when configured; local export works without it.
@@ -230,5 +260,5 @@ MVP acceptance:
 
 Chromium is adequate for ordinary technical/digital publications, not full
 commercial prepress. Evaluate another print backend only against a concrete
-requirement. Future CLI commands build, batch, and validate the same manifests
-through the shared publishing core.
+requirement. Future CLI work may add batch and multi-chapter publication through
+the shared publishing pipeline.

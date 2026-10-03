@@ -9,6 +9,9 @@ files:
   - apps/desktop/assets/**/*
   - package.json
   - '!**/*.map'
+extraResources:
+  - from: out/main/mps-runtime.json
+    to: mps-runtime.json
 asar: true
 
 win:

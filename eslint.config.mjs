@@ -4,6 +4,7 @@ import globals from 'globals';
 export default [
   {
     ignores: [
+      '**/dist/**',
       'dist/**',
       'out/**',
       'release/**',

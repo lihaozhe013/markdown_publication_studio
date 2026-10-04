@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  UiPreferencesSchema,
   type CoverAssetReference,
   type CoverSelection,
   HtmlExportRequestSchema,
@@ -149,6 +150,16 @@ function createMainWindow(): BrowserWindow {
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.handle('settings:get-ui-preferences', () =>
+    appSettingsService.loadUiPreferences(),
+  );
+  ipcMain.handle(
+    'settings:save-ui-preferences',
+    (_event, rawPreferences: unknown) =>
+      appSettingsService.saveUiPreferences(
+        UiPreferencesSchema.parse(rawPreferences),
+      ),
+  );
   ipcMain.handle('settings:get-page-number', async () =>
     appSettingsService.loadPageNumber(),
   );

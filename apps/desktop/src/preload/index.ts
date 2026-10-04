@@ -19,6 +19,9 @@ function subscribeToMenuCommand(
 
 const api: DesktopApi = {
   settings: {
+    getUiPreferences: () => ipcRenderer.invoke('settings:get-ui-preferences'),
+    saveUiPreferences: (preferences) =>
+      ipcRenderer.invoke('settings:save-ui-preferences', preferences),
     getPageNumber: () => ipcRenderer.invoke('settings:get-page-number'),
     savePageNumber: (settings) =>
       ipcRenderer.invoke('settings:save-page-number', settings),
@@ -42,6 +45,18 @@ const api: DesktopApi = {
       ipcRenderer.invoke('project:close-markdown', request),
   },
   menu: {
+    onExportPdfRequest: (listener) =>
+      subscribeToMenuCommand('menu:export-pdf', listener),
+    onExportHtmlRequest: (listener) =>
+      subscribeToMenuCommand('menu:export-html', listener),
+    onPreviewZoomRequest: (listener) => {
+      const unsubscribe = (['in', 'out', 'reset'] as const).map((action) =>
+        subscribeToMenuCommand(`menu:preview-zoom-${action}`, () =>
+          listener(action),
+        ),
+      );
+      return () => unsubscribe.forEach((stop) => stop());
+    },
     onOpenMarkdownRequest: (listener) =>
       subscribeToMenuCommand('menu:open-markdown', listener),
     onCloseMarkdownRequest: (listener) =>

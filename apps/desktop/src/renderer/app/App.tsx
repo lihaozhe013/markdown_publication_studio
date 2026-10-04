@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
   DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
+  DEFAULT_UI_PREFERENCES,
+  type UiPreferences,
   PageNumberSettingsSchema,
   PublicationStyleOverridesSchema,
   TocSettingsSchema,
@@ -24,7 +26,17 @@ import {
   getCoverSizeError,
   type CoverSlot,
 } from './publication-format-controls.js';
-import { probePreviewRendering } from './preview-probe.js';
+import { PreviewCanvas } from './preview-canvas.js';
+import { DocumentToolbar } from './document-toolbar.js';
+import { PropertiesPanel, type InspectorTab } from './properties-panel.js';
+import { DiagnosticsPanel } from './diagnostics-panel.js';
+import { StatusBar } from './status-bar.js';
+import {
+  clampZoom,
+  styleSessionReducer,
+  effectiveStyle as getEffectiveStyle,
+  type ZoomMode,
+} from './workspace-model.js';
 import { PageNumberControls } from './page-number-controls.js';
 
 function hasStyleValue(value: unknown): boolean {
@@ -55,28 +67,91 @@ export function App(): React.JSX.Element {
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
-  const [customStyle, setCustomStyle] = useState<PublicationStyleOverrides>({
-    ...DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  const [styleSession, dispatchStyle] = useReducer(styleSessionReducer, {
+    saved: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
+    draft: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
+    editing: false,
   });
-  const [styleDraft, setStyleDraft] = useState<PublicationStyleOverrides>({
-    ...DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+  const {
+    saved: customStyle,
+    draft: styleDraft,
+    editing: stylePanelOpen,
+  } = styleSession;
+  const [uiPreferences, setUiPreferences] = useState<UiPreferences>({
+    ...DEFAULT_UI_PREFERENCES,
   });
+  const uiPreferencesRef = useRef(uiPreferences);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+  );
+  const [inspectorVisible, setInspectorVisible] = useState(true);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('layout');
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const previousErrors = useRef('');
+  const [zoomMode, setZoomMode] = useState<ZoomMode>('fit');
+  const [zoom, setZoom] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [pageNumberError, setPageNumberError] = useState('');
   const [styleError, setStyleError] = useState('');
-  const [stylePanelOpen, setStylePanelOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
-  const [dropActive, setDropActive] = useState(false);
-  const dragDepthRef = useRef(0);
-  const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const pageNumberSaveSequenceRef = useRef(0);
   const previewSequenceRef = useRef(0);
+  const previewRequestRef = useRef('');
 
   const styleDirty = JSON.stringify(styleDraft) !== JSON.stringify(customStyle);
-  const effectiveStyle = stylePanelOpen ? styleDraft : customStyle;
+  const effectiveStyle = getEffectiveStyle(styleSession);
   const customStyleActive = hasStyleOverrides(customStyle);
   const coverSizeError = getCoverSizeError(covers, pageSize);
+  const pageNumberValidation = PageNumberSettingsSchema.safeParse(pageNumber);
+  const pdfError =
+    coverSizeError ??
+    (pageNumberValidation.success
+      ? undefined
+      : pageNumberValidation.error.issues[0]?.message);
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = (): void => setSystemDark(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    document.title = source
+      ? `${title} — Markdown Publication Studio`
+      : 'Markdown Publication Studio';
+  }, [source, title]);
+
+  useEffect(() => {
+    const errors = diagnostics
+      .filter((item) => item.severity === 'error')
+      .map((item) => `${item.code}:${item.message}`)
+      .join('\n');
+    if (errors && errors !== previousErrors.current) setDiagnosticsOpen(true);
+    previousErrors.current = errors;
+  }, [diagnostics]);
+
+  function updateUiPreferences(
+    patch: Partial<UiPreferences>,
+    commit = true,
+  ): void {
+    const next = { ...uiPreferencesRef.current, ...patch };
+    uiPreferencesRef.current = next;
+    setUiPreferences(next);
+    if (!commit || !window.desktopApi?.settings) return;
+    void window.desktopApi.settings
+      .saveUiPreferences(next)
+      .catch((error: unknown) => {
+        setStatus(
+          error instanceof Error
+            ? `Could not save UI preferences: ${error.message}`
+            : 'Could not save UI preferences.',
+        );
+      });
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -89,12 +164,14 @@ export function App(): React.JSX.Element {
     void Promise.all([
       settingsApi.getPageNumber(),
       settingsApi.getCustomStyle(),
+      settingsApi.getUiPreferences(),
     ])
-      .then(([loadedPageNumber, loadedStyle]) => {
+      .then(([loadedPageNumber, loadedStyle, loadedUi]) => {
         if (!mounted) return;
         setPageNumber(loadedPageNumber);
-        setCustomStyle(loadedStyle);
-        setStyleDraft(loadedStyle);
+        dispatchStyle({ type: 'load', style: loadedStyle });
+        setUiPreferences(loadedUi);
+        uiPreferencesRef.current = loadedUi;
         setSettingsReady(true);
       })
       .catch((error: unknown) => {
@@ -118,6 +195,13 @@ export function App(): React.JSX.Element {
     selectedStyle: PublicationStyleOverrides,
     selectedToc: TocSettings,
   ): Promise<void> {
+    previewRequestRef.current = JSON.stringify([
+      path,
+      selectedTheme,
+      selectedPageSize,
+      selectedStyle,
+      selectedToc,
+    ]);
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
     setStatus('Rendering preview…');
@@ -136,7 +220,17 @@ export function App(): React.JSX.Element {
       setStatus('Preview ready.');
     } catch (error) {
       if (sequence !== previewSequenceRef.current) return;
-      setStatus(error instanceof Error ? error.message : 'Preview failed.');
+      const message =
+        error instanceof Error ? error.message : 'Preview failed.';
+      setStatus(message);
+      setDiagnostics([
+        {
+          severity: 'error',
+          code: 'preview-failed',
+          message,
+          sourcePath: path,
+        },
+      ]);
     } finally {
       if (sequence === previewSequenceRef.current) setBusy(false);
     }
@@ -158,7 +252,13 @@ export function App(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (!stylePanelOpen || !styleDirty || !source) return undefined;
+    if (!stylePanelOpen || !source || exporting || styleSaving)
+      return undefined;
+    if (
+      previewRequestRef.current ===
+      JSON.stringify([source.path, themeId, pageSize, styleDraft, toc])
+    )
+      return undefined;
     const timer = window.setTimeout(() => {
       void refreshPreview(source.path, themeId, pageSize, styleDraft, toc);
     }, 250);
@@ -167,9 +267,10 @@ export function App(): React.JSX.Element {
     pageSize,
     refreshPreview,
     source,
-    styleDirty,
     styleDraft,
     stylePanelOpen,
+    exporting,
+    styleSaving,
     themeId,
     toc,
   ]);
@@ -177,6 +278,7 @@ export function App(): React.JSX.Element {
   async function commitPageNumberSettings(
     nextSettings: PageNumberSettings,
   ): Promise<void> {
+    const sequence = ++pageNumberSaveSequenceRef.current;
     const parsed = PageNumberSettingsSchema.safeParse(nextSettings);
     if (!parsed.success) {
       setPageNumberError(
@@ -190,8 +292,9 @@ export function App(): React.JSX.Element {
       const saved = await window.desktopApi.settings.savePageNumber(
         parsed.data,
       );
-      setPageNumber(saved);
+      if (sequence === pageNumberSaveSequenceRef.current) setPageNumber(saved);
     } catch (error) {
+      if (sequence !== pageNumberSaveSequenceRef.current) return;
       setStatus(
         error instanceof Error
           ? `Could not save page number settings: ${error.message}`
@@ -210,9 +313,8 @@ export function App(): React.JSX.Element {
   }
 
   function openStylePanel(): void {
-    setStyleDraft(customStyle);
+    dispatchStyle({ type: 'begin' });
     setStyleError('');
-    setStylePanelOpen(true);
   }
 
   function updateStyleDraft(nextStyle: PublicationStyleOverrides): void {
@@ -224,10 +326,11 @@ export function App(): React.JSX.Element {
       return;
     }
     setStyleError('');
-    setStyleDraft(parsed.data);
+    dispatchStyle({ type: 'edit', style: parsed.data });
   }
 
   async function applyStyleDraft(): Promise<void> {
+    if (styleSaving || exporting) return;
     const parsed = PublicationStyleOverridesSchema.safeParse(styleDraft);
     if (!parsed.success) {
       setStyleError(
@@ -241,9 +344,7 @@ export function App(): React.JSX.Element {
       const saved = await window.desktopApi.settings.saveCustomStyle(
         parsed.data,
       );
-      setCustomStyle(saved);
-      setStyleDraft(saved);
-      setStylePanelOpen(false);
+      dispatchStyle({ type: 'saved', style: saved });
       setStatus('Advanced styles saved.');
       if (source) {
         refreshCurrentPreview(source.path, themeId, pageSize, saved);
@@ -260,9 +361,8 @@ export function App(): React.JSX.Element {
   }
 
   function cancelStyleDraft(): void {
-    setStyleDraft(customStyle);
+    dispatchStyle({ type: 'discard' });
     setStyleError('');
-    setStylePanelOpen(false);
     if (source) {
       refreshCurrentPreview(source.path, themeId, pageSize, customStyle);
     }
@@ -270,7 +370,10 @@ export function App(): React.JSX.Element {
 
   function resetStyleDraft(): void {
     setStyleError('');
-    setStyleDraft({ ...DEFAULT_PUBLICATION_STYLE_OVERRIDES });
+    dispatchStyle({
+      type: 'edit',
+      style: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
+    });
   }
 
   function updatePageSize(nextPageSize: PageSizeId): void {
@@ -299,6 +402,7 @@ export function App(): React.JSX.Element {
   }
 
   async function chooseCoverAsset(slot: CoverSlot): Promise<void> {
+    if (!source || busy || styleSaving) return;
     setBusy(true);
     setStatus(`Choosing ${coverSlotLabels[slot].toLowerCase()}…`);
     console.info('[cover] Cover asset selection requested.', { slot });
@@ -342,6 +446,7 @@ export function App(): React.JSX.Element {
   }
 
   async function openMarkdown(): Promise<void> {
+    if (busy || styleSaving || !settingsReady) return;
     setBusy(true);
     setStatus('Opening Markdown file…');
     console.info('[open-file] Open Markdown requested.');
@@ -361,10 +466,13 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
+      setTitle(selected.name);
+      setHtml('');
+      setDiagnostics([]);
+      setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
-      setStyleDraft(customStyle);
-      setStylePanelOpen(false);
+      dispatchStyle({ type: 'close-document' });
       await refreshPreview(
         selected.path,
         themeId,
@@ -385,6 +493,7 @@ export function App(): React.JSX.Element {
   }
 
   async function openDroppedMarkdown(file: File): Promise<void> {
+    if (busy || styleSaving || !settingsReady) return;
     setBusy(true);
     setStatus('Opening dropped Markdown file…');
     console.info('[open-file] Dropped Markdown requested.', {
@@ -402,10 +511,13 @@ export function App(): React.JSX.Element {
         fileName: selected.name,
       });
       setSource(selected);
+      setTitle(selected.name);
+      setHtml('');
+      setDiagnostics([]);
+      setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
-      setStyleDraft(customStyle);
-      setStylePanelOpen(false);
+      dispatchStyle({ type: 'close-document' });
       await refreshPreview(
         selected.path,
         themeId,
@@ -426,6 +538,7 @@ export function App(): React.JSX.Element {
   }
 
   async function closeMarkdown(): Promise<void> {
+    if (busy || styleSaving) return;
     if (!source) {
       setStatus('No publication is open.');
       return;
@@ -439,8 +552,7 @@ export function App(): React.JSX.Element {
     setDiagnostics([]);
     setCovers({});
     setToc({ ...DEFAULT_TOC_SETTINGS });
-    setStyleDraft(customStyle);
-    setStylePanelOpen(false);
+    dispatchStyle({ type: 'close-document' });
     setStatus(`Closed ${closed.name}.`);
     console.info('[close-file] Markdown closed.', { fileName: closed.name });
     try {
@@ -461,12 +573,28 @@ export function App(): React.JSX.Element {
   const menuCommandsRef = useRef({
     open: (): Promise<void> => openMarkdown(),
     close: (): Promise<void> => closeMarkdown(),
+    pdf: (): Promise<void> => exportPdf(),
+    html: (): Promise<void> => exportHtml(),
+    zoom: (action: 'in' | 'out' | 'reset'): void =>
+      setZoomMode(
+        action === 'reset'
+          ? 1
+          : clampZoom(zoom + (action === 'in' ? 0.1 : -0.1)),
+      ),
   });
 
   useEffect(() => {
     menuCommandsRef.current = {
       open: (): Promise<void> => openMarkdown(),
       close: (): Promise<void> => closeMarkdown(),
+      pdf: (): Promise<void> => exportPdf(),
+      html: (): Promise<void> => exportHtml(),
+      zoom: (action: 'in' | 'out' | 'reset'): void =>
+        setZoomMode(
+          action === 'reset'
+            ? 1
+            : clampZoom(zoom + (action === 'in' ? 0.1 : -0.1)),
+        ),
     };
   });
 
@@ -479,19 +607,32 @@ export function App(): React.JSX.Element {
     const unsubscribeClose = menuApi.onCloseMarkdownRequest(() => {
       void menuCommandsRef.current.close();
     });
+    const unsubscribePdf = menuApi.onExportPdfRequest(() => {
+      void menuCommandsRef.current.pdf();
+    });
+    const unsubscribeHtml = menuApi.onExportHtmlRequest(() => {
+      void menuCommandsRef.current.html();
+    });
+    const unsubscribeZoom = menuApi.onPreviewZoomRequest((action) =>
+      menuCommandsRef.current.zoom(action),
+    );
     return () => {
+      unsubscribePdf();
+      unsubscribeHtml();
+      unsubscribeZoom();
       unsubscribeOpen();
       unsubscribeClose();
     };
   }, []);
 
   async function exportPdf(): Promise<void> {
-    if (!source) return;
-    if (coverSizeError) {
-      setStatus(coverSizeError);
+    if (!source || busy || styleSaving || !settingsReady) return;
+    if (pdfError) {
+      setStatus(pdfError);
       return;
     }
     setBusy(true);
+    setExporting(true);
     setStatus('Printing PDF with Chromium…');
     try {
       const result = await window.desktopApi.export.start({
@@ -510,15 +651,27 @@ export function App(): React.JSX.Element {
       setDiagnostics(result.diagnostics);
       setStatus(`PDF written to ${result.outputPath}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Export failed.');
+      const message = error instanceof Error ? error.message : 'Export failed.';
+      setStatus(message);
+      setDiagnostics((current) => [
+        ...current.filter((item) => item.code !== 'export-failed'),
+        {
+          severity: 'error',
+          code: 'export-failed',
+          message,
+          sourcePath: source.path,
+        },
+      ]);
     } finally {
+      setExporting(false);
       setBusy(false);
     }
   }
 
   async function exportHtml(): Promise<void> {
-    if (!source) return;
+    if (!source || busy || styleSaving || !settingsReady) return;
     setBusy(true);
+    setExporting(true);
     setStatus('Writing self-contained HTML…');
     try {
       const result = await window.desktopApi.export.html({
@@ -534,235 +687,219 @@ export function App(): React.JSX.Element {
       setDiagnostics(result.diagnostics);
       setStatus(`HTML written to ${result.outputPath}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Export failed.');
+      const message = error instanceof Error ? error.message : 'Export failed.';
+      setStatus(message);
+      setDiagnostics((current) => [
+        ...current.filter((item) => item.code !== 'export-failed'),
+        {
+          severity: 'error',
+          code: 'export-failed',
+          message,
+          sourcePath: source.path,
+        },
+      ]);
     } finally {
+      setExporting(false);
       setBusy(false);
     }
   }
 
+  const appearance =
+    uiPreferences.appearance === 'system'
+      ? systemDark
+        ? 'dark'
+        : 'light'
+      : uiPreferences.appearance;
+  const formatProps = {
+    covers,
+    disabled: !source || busy || styleSaving,
+    pageSize,
+    toc,
+    onChooseCover: (slot: CoverSlot) => {
+      void chooseCoverAsset(slot);
+    },
+    onClearCover: clearCoverAsset,
+    onPageSizeChange: updatePageSize,
+    onTocChange: updateToc,
+  };
+
   return (
-    <main className="workspace">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">PUBLICATION COMPILER</p>
-          <h1>{title}</h1>
-        </div>
-        <div className="actions">
-          <button
-            className="secondary"
-            onClick={() => void openMarkdown()}
-            disabled={busy || !settingsReady}
+    <main className="workspace" data-appearance={appearance}>
+      <DocumentToolbar
+        title={title}
+        source={source}
+        busy={busy || styleSaving}
+        ready={settingsReady}
+        pdfError={pdfError}
+        appearance={uiPreferences.appearance}
+        inspectorVisible={inspectorVisible}
+        onOpen={() => void openMarkdown()}
+        onExportPdf={() => void exportPdf()}
+        onExportHtml={() => void exportHtml()}
+        onAppearance={(next) => updateUiPreferences({ appearance: next })}
+        onToggleInspector={() => setInspectorVisible((visible) => !visible)}
+      />
+      <div className="workspace-body">
+        <PreviewCanvas
+          html={html}
+          sourceLoaded={Boolean(source)}
+          pageSize={pageSize}
+          zoomMode={zoomMode}
+          busy={busy}
+          ready={settingsReady}
+          onZoomResolved={setZoom}
+          onProbe={(probeDiagnostics) =>
+            setDiagnostics((current) => [
+              ...current.filter(
+                (item) => item.code !== 'math-font-unavailable',
+              ),
+              ...probeDiagnostics,
+            ])
+          }
+          onOpen={() => void openMarkdown()}
+          onDrop={(file) => void openDroppedMarkdown(file)}
+          onDropError={setStatus}
+        />
+        <PropertiesPanel
+          width={uiPreferences.inspectorWidth}
+          visible={inspectorVisible}
+          tab={inspectorTab}
+          onTab={setInspectorTab}
+          onResize={(width, commit) =>
+            updateUiPreferences({ inspectorWidth: width }, commit)
+          }
+        >
+          <section
+            className="inspector-page inspector-scroll"
+            id="properties-layout"
+            role="tabpanel"
+            aria-labelledby="tab-layout"
+            hidden={inspectorTab !== 'layout'}
           >
-            Open Markdown
-          </button>
-          <button
-            className="primary"
-            onClick={() => void exportPdf()}
-            disabled={!source || busy || Boolean(coverSizeError)}
-            title={coverSizeError}
-          >
-            Export PDF
-          </button>
-          <button
-            className="secondary"
-            onClick={() => void exportHtml()}
-            disabled={!source || busy}
-          >
-            Export HTML
-          </button>
-        </div>
-      </header>
-      <section className="content-grid">
-        <aside className="sidebar">
-          <div className="panel-block">
-            <p className="eyebrow">SOURCE</p>
-            <p className="source-name">{source?.name ?? 'No file selected'}</p>
-            <p className="muted source-path" title={source?.path}>
-              {source?.path ?? 'The renderer never receives filesystem access.'}
-            </p>
-          </div>
-          <div className="panel-block">
-            <label className="eyebrow theme-label" htmlFor="theme-select">
-              STYLE
-            </label>
-            <select
-              id="theme-select"
-              className="theme-select"
-              value={themeId}
-              disabled={busy}
-              onChange={(event) => {
-                const parsed = ThemeIdSchema.safeParse(event.target.value);
-                if (!parsed.success) return;
-                setThemeId(parsed.data);
-                if (source) {
-                  refreshCurrentPreview(
-                    source.path,
-                    parsed.data,
-                    pageSize,
-                    effectiveStyle,
-                  );
-                }
-              }}
-            >
-              {BUILT_IN_THEMES.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.name}
-                </option>
-              ))}
-            </select>
-            <p className="muted theme-description">
-              {
-                BUILT_IN_THEMES.find((theme) => theme.id === themeId)
-                  ?.description
+            <PublicationFormatControls section="layout" {...formatProps} />
+            <PageNumberControls
+              disabled={busy || styleSaving || !settingsReady}
+              error={pageNumberError}
+              settings={pageNumber}
+              onCommitFormat={(settings) =>
+                void commitPageNumberSettings(settings)
               }
-            </p>
-            <button
-              className="style-advanced-button"
-              type="button"
-              onClick={openStylePanel}
-              disabled={!settingsReady || styleSaving}
-            >
-              Advanced styles
-              <span>
-                {customStyleActive
-                  ? 'Custom overrides active'
-                  : 'Theme defaults'}
-              </span>
-            </button>
-          </div>
-          <PublicationFormatControls
-            covers={covers}
-            disabled={!source || busy}
-            pageSize={pageSize}
-            toc={toc}
-            onChooseCover={(slot) => void chooseCoverAsset(slot)}
-            onClearCover={clearCoverAsset}
-            onPageSizeChange={updatePageSize}
-            onTocChange={updateToc}
-          />
-          <PageNumberControls
-            disabled={busy}
-            error={pageNumberError}
-            settings={pageNumber}
-            onCommitFormat={(settings) => {
-              void commitPageNumberSettings(settings);
-            }}
-            onFieldChange={updatePageNumberField}
-            onFormatChange={(format) =>
-              setPageNumber((current) => ({ ...current, format }))
-            }
-          />
-          <div className="panel-block diagnostics">
-            <p className="eyebrow">DIAGNOSTICS</p>
-            {diagnostics.length === 0 ? (
-              <p className="muted">No warnings.</p>
-            ) : (
-              diagnostics.map((diagnostic, index) => (
-                <p
-                  className={`diagnostic ${diagnostic.severity}`}
-                  key={`${diagnostic.code}-${diagnostic.message}-${index}`}
-                >
-                  {diagnostic.message}
-                </p>
-              ))
-            )}
-          </div>
-        </aside>
-        <section className="preview-shell">
-          <div className="preview-toolbar">
-            <span>Preview</span>
-            <span className="status">{status}</span>
-          </div>
-          {html ? (
-            <iframe
-              title="Publication preview"
-              className="preview"
-              sandbox="allow-same-origin"
-              srcDoc={html}
-              ref={previewFrameRef}
-              onLoad={() => {
-                if (previewFrameRef.current) {
-                  void probePreviewRendering(previewFrameRef.current).then(
-                    (probeDiagnostics) => {
-                      setDiagnostics((current) => [
-                        ...current.filter(
-                          (diagnostic) =>
-                            diagnostic.code !== 'math-font-unavailable',
-                        ),
-                        ...probeDiagnostics,
-                      ]);
-                    },
-                  );
-                }
+              onFieldChange={updatePageNumberField}
+              onFormatChange={(format) => {
+                pageNumberSaveSequenceRef.current += 1;
+                setPageNumber((current) => ({ ...current, format }));
               }}
             />
-          ) : (
-            <div
-              className={`empty-state${dropActive ? ' is-dragging' : ''}`}
-              role="region"
-              aria-label="Markdown file drop zone"
-              onDragEnter={(event) => {
-                event.preventDefault();
-                if (
-                  source ||
-                  busy ||
-                  !event.dataTransfer.types.includes('Files')
-                )
-                  return;
-                dragDepthRef.current += 1;
-                setDropActive(true);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect =
-                  source || busy ? 'none' : 'copy';
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-                if (dragDepthRef.current === 0) setDropActive(false);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                dragDepthRef.current = 0;
-                setDropActive(false);
-                if (source || busy) return;
-                const files = [...event.dataTransfer.files];
-                if (files.length !== 1) {
-                  setStatus('Drop exactly one Markdown file at a time.');
-                  return;
+          </section>
+          <section
+            className="inspector-page style-inspector"
+            id="properties-style"
+            role="tabpanel"
+            aria-labelledby="tab-style"
+            hidden={inspectorTab !== 'style'}
+          >
+            <div className="theme-panel panel-block">
+              <p className="eyebrow">Publication theme</p>
+              <div
+                className="theme-options"
+                role="radiogroup"
+                aria-label="Publication theme"
+              >
+                {BUILT_IN_THEMES.map((theme) => (
+                  <label
+                    key={theme.id}
+                    className={`theme-option${themeId === theme.id ? ' selected' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="publication-theme"
+                      value={theme.id}
+                      checked={themeId === theme.id}
+                      disabled={busy || styleSaving}
+                      onChange={() => {
+                        const parsed = ThemeIdSchema.safeParse(theme.id);
+                        if (!parsed.success) return;
+                        setThemeId(parsed.data);
+                        if (source)
+                          refreshCurrentPreview(
+                            source.path,
+                            parsed.data,
+                            pageSize,
+                            effectiveStyle,
+                          );
+                      }}
+                    />
+                    <span
+                      className={`theme-sample theme-${theme.id}`}
+                      aria-hidden="true"
+                    >
+                      Aa
+                    </span>
+                    <span>{theme.name}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="muted theme-description">
+                {
+                  BUILT_IN_THEMES.find((theme) => theme.id === themeId)
+                    ?.description
                 }
-                const file = files[0];
-                if (file) void openDroppedMarkdown(file);
-              }}
-            >
-              <div className="empty-mark">✦</div>
-              <h2>
-                {dropActive
-                  ? 'Drop to open your manuscript.'
-                  : 'Bring your manuscript to life.'}
-              </h2>
-              <p>Drag a .md or .markdown file here, or use Open Markdown.</p>
+              </p>
             </div>
-          )}
-        </section>
-      </section>
-      {stylePanelOpen ? (
-        <AdvancedStylePanel
-          styleOverrides={styleDraft}
-          dirty={styleDirty}
-          saving={styleSaving}
-          exporting={busy}
-          canExport={source !== null}
-          error={styleError}
-          onChange={updateStyleDraft}
-          onApply={() => void applyStyleDraft()}
-          onCancel={cancelStyleDraft}
-          onReset={resetStyleDraft}
-          onExportPdf={() => void exportPdf()}
-          onExportHtml={() => void exportHtml()}
-        />
-      ) : null}
+            {stylePanelOpen ? (
+              <AdvancedStylePanel
+                styleOverrides={styleDraft}
+                dirty={styleDirty}
+                saving={styleSaving}
+                disabled={exporting}
+                error={styleError}
+                onChange={updateStyleDraft}
+                onApply={() => void applyStyleDraft()}
+                onCancel={cancelStyleDraft}
+                onReset={resetStyleDraft}
+              />
+            ) : (
+              <div className="style-entry">
+                <p className="muted">
+                  {customStyleActive
+                    ? 'Custom styles are applied.'
+                    : 'Using the theme’s typography and spacing.'}
+                </p>
+                <button
+                  onClick={openStylePanel}
+                  disabled={!settingsReady || styleSaving || exporting}
+                >
+                  Customize styles
+                </button>
+              </div>
+            )}
+          </section>
+          <section
+            className="inspector-page inspector-scroll"
+            id="properties-covers"
+            role="tabpanel"
+            aria-labelledby="tab-covers"
+            hidden={inspectorTab !== 'covers'}
+          >
+            <PublicationFormatControls section="covers" {...formatProps} />
+          </section>
+        </PropertiesPanel>
+      </div>
+      <DiagnosticsPanel
+        diagnostics={diagnostics}
+        open={diagnosticsOpen}
+        onClose={() => setDiagnosticsOpen(false)}
+      />
+      <StatusBar
+        status={status}
+        busy={busy || styleSaving}
+        diagnostics={diagnostics}
+        diagnosticsOpen={diagnosticsOpen}
+        zoom={zoom}
+        zoomMode={zoomMode}
+        onDiagnostics={() => setDiagnosticsOpen((open) => !open)}
+        onZoom={setZoomMode}
+      />
     </main>
   );
 }

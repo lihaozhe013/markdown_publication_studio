@@ -51,11 +51,11 @@ exports. HTML export remains body-only.
 
 **Advanced Styles**
 
-The advanced style panel provides structured overrides for body text, headings,
-links, code, blockquotes, tables, images, and dividers. Changes preview
-immediately, while one global style configuration is saved only when the user
-chooses Apply & Save. The generated override layer is shared by preview, PDF,
-and HTML output; arbitrary CSS is not accepted.
+The docked Style inspector provides structured overrides for body text,
+headings, links, code, blockquotes, tables, images, and dividers. Changes
+preview immediately, while one global style configuration is saved only when the
+user chooses Apply & Save. The generated override layer is shared by preview,
+PDF, and HTML output; arbitrary CSS is not accepted.
 
 **Mermaid Diagrams**
 
@@ -75,11 +75,21 @@ A built-in diagnostics panel reports warnings and errors from the last render,
 covering missing images, unsupported code languages, invalid math expressions,
 Mermaid render failures, unsafe HTML removal, and font readiness.
 
+**Publication Workspace**
+
+A compact document toolbar, adjustable right-hand Layout/Style/Covers inspector,
+continuous paper-width preview, and collapsible diagnostics pane keep the
+publication in focus. Preview zoom supports fit width, 25–200%, and actual size
+without recompilation. Native View menu zoom commands target the preview.
+Application appearance supports system, light, and dark modes independently of
+publication styling. Unsaved style drafts survive panel navigation and can be
+exported without being saved.
+
 **Application Settings**
 
-Page number preferences and the last saved advanced style configuration are
-persisted to the user data directory via atomic writes and restored on next
-launch.
+Application appearance, inspector width, page number preferences, and the last
+saved advanced style configuration are persisted to the user data directory via
+atomic writes and restored on next launch.
 
 ## CLI and Agent Skill
 

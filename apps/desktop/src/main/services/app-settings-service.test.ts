@@ -115,3 +115,62 @@ describe('AppSettingsService custom styles', () => {
     );
   });
 });
+
+describe('AppSettingsService UI preferences', () => {
+  it('loads defaults from older files and preserves publication settings on UI saves', async () => {
+    await writeFile(
+      join(userDataDirectory, 'settings.json'),
+      JSON.stringify({ pageNumber, customStyle: firstStyle }),
+      'utf8',
+    );
+    const service = new AppSettingsService();
+    await expect(service.loadUiPreferences()).resolves.toEqual({
+      appearance: 'system',
+      inspectorWidth: 320,
+    });
+    await service.saveUiPreferences({
+      appearance: 'dark',
+      inspectorWidth: 440,
+    });
+    await expect(service.loadCustomStyle()).resolves.toEqual(firstStyle);
+    await expect(service.loadPageNumber()).resolves.toEqual(pageNumber);
+    await expect(new AppSettingsService().loadUiPreferences()).resolves.toEqual(
+      { appearance: 'dark', inspectorWidth: 440 },
+    );
+  });
+  it('serializes simultaneous UI, page number and style saves without losing fields', async () => {
+    const service = new AppSettingsService();
+    await Promise.all([
+      service.saveUiPreferences({ appearance: 'light', inspectorWidth: 280 }),
+      service.savePageNumber(pageNumber),
+      service.saveCustomStyle(firstStyle),
+    ]);
+    await expect(service.loadUiPreferences()).resolves.toEqual({
+      appearance: 'light',
+      inspectorWidth: 280,
+    });
+    await expect(service.loadPageNumber()).resolves.toEqual(pageNumber);
+    await expect(service.loadCustomStyle()).resolves.toEqual(firstStyle);
+  });
+  it('falls back invalid UI preferences without resetting valid publication settings', async () => {
+    await writeFile(
+      join(userDataDirectory, 'settings.json'),
+      JSON.stringify({
+        pageNumber,
+        customStyle: firstStyle,
+        uiPreferences: { appearance: 'dark', inspectorWidth: 900 },
+      }),
+      'utf8',
+    );
+    const service = new AppSettingsService();
+    await expect(service.loadUiPreferences()).resolves.toEqual({
+      appearance: 'system',
+      inspectorWidth: 320,
+    });
+    await expect(service.loadPageNumber()).resolves.toEqual(pageNumber);
+    await expect(service.loadCustomStyle()).resolves.toEqual(firstStyle);
+    await expect(
+      service.saveUiPreferences({ appearance: 'light', inspectorWidth: 100 }),
+    ).rejects.toThrow();
+  });
+});

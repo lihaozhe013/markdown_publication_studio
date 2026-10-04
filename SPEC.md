@@ -147,6 +147,41 @@ code style, cover layouts, CSS, and assets. Common layout controls are available
 in the GUI. Interactive controls are keyboard accessible and use semantic
 HTML/ARIA.
 
+### Desktop publication workspace
+
+The GUI is a single-source publication workspace with native OS window chrome
+and menus. A compact 48px document toolbar provides open, application
+appearance, properties visibility, and PDF/HTML export. A paper-width preview
+occupies the center; a right inspector defaults to 320px, resizes from
+280–440px, and groups controls into Layout, Style, and Covers. A collapsible
+220px diagnostics pane and 26px status bar show actionable errors, warnings,
+operation status, and zoom.
+
+Application appearance defaults to the system and supports explicit light/dark
+choices through renderer-only UI tokens. Do not set global
+nativeTheme.themeSource or override publication theme color-scheme rules when
+changing UI appearance. Appearance and inspector width are persisted through the
+main-process settings service, retaining existing page-number and custom-style
+settings. Inspector visibility, category, diagnostics visibility, and zoom are
+session state.
+
+The interactive preview displays continuous content at the selected A4/Letter
+width (points converted at 96/72 CSS pixels). Fit width is the default; manual
+zoom supports 25–200% and actual size. Zoom changes presentation without
+compilation or text reflow. Preview-only screen rules are installed inside the
+sandboxed iframe; they never enter PDF/HTML output or the shared publishing
+pipeline. Do not imply exact pagination, page counts, cover preview, or PDF
+page-number parity. PDF output remains authoritative.
+
+Advanced styles are edited within the inspector, with Body and Headings expanded
+initially and other sections collapsed. Drafts preview immediately, survive
+category changes and inspector hiding, and are used for exports without implicit
+saving. Apply & Save persists the global style; Discard restores saved values;
+Restore theme defaults creates a draft. Opening or closing a document resets the
+draft to the saved style. Escape closes transient export options without
+discarding a draft. Native View zoom commands control the publication preview,
+not the application UI. PDF export also supports CmdOrCtrl+Shift+E.
+
 ### PDF printing and assembly
 
 Use a dedicated hidden Electron WebContents behind a replaceable `PrintBackend`.

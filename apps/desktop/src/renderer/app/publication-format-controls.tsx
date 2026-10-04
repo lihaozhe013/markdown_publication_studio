@@ -93,6 +93,7 @@ function CoverAssetControl({
 }
 
 interface PublicationFormatControlsProps {
+  section: 'layout' | 'covers';
   covers: CoverSelection;
   disabled: boolean;
   pageSize: PageSizeId;
@@ -104,6 +105,7 @@ interface PublicationFormatControlsProps {
 }
 
 export function PublicationFormatControls({
+  section,
   covers,
   disabled,
   pageSize,
@@ -117,108 +119,126 @@ export function PublicationFormatControls({
 
   return (
     <>
-      <div className="panel-block page-size-panel">
-        <label className="eyebrow theme-label" htmlFor="page-size-select">
-          PAGE SIZE
-        </label>
-        <select
-          id="page-size-select"
-          className="theme-select"
-          value={pageSize}
-          disabled={disabled}
-          onChange={(event) => {
-            const parsed = PageSizeIdSchema.safeParse(event.target.value);
-            if (parsed.success) onPageSizeChange(parsed.data);
-          }}
-        >
-          {(
-            Object.values(PAGE_SIZE_DEFINITIONS) as readonly {
-              id: PageSizeId;
-              label: string;
-            }[]
-          ).map((definition) => (
-            <option key={definition.id} value={definition.id}>
-              {definition.label}
-            </option>
-          ))}
-        </select>
-        <p className="muted page-size-help">
-          Cover PDFs must match this portrait page size. Images are stretched to
-          fill it.
-        </p>
-      </div>
-      <div className="panel-block toc-panel">
-        <p className="eyebrow">TABLE OF CONTENTS</p>
-        <label className="toggle-row" htmlFor="toc-enabled">
-          <input
-            id="toc-enabled"
-            type="checkbox"
-            checked={toc.enabled}
-            disabled={disabled}
-            onChange={(event) =>
-              onTocChange({ ...toc, enabled: event.target.checked })
-            }
-          />
-          <span>Include table of contents</span>
-        </label>
-        <fieldset className="toc-controls" disabled={disabled || !toc.enabled}>
-          <label htmlFor="toc-preset">Preset</label>
-          <select
-            id="toc-preset"
-            value={toc.preset}
-            onChange={(event) => {
-              const parsed = TocPresetIdSchema.safeParse(event.target.value);
-              if (parsed.success) onTocChange({ ...toc, preset: parsed.data });
-            }}
-          >
-            {TOC_PRESET_DEFINITIONS.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
-        </fieldset>
-        <p className="muted toc-preset-description">
-          {
-            TOC_PRESET_DEFINITIONS.find((preset) => preset.id === toc.preset)
-              ?.description
-          }
-        </p>
-        <p className="muted toc-help">
-          H1-H3 only. PDF export and this preview include the contents page;
-          HTML export remains body-only. The contents page uses hierarchy and
-          links without page references for stable Markdown exports.
-        </p>
-        {!TocSettingsSchema.safeParse(toc).success ? (
-          <p className="diagnostic error">
-            Invalid table of contents settings.
+      {section === 'layout' ? (
+        <>
+          <div className="panel-block page-size-panel">
+            <label className="eyebrow theme-label" htmlFor="page-size-select">
+              PAGE SIZE
+            </label>
+            <select
+              id="page-size-select"
+              className="theme-select"
+              value={pageSize}
+              disabled={disabled}
+              onChange={(event) => {
+                const parsed = PageSizeIdSchema.safeParse(event.target.value);
+                if (parsed.success) onPageSizeChange(parsed.data);
+              }}
+            >
+              {(
+                Object.values(PAGE_SIZE_DEFINITIONS) as readonly {
+                  id: PageSizeId;
+                  label: string;
+                }[]
+              ).map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted page-size-help">
+              Cover PDFs must match this portrait page size. Images are
+              stretched to fill it.
+            </p>
+          </div>
+          <div className="panel-block toc-panel">
+            <p className="eyebrow">
+              TABLE OF CONTENTS <span className="pdf-badge">PDF</span>
+            </p>
+            <label className="toggle-row" htmlFor="toc-enabled">
+              <input
+                id="toc-enabled"
+                type="checkbox"
+                checked={toc.enabled}
+                disabled={disabled}
+                onChange={(event) =>
+                  onTocChange({ ...toc, enabled: event.target.checked })
+                }
+              />
+              <span>Include table of contents</span>
+            </label>
+            <fieldset
+              className="toc-controls"
+              disabled={disabled || !toc.enabled}
+            >
+              <label htmlFor="toc-preset">Preset</label>
+              <select
+                id="toc-preset"
+                value={toc.preset}
+                onChange={(event) => {
+                  const parsed = TocPresetIdSchema.safeParse(
+                    event.target.value,
+                  );
+                  if (parsed.success)
+                    onTocChange({ ...toc, preset: parsed.data });
+                }}
+              >
+                {TOC_PRESET_DEFINITIONS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </fieldset>
+            <p className="muted toc-preset-description">
+              {
+                TOC_PRESET_DEFINITIONS.find(
+                  (preset) => preset.id === toc.preset,
+                )?.description
+              }
+            </p>
+            <p className="muted toc-help">
+              H1–H3 headings. Included in preview and PDF; HTML remains
+              body-only. Uses links without page references.
+            </p>
+            {!TocSettingsSchema.safeParse(toc).success ? (
+              <p className="diagnostic error">
+                Invalid table of contents settings.
+              </p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+      {section === 'covers' ? (
+        <div className="panel-block covers-panel">
+          <p className="eyebrow">
+            COVERS <span className="pdf-badge">PDF</span>
           </p>
-        ) : null}
-      </div>
-      <div className="panel-block covers-panel">
-        <p className="eyebrow">COVERS</p>
-        <p className="muted covers-help">
-          Applied to PDF export only. Choose one image or single-page PDF per
-          slot.
-        </p>
-        <CoverAssetControl
-          asset={covers.front}
-          disabled={disabled}
-          slot="front"
-          onChoose={onChooseCover}
-          onClear={onClearCover}
-        />
-        <CoverAssetControl
-          asset={covers.back}
-          disabled={disabled}
-          slot="back"
-          onChoose={onChooseCover}
-          onClear={onClearCover}
-        />
-        {coverSizeError ? (
-          <p className="diagnostic error cover-size-error">{coverSizeError}</p>
-        ) : null}
-      </div>
+          <p className="muted covers-help">
+            Applied to PDF export only. Choose one image or single-page PDF per
+            slot.
+          </p>
+          <CoverAssetControl
+            asset={covers.front}
+            disabled={disabled}
+            slot="front"
+            onChoose={onChooseCover}
+            onClear={onClearCover}
+          />
+          <CoverAssetControl
+            asset={covers.back}
+            disabled={disabled}
+            slot="back"
+            onChoose={onChooseCover}
+            onClear={onClearCover}
+          />
+          {coverSizeError ? (
+            <p className="diagnostic error cover-size-error">
+              {coverSizeError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

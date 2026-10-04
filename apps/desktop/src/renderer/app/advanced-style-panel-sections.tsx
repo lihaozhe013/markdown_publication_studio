@@ -120,7 +120,7 @@ export function AdvancedStylePanelSections({
   }
 
   return (
-    <div className="style-panel-scroll">
+    <div className="style-sections">
       <Section title="Body">
         <OptionalSelect
           id="style-body-font"

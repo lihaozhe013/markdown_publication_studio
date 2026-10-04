@@ -38,7 +38,9 @@ export function PageNumberControls({
 }: PageNumberControlsProps): React.JSX.Element {
   return (
     <div className="panel-block page-number-panel">
-      <p className="eyebrow">PAGE NUMBERS</p>
+      <p className="eyebrow">
+        PAGE NUMBERS <span className="pdf-badge">PDF</span>
+      </p>
       <label className="toggle-row" htmlFor="page-number-enabled">
         <input
           id="page-number-enabled"

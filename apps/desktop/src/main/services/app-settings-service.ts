@@ -3,6 +3,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app } from 'electron';
 import {
+  DEFAULT_UI_PREFERENCES,
+  UiPreferencesSchema,
+  type UiPreferences,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   PageNumberSettingsSchema,
@@ -13,11 +16,13 @@ import {
 import { appLogger } from './app-logger.js';
 
 interface StoredAppSettings {
+  uiPreferences: UiPreferences;
   pageNumber: PageNumberSettings;
   customStyle: PublicationStyleOverrides;
 }
 
 interface AppSettings {
+  uiPreferences: UiPreferences;
   pageNumber: PageNumberSettings;
   customStyle: PublicationStyleOverrides;
 }
@@ -42,6 +47,19 @@ function propertyFrom(value: unknown, property: string): unknown {
 
 export class AppSettingsService {
   private writeQueue: Promise<void> = Promise.resolve();
+
+  async loadUiPreferences(): Promise<UiPreferences> {
+    return (await this.readSettings()).uiPreferences;
+  }
+
+  async saveUiPreferences(preferences: UiPreferences): Promise<UiPreferences> {
+    const uiPreferences = UiPreferencesSchema.parse(preferences);
+    const next = await this.updateSettings(
+      (current) => ({ ...current, uiPreferences }),
+      '[settings] UI preferences could not be saved.',
+    );
+    return next.uiPreferences;
+  }
 
   async loadPageNumber(): Promise<PageNumberSettings> {
     const settings = await this.readSettings();
@@ -79,6 +97,9 @@ export class AppSettingsService {
     try {
       const raw = await readFile(settingsPath(), 'utf8');
       const parsed: unknown = JSON.parse(raw);
+      const uiPreferences = UiPreferencesSchema.safeParse(
+        propertyFrom(parsed, 'uiPreferences'),
+      );
       const pageNumberResult = PageNumberSettingsSchema.safeParse(
         propertyFrom(parsed, 'pageNumber'),
       );
@@ -96,6 +117,9 @@ export class AppSettingsService {
       }
 
       return {
+        uiPreferences: uiPreferences.success
+          ? uiPreferences.data
+          : { ...DEFAULT_UI_PREFERENCES },
         pageNumber: pageNumberResult.success
           ? pageNumberResult.data
           : { ...DEFAULT_PAGE_NUMBER_SETTINGS },
@@ -110,6 +134,7 @@ export class AppSettingsService {
         );
       }
       return {
+        uiPreferences: { ...DEFAULT_UI_PREFERENCES },
         pageNumber: { ...DEFAULT_PAGE_NUMBER_SETTINGS },
         customStyle: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
       };
@@ -140,6 +165,7 @@ export class AppSettingsService {
     const targetPath = settingsPath();
     const temporaryPath = `${targetPath}.${randomUUID()}.tmp`;
     const stored: StoredAppSettings = {
+      uiPreferences: settings.uiPreferences,
       pageNumber: settings.pageNumber,
       customStyle: settings.customStyle,
     };

@@ -89,10 +89,36 @@ export async function probePreviewRendering(
     );
   }
 
-  const missingMathFonts =
-    mathElement === null
-      ? []
-      : katexFontFamilies.filter((family) => !fonts[family]);
+  // FontFaceSet.ready loads fonts actually used by the document. Unused KaTeX
+  // size families may remain unloaded and must not produce missing-font warnings.
+  const missingMathFonts = [
+    ...new Set(
+      [
+        ...document.querySelectorAll<HTMLElement>('.katex-html, .katex-html *'),
+      ].flatMap((element) => {
+        const text = [...element.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? '')
+          .join('')
+          .trim();
+        if (!text) return [];
+        const computed = previewWindow.getComputedStyle(element);
+        const families = computed.fontFamily
+          .split(',')
+          .map((family) =>
+            family.trim().replaceAll('"', '').replaceAll("'", ''),
+          );
+        return katexFontFamilies.filter(
+          (family) =>
+            families.includes(family) &&
+            !document.fonts.check(
+              `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} "${family}"`,
+              text,
+            ),
+        );
+      }),
+    ),
+  ];
   return missingMathFonts.length === 0
     ? []
     : [

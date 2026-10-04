@@ -303,10 +303,48 @@ export function setupApplicationMenu(): void {
           sendMenuCommandToRenderer(MENU_CLOSE_MARKDOWN_CHANNEL);
         },
       },
+      { type: 'separator' },
+      {
+        label: 'Export PDF…',
+        accelerator: 'CmdOrCtrl+Shift+E',
+        click: () => sendMenuCommandToRenderer('menu:export-pdf'),
+      },
+      {
+        label: 'Export HTML…',
+        click: () => sendMenuCommandToRenderer('menu:export-html'),
+      },
     ],
   });
 
-  template.push({ role: 'editMenu' }, { role: 'viewMenu' });
+  template.push(
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Zoom In Preview',
+          accelerator: 'CmdOrCtrl+Plus',
+          click: () => sendMenuCommandToRenderer('menu:preview-zoom-in'),
+        },
+        {
+          label: 'Zoom Out Preview',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => sendMenuCommandToRenderer('menu:preview-zoom-out'),
+        },
+        {
+          label: 'Actual Size',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => sendMenuCommandToRenderer('menu:preview-zoom-reset'),
+        },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+  );
 
   if (process.platform !== 'darwin') {
     template.push({

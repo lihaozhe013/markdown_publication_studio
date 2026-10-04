@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+export const UiPreferencesSchema = z.object({
+  appearance: z.enum(['system', 'light', 'dark']),
+  inspectorWidth: z.number().finite().min(280).max(440),
+});
+
+export type UiPreferences = z.infer<typeof UiPreferencesSchema>;
+export const DEFAULT_UI_PREFERENCES: UiPreferences = {
+  appearance: 'system',
+  inspectorWidth: 320,
+};
+export type PreviewZoomAction = 'in' | 'out' | 'reset';
+
 export const ThemeIdSchema = z.enum([
   'rose',
   'github-markdown',
@@ -605,6 +617,8 @@ export interface ExportResult {
 
 export interface DesktopApi {
   settings: {
+    getUiPreferences(): Promise<UiPreferences>;
+    saveUiPreferences(preferences: UiPreferences): Promise<UiPreferences>;
     getPageNumber(): Promise<PageNumberSettings>;
     savePageNumber(settings: PageNumberSettings): Promise<PageNumberSettings>;
     getCustomStyle(): Promise<PublicationStyleOverrides>;
@@ -619,6 +633,11 @@ export interface DesktopApi {
     closeMarkdown(request: CloseMarkdownRequest): Promise<void>;
   };
   menu: {
+    onExportPdfRequest(listener: () => void): () => void;
+    onExportHtmlRequest(listener: () => void): () => void;
+    onPreviewZoomRequest(
+      listener: (action: PreviewZoomAction) => void,
+    ): () => void;
     onOpenMarkdownRequest(listener: () => void): () => void;
     onCloseMarkdownRequest(listener: () => void): () => void;
   };

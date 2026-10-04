@@ -355,7 +355,10 @@ export function Section({
   children: ReactNode;
 }): ReactElement {
   return (
-    <details className="style-section" open>
+    <details
+      className="style-section"
+      open={title === 'Body' || title === 'Headings'}
+    >
       <summary>{title}</summary>
       <div className="style-section-content">{children}</div>
     </details>

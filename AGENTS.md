@@ -5,6 +5,8 @@
   Localized UI text is allowed.
 - Use pnpm and the repository's existing scripts and toolchain.
 - Preserve unrelated changes; keep secrets and generated artifacts out of Git.
+- The `publish` branch is the sole publication branch. Pushes to it update the
+  GitHub `nightly` prerelease; do not create or use a separate `ci` branch.
 - Run checks relevant to the change. Report results and any remaining gaps
   briefly.
 - Use Conventional Commits: `type(scope): imperative summary`. Add a body when

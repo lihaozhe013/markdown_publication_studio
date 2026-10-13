@@ -1,14 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import {
-  link,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { app } from 'electron';
 import {
   CliWorkerRequestSchema,
@@ -29,6 +22,14 @@ import { PageNumberPdfService } from './services/page-number-pdf-service.js';
 import { PdfAssemblyService } from './services/pdf-assembly-service.js';
 import type { PdfAssemblyCovers } from './services/pdf-assembly-service.js';
 import type { CliWorkerRequest } from '@markdown-publication/shared';
+import { writePublicationAtomically } from '@markdown-publication/publishing-runtime';
+
+let cancellationRequested = false;
+
+function throwIfCancellationRequested(): void {
+  if (cancellationRequested)
+    throw new Error('The publication job was cancelled.');
+}
 
 function errorCode(error: unknown): 'usage' | 'io' | 'publish' {
   if (
@@ -65,43 +66,6 @@ async function loadCovers(
   };
 }
 
-async function writePublication(
-  outputPath: string,
-  data: Uint8Array | string,
-  force: boolean,
-): Promise<void> {
-  if (!force) {
-    try {
-      await stat(outputPath);
-      throw Object.assign(new Error(`Output already exists: ${outputPath}`), {
-        code: 'EEXIST',
-      });
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
-        if (error.code === 'EEXIST') throw error;
-        if (error.code !== 'ENOENT') throw error;
-      }
-    }
-  }
-
-  const temporaryPath = join(
-    dirname(outputPath),
-    `.${basename(outputPath, extname(outputPath))}-${randomUUID()}.tmp`,
-  );
-  try {
-    await writeFile(temporaryPath, data, { flag: 'wx' });
-    if (force) {
-      await rename(temporaryPath, outputPath);
-    } else {
-      await link(temporaryPath, outputPath);
-      await unlink(temporaryPath).catch(() => undefined);
-    }
-  } catch (error) {
-    await unlink(temporaryPath).catch(() => undefined);
-    throw error;
-  }
-}
-
 function response(
   command: 'build' | 'validate',
   ok: boolean,
@@ -127,7 +91,7 @@ function response(
   });
 }
 
-export async function runCliWorker(requestPath: string): Promise<void> {
+async function runCliWorkerInternal(requestPath: string): Promise<void> {
   const resultPath = join(dirname(requestPath), 'result.json');
   let command: 'build' | 'validate' = 'build';
   let result: CliWorkerResponse;
@@ -136,6 +100,7 @@ export async function runCliWorker(requestPath: string): Promise<void> {
     const raw = JSON.parse(await readFile(requestPath, 'utf8')) as unknown;
     const request = CliWorkerRequestSchema.parse(raw);
     command = request.command;
+    throwIfCancellationRequested();
     await validateMarkdownPath(request.sourcePath);
     if (request.command === 'build' && request.outputPath && !request.force) {
       try {
@@ -156,6 +121,7 @@ export async function runCliWorker(requestPath: string): Promise<void> {
       request.command === 'validate' || request.format === 'pdf'
         ? await loadCovers(request)
         : {};
+    throwIfCancellationRequested();
 
     const hasPdfOnlyOptions =
       request.toc.enabled ||
@@ -201,6 +167,7 @@ export async function runCliWorker(requestPath: string): Promise<void> {
           request.pageSize,
           request.styleOverrides,
         );
+      throwIfCancellationRequested();
       diagnostics.push(...buildDiagnostics);
       if (
         request.strict &&
@@ -213,7 +180,12 @@ export async function runCliWorker(requestPath: string): Promise<void> {
       }
       if (!request.outputPath)
         throw new Error('Build request is missing outputPath.');
-      await writePublication(request.outputPath, html, request.force);
+      await writePublicationAtomically(
+        request.outputPath,
+        html,
+        request.force,
+        throwIfCancellationRequested,
+      );
       result = response(command, true, {
         outputPath: request.outputPath,
         diagnostics,
@@ -232,6 +204,7 @@ export async function runCliWorker(requestPath: string): Promise<void> {
           request.styleOverrides,
           request.toc,
         );
+      throwIfCancellationRequested();
       diagnostics.push(...buildDiagnostics);
       if (
         request.strict &&
@@ -244,7 +217,12 @@ export async function runCliWorker(requestPath: string): Promise<void> {
       }
       if (!request.outputPath)
         throw new Error('Build request is missing outputPath.');
-      await writePublication(request.outputPath, pdf, request.force);
+      await writePublicationAtomically(
+        request.outputPath,
+        pdf,
+        request.force,
+        throwIfCancellationRequested,
+      );
       result = response(command, true, {
         outputPath: request.outputPath,
         diagnostics,
@@ -279,4 +257,17 @@ export async function runCliWorker(requestPath: string): Promise<void> {
 
   await writeFile(resultPath, JSON.stringify(result), 'utf8');
   app.exit(result.ok ? 0 : 1);
+}
+
+export async function runCliWorker(requestPath: string): Promise<void> {
+  cancellationRequested = false;
+  const onCancel = (): void => {
+    cancellationRequested = true;
+  };
+  process.once('SIGTERM', onCancel);
+  try {
+    await runCliWorkerInternal(requestPath);
+  } finally {
+    process.off('SIGTERM', onCancel);
+  }
 }

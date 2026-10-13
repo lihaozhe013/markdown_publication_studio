@@ -42,6 +42,8 @@ Current boundaries:
 - `apps/desktop`: main, preload, and renderer targets.
 - `packages/publication-core`: publication model and publishing stages.
 - `packages/shared`: environment-safe contracts and validation.
+- `packages/publishing-runtime`: shared publication request construction and
+  path/output safety used by CLI, desktop workers, and MCP.
 - `examples/`: regression publications.
 - `docs/`: focused engineering notes, dependency baseline, security, and
   rendering.
@@ -113,12 +115,46 @@ stores:
 GUI configuration updates this model. Paths and asset resolution must not depend
 on the process working directory. Preserve portable, scriptable project files.
 
-CLI v1 accepts a strict single-source subset of `publish.yaml` with
-`version: 1`, `source`, `format`, `output`, `themeId`, `pageSize`, `toc`,
-`pageNumber`, `covers`, and `styleOverrides`. It uses the same Zod definitions
-and publishing services as the desktop app. CLI paths resolve from the
-configuration file or the command working directory; Markdown images remain
-relative to their source file. CLI configuration never reads desktop settings.
+CLI and desktop MCP file tools accept a strict single-source subset of
+`publish.yaml` with `version: 1`, `source`, `format`, `output`, `themeId`,
+`pageSize`, `toc`, `pageNumber`, `covers`, and `styleOverrides`. It uses the
+same Zod definitions and publishing services as the desktop app. CLI paths
+resolve from the configuration file or the command working directory; Markdown
+images remain relative to their source file. CLI configuration never reads
+desktop settings.
+
+### Desktop MCP and AI connection
+
+The desktop executable exposes an opt-in `--mps-mcp` stdio startup mode using
+the bundled Electron runtime and MCP TypeScript SDK v2. It does not create a
+window or read GUI settings. A separate GUI startup registers a versioned,
+owner-only session manifest and a random-token HTTP bridge bound to loopback.
+Only `session_open` may start the GUI; session discovery and file tools never
+do. The launcher resolves installed executables, development Electron entry
+arguments, and the outer Linux AppImage path.
+
+The Connect AI window provides persistent configuration and one-time task
+prompts, executable availability, generic stdio connection details, and GUI task
+diagnostics. Setup verification calls only `publication_describe` and
+`session_list`. Prompts do not contain bridge credentials, and the UI reports
+local executable availability rather than client connection success.
+
+File tools expose capability discovery, validation, export, job query, and
+cancellation. GUI tools expose session discovery/open, document lifecycle,
+revision-checked settings updates, explicit global settings save, export, view
+adjustment, and preview capture. Session changes remain in-memory until the
+explicit save operation. Revision conflicts fail without automatic retries. Task
+state is independent of SDK request instances: file jobs belong to the MCP
+process, and GUI jobs belong to their window. Workers use isolated temporary
+user-data directories and the common PublicationService, Chromium, theme, and
+PDF assembly pipeline.
+
+MCP input paths are absolute; YAML and Markdown asset paths retain their
+configuration/source-relative behavior. Outputs cannot replace sources,
+configuration, or cover assets even when overwrite is enabled. The server does
+not expose arbitrary shell, JavaScript, DOM, or generic input-control tools.
+Preview screenshots are continuous-preview captures, not final PDF pages. See
+`docs/mcp.md` for tool details and operating constraints.
 
 ### Markdown and HTML
 

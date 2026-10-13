@@ -219,6 +219,212 @@ button svg {
   display: flex;
   align-items: center;
 }
+.connect-ai-button {
+  white-space: nowrap;
+}
+.mcp-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(10 12 18 / 58%);
+}
+.mcp-dialog {
+  width: min(760px, 100%);
+  max-height: min(850px, 94vh);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 30%);
+}
+.mcp-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.mcp-dialog-header h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.mcp-dialog-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  font-size: 24px;
+  color: var(--muted);
+}
+.mcp-dialog-content {
+  padding: 18px 24px 24px;
+}
+.mcp-dialog-intro,
+.mcp-details p,
+.mcp-client-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.mcp-mode-switch {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin: 16px 0;
+  border-radius: 8px;
+  background: var(--window);
+}
+.mcp-mode-switch button {
+  flex: 1;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.mcp-mode-switch button.selected {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+.mcp-launch-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mcp-launch-status > div {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-launch-status strong {
+  font-size: 12px;
+}
+.mcp-launch-status p {
+  margin: 4px 0 0;
+  color: var(--error, #c2413b);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.mcp-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b7791f;
+  flex: 0 0 auto;
+}
+.mcp-launch-status[data-available='true'] .mcp-status-dot {
+  background: #27956a;
+}
+.mcp-launch-status[data-available='false'] .mcp-status-dot {
+  background: #c2413b;
+}
+.mcp-command-summary {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.mcp-command-summary > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 11px;
+}
+.mcp-command-summary span {
+  color: var(--muted);
+}
+.mcp-command-summary code {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.mcp-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+.mcp-copy-success {
+  color: #25845f;
+  font-size: 12px;
+}
+.mcp-copy-error {
+  color: var(--error, #c2413b);
+  font-size: 12px;
+}
+.mcp-prompt-label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mcp-prompt-preview {
+  width: 100%;
+  min-height: 160px;
+  max-height: 280px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--window);
+  color: var(--text);
+  font:
+    11px/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.mcp-details {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.mcp-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mcp-details p {
+  margin: 8px 0;
+}
+.mcp-details pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--window);
+  font:
+    10px/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mcp-diagnostics-toolbar,
+.mcp-active-job {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+.mcp-client-note {
+  margin: 14px 0 0;
+}
 .export-control > button {
   border-radius: 5px 0 0 5px;
 }

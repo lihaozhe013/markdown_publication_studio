@@ -1,0 +1,14 @@
+{
+  "name": "@markdown-publication/publishing-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@markdown-publication/shared": "workspace:*",
+    "js-yaml": "4.3.1",
+    "zod": "4.4.3"
+  }
+}

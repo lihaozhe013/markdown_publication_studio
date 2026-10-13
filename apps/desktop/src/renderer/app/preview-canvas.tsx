@@ -26,6 +26,13 @@ interface Props {
   onOpen(): void;
   onDrop(file: File): void;
   onDropError(message: string): void;
+  onPreviewReady(): void;
+  onViewMetrics(metrics: {
+    scrollY: number;
+    previewRect: { x: number; y: number; width: number; height: number } | null;
+  }): void;
+  onViewRequestResult(found: boolean): void;
+  scrollRequest?: { scrollY?: number; heading?: string; nonce: number } | null;
 }
 export function PreviewCanvas(props: Props): ReactElement {
   const canvas = useRef<HTMLDivElement>(null);
@@ -35,6 +42,13 @@ export function PreviewCanvas(props: Props): ReactElement {
   latestHtml.current = props.html;
   const probeCallback = useRef(props.onProbe);
   probeCallback.current = props.onProbe;
+  const readyCallback = useRef(props.onPreviewReady);
+  readyCallback.current = props.onPreviewReady;
+  const viewCallback = useRef(props.onViewMetrics);
+  viewCallback.current = props.onViewMetrics;
+  const lastViewMetrics = useRef('');
+  const viewRequestCallback = useRef(props.onViewRequestResult);
+  viewRequestCallback.current = props.onViewRequestResult;
   const [availableWidth, setAvailableWidth] = useState(0);
   const [height, setHeight] = useState(
     (PAGE_SIZE_DEFINITIONS[props.pageSize].heightPt * 96) / 72,
@@ -55,6 +69,7 @@ export function PreviewCanvas(props: Props): ReactElement {
       scheduled = window.requestAnimationFrame(() => {
         scheduled = 0;
         setAvailableWidth(element.clientWidth);
+        reportViewMetrics();
       });
     };
     const observer = new ResizeObserver(measure);
@@ -66,6 +81,35 @@ export function PreviewCanvas(props: Props): ReactElement {
     };
   }, []);
   useEffect(() => props.onZoomResolved(zoom), [zoom, props.onZoomResolved]);
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element || !props.scrollRequest) return;
+    const request = props.scrollRequest;
+    const frameId = window.requestAnimationFrame(() => {
+      let found = false;
+      if (request.heading) {
+        const document = frame.current?.contentDocument;
+        const target =
+          document?.getElementById(request.heading) ??
+          [...(document?.querySelectorAll('h1,h2,h3,h4,h5,h6') ?? [])].find(
+            (heading) =>
+              heading.textContent?.trim().toLocaleLowerCase() ===
+              request.heading?.trim().toLocaleLowerCase(),
+          );
+        if (target) {
+          element.scrollTop +=
+            target.getBoundingClientRect().top * zoomRef.current;
+          found = true;
+        }
+      } else if (request.scrollY !== undefined) {
+        element.scrollTo({ top: request.scrollY, behavior: 'auto' });
+        found = true;
+      }
+      viewRequestCallback.current(found);
+      reportViewMetrics();
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [props.scrollRequest]);
   useLayoutEffect(
     () => () => {
       cleanup.current?.();
@@ -110,6 +154,23 @@ export function PreviewCanvas(props: Props): ReactElement {
         );
       });
     };
+    const reportReady = async (): Promise<void> => {
+      const imageLoads = [...document.images].map((image) =>
+        image.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              image.addEventListener('load', () => resolve(), { once: true });
+              image.addEventListener('error', () => resolve(), { once: true });
+            }),
+      );
+      await Promise.allSettled([document.fonts.ready, ...imageLoads]);
+      if (
+        !disposed &&
+        loadedHtml === latestHtml.current &&
+        iframe.contentDocument === document
+      )
+        readyCallback.current();
+    };
     const observer = new previewWindow.ResizeObserver(measure);
     observer.observe(document.body);
     const onResourceLoad = (): void => measure();
@@ -135,6 +196,7 @@ export function PreviewCanvas(props: Props): ReactElement {
     document.addEventListener('click', onAnchor);
     measure();
     void document.fonts.ready.then(measure);
+    void reportReady();
     void probePreviewRendering(iframe)
       .then((diagnostics) => {
         if (
@@ -155,6 +217,23 @@ export function PreviewCanvas(props: Props): ReactElement {
       document.removeEventListener('click', onAnchor);
     };
   }
+
+  function reportViewMetrics(): void {
+    const element = canvas.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const metrics = {
+      scrollY: element.scrollTop,
+      previewRect:
+        rect.width > 0 && rect.height > 0
+          ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+          : null,
+    };
+    const key = JSON.stringify(metrics);
+    if (key === lastViewMetrics.current) return;
+    lastViewMetrics.current = key;
+    viewCallback.current(metrics);
+  }
   return (
     <section className="preview-shell" aria-label="Publication preview canvas">
       <div className="canvas-caption">
@@ -168,6 +247,7 @@ export function PreviewCanvas(props: Props): ReactElement {
       <div
         ref={canvas}
         className={`preview-canvas${dropActive ? ' is-dragging' : ''}`}
+        onScroll={reportViewMetrics}
         onDragEnter={(event) => {
           event.preventDefault();
           if (

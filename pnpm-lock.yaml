@@ -224,6 +224,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@markdown-publication/publishing-runtime':
+        specifier: workspace:*
+        version: link:../../packages/publishing-runtime
       js-yaml:
         specifier: 4.3.1
         version: 4.3.1
@@ -240,9 +243,15 @@ importers:
       '@markdown-publication/publication-core':
         specifier: workspace:*
         version: link:../../packages/publication-core
+      '@markdown-publication/publishing-runtime':
+        specifier: workspace:*
+        version: link:../../packages/publishing-runtime
       '@markdown-publication/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@modelcontextprotocol/server':
+        specifier: 2.3.1
+        version: 2.3.1
       '@pdf-lib/fontkit':
         specifier: 1.1.1
         version: 1.1.1
@@ -255,6 +264,9 @@ importers:
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/publication-core:
     dependencies:
@@ -283,6 +295,18 @@ importers:
       '@types/sanitize-html':
         specifier: 2.16.1
         version: 2.16.1
+
+  packages/publishing-runtime:
+    dependencies:
+      '@markdown-publication/shared':
+        specifier: workspace:*
+        version: link:../shared
+      js-yaml:
+        specifier: 4.3.1
+        version: 4.3.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/shared:
     dependencies:
@@ -673,6 +697,14 @@ packages:
 
   '@mermaid-js/parser@1.2.0':
     resolution: {integrity: sha512-oYPyv8A4As1yH5Bx+04iQEQxXuIQDe0GKCNSRgao6z8AM9jixXIfP0vsppRLvGf+nKIOb9/LdpWA4YuJiVvESA==}
+
+  '@modelcontextprotocol/core@2.3.1':
+    resolution: {integrity: sha512-laVmIhPGpWi7rG9q+0UigblRN0Hws/Yjlb6qLFtVqryXVLkc4h+yN8z731POD2LnAGQlFe7/tXhUm7Bi0YB91g==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/server@2.3.1':
+    resolution: {integrity: sha512-e59MfWuSssj6DoQ96JCTqdW1AXT5/XtnTl0WWd6MU1Ka434fFUGGosCLJbGNySDhHGvxQWoRWK137FXYFkYNWw==}
+    engines: {node: '>=20'}
 
   '@noble/hashes@1.4.0':
     resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
@@ -3425,6 +3457,15 @@ snapshots:
   '@mermaid-js/parser@1.2.0':
     dependencies:
       '@chevrotain/types': 11.1.2
+
+  '@modelcontextprotocol/core@2.3.1':
+    dependencies:
+      zod: 4.4.3
+
+  '@modelcontextprotocol/server@2.3.1':
+    dependencies:
+      '@modelcontextprotocol/core': 2.3.1
+      zod: 4.4.3
 
   '@noble/hashes@1.4.0': {}
 

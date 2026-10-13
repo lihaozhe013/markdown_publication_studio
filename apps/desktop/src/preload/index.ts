@@ -5,6 +5,10 @@ import {
   type IpcRendererEvent,
 } from 'electron';
 import type { DesktopApi } from '@markdown-publication/shared';
+import type {
+  McpRendererCommand,
+  McpRendererSnapshot,
+} from '@markdown-publication/shared/mcp';
 
 function subscribeToMenuCommand(
   channel: string,
@@ -68,6 +72,25 @@ const api: DesktopApi = {
   export: {
     start: (request) => ipcRenderer.invoke('export:start', request),
     html: (request) => ipcRenderer.invoke('export:html', request),
+  },
+  mcp: {
+    getSetup: () => ipcRenderer.invoke('mcp:get-setup'),
+    copyPrompt: (mode) => ipcRenderer.invoke('mcp:copy-prompt', mode),
+    getDiagnostics: () => ipcRenderer.invoke('mcp:get-diagnostics'),
+    cancelActiveJob: () => ipcRenderer.invoke('mcp:cancel-active-job'),
+    reportSnapshot: (snapshot: McpRendererSnapshot) =>
+      ipcRenderer.send('mcp:report-snapshot', snapshot),
+    onOpenRequest: (listener) =>
+      subscribeToMenuCommand('menu:connect-ai', listener),
+    onCommand: (listener) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        command: McpRendererCommand,
+      ): void => listener(command);
+      ipcRenderer.on('mcp:session-command', handler);
+      return () => ipcRenderer.removeListener('mcp:session-command', handler);
+    },
+    completeCommand: (reply) => ipcRenderer.send('mcp:complete-command', reply),
   },
 };
 

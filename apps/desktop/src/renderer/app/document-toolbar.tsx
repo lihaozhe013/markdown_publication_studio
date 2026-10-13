@@ -11,6 +11,7 @@ interface DocumentToolbarProps {
   appearance: UiPreferences['appearance'];
   inspectorVisible: boolean;
   onOpen(): void;
+  onConnectAI(): void;
   onExportPdf(): void;
   onExportHtml(): void;
   onAppearance(appearance: UiPreferences['appearance']): void;
@@ -55,6 +56,13 @@ export function DocumentToolbar(props: DocumentToolbarProps): ReactElement {
         </div>
       </div>
       <div className="toolbar-actions">
+        <button
+          className="secondary connect-ai-button"
+          onClick={props.onConnectAI}
+          disabled={!props.ready}
+        >
+          Connect AI
+        </button>
         <label className="appearance-control">
           <span className="sr-only">Application appearance</span>
           <select

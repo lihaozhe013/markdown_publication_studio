@@ -31,6 +31,7 @@ let aboutWindow: BrowserWindow | null = null;
 const ABOUT_CLOSE_CHANNEL = 'about:close';
 const MENU_OPEN_MARKDOWN_CHANNEL = 'menu:open-markdown';
 const MENU_CLOSE_MARKDOWN_CHANNEL = 'menu:close-markdown';
+const MENU_CONNECT_AI_CHANNEL = 'menu:connect-ai';
 
 let menuTargetWindow: BrowserWindow | null = null;
 
@@ -351,8 +352,23 @@ export function setupApplicationMenu(): void {
       label: 'Help',
       submenu: [
         {
+          label: 'Connect AI…',
+          click: () => sendMenuCommandToRenderer(MENU_CONNECT_AI_CHANNEL),
+        },
+        { type: 'separator' },
+        {
           label: 'About',
           click: () => showAboutWindow(),
+        },
+      ],
+    });
+  } else {
+    template.push({
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Connect AI…',
+          click: () => sendMenuCommandToRenderer(MENU_CONNECT_AI_CHANNEL),
         },
       ],
     });

@@ -38,6 +38,11 @@ import {
   type ZoomMode,
 } from './workspace-model.js';
 import { PageNumberControls } from './page-number-controls.js';
+import { McpConnectionDialog } from './mcp-connection-dialog.js';
+import type {
+  McpRendererCommand,
+  McpRendererSnapshot,
+} from '@markdown-publication/shared/mcp';
 
 function hasStyleValue(value: unknown): boolean {
   if (value === undefined || value === null) return false;
@@ -97,9 +102,22 @@ export function App(): React.JSX.Element {
   const [settingsReady, setSettingsReady] = useState(false);
   const [status, setStatus] = useState('Choose a Markdown file to begin.');
   const [busy, setBusy] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const [previewScrollY, setPreviewScrollY] = useState(0);
+  const [previewRect, setPreviewRect] =
+    useState<McpRendererSnapshot['view']['previewRect']>(null);
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+  const [previewScrollRequest, setPreviewScrollRequest] = useState<{
+    scrollY?: number;
+    heading?: string;
+    nonce: number;
+  } | null>(null);
   const pageNumberSaveSequenceRef = useRef(0);
   const previewSequenceRef = useRef(0);
   const previewRequestRef = useRef('');
+  const latestMcpSnapshotRef = useRef<McpRendererSnapshot | null>(null);
+  const pendingViewRequestRef = useRef<((found: boolean) => void) | null>(null);
 
   const styleDirty = JSON.stringify(styleDraft) !== JSON.stringify(customStyle);
   const effectiveStyle = getEffectiveStyle(styleSession);
@@ -204,6 +222,8 @@ export function App(): React.JSX.Element {
     ]);
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
+    setPreviewReady(false);
+    setPreviewFailed(false);
     setStatus('Rendering preview…');
     try {
       const result = await window.desktopApi.preview.build({
@@ -217,6 +237,7 @@ export function App(): React.JSX.Element {
       setTitle(result.title);
       setHtml(result.html);
       setDiagnostics(result.diagnostics);
+      setPreviewFailed(false);
       setStatus('Preview ready.');
     } catch (error) {
       if (sequence !== previewSequenceRef.current) return;
@@ -231,10 +252,199 @@ export function App(): React.JSX.Element {
           sourcePath: path,
         },
       ]);
+      setPreviewFailed(true);
     } finally {
       if (sequence === previewSequenceRef.current) setBusy(false);
     }
   }, []);
+
+  const closeMcpDialog = useCallback(() => setMcpDialogOpen(false), []);
+  const onMcpPreviewReady = useCallback(() => {
+    setPreviewReady(true);
+    setPreviewFailed(false);
+  }, []);
+  const onPreviewViewMetrics = useCallback(
+    (metrics: {
+      scrollY: number;
+      previewRect: McpRendererSnapshot['view']['previewRect'];
+    }) => {
+      setPreviewScrollY(metrics.scrollY);
+      setPreviewRect(metrics.previewRect);
+    },
+    [],
+  );
+  const onPreviewViewRequestResult = useCallback((found: boolean) => {
+    const resolveRequest = pendingViewRequestRef.current;
+    pendingViewRequestRef.current = null;
+    resolveRequest?.(found);
+  }, []);
+
+  const mcpPreviewStatus: McpRendererSnapshot['preview']['status'] = !source
+    ? 'empty'
+    : previewFailed
+      ? 'failed'
+      : previewReady && !busy
+        ? 'ready'
+        : 'building';
+  const mcpSnapshot: McpRendererSnapshot = {
+    source,
+    settings: {
+      themeId,
+      pageSize,
+      toc,
+      pageNumber,
+      styleOverrides: effectiveStyle,
+      savedStyle: customStyle,
+      covers: { front: covers.front ?? null, back: covers.back ?? null },
+    },
+    styleDirty,
+    diagnostics,
+    preview: {
+      status: mcpPreviewStatus,
+      revision:
+        mcpPreviewStatus === 'ready' ? previewSequenceRef.current : null,
+    },
+    view: {
+      zoom: clampZoom(zoom),
+      scrollY: Math.max(0, previewScrollY),
+      previewRect,
+    },
+  };
+  latestMcpSnapshotRef.current = mcpSnapshot;
+  const mcpSnapshotKey = JSON.stringify(mcpSnapshot);
+
+  useEffect(() => {
+    const latest = latestMcpSnapshotRef.current;
+    if (settingsReady && latest) window.desktopApi.mcp.reportSnapshot(latest);
+  }, [mcpSnapshotKey, settingsReady]);
+
+  useEffect(() => {
+    const completeAfterRender = async (
+      command: McpRendererCommand,
+      error?: string,
+    ): Promise<void> => {
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => resolve()),
+        ),
+      );
+      const snapshot = latestMcpSnapshotRef.current;
+      window.desktopApi.mcp.completeCommand({
+        requestId: command.requestId,
+        ...(error
+          ? { error }
+          : snapshot
+            ? { snapshot }
+            : {
+                error: 'The renderer has not reported a publication snapshot.',
+              }),
+      });
+    };
+
+    const unsubscribe = window.desktopApi.mcp.onCommand((command) => {
+      void (async () => {
+        try {
+          if (command.operation === 'update' && command.settings) {
+            const settings = command.settings;
+            setThemeId(settings.themeId);
+            setPageSize(settings.pageSize);
+            setToc(settings.toc);
+            setPageNumber(settings.pageNumber);
+            dispatchStyle({ type: 'edit', style: settings.styleOverrides });
+            if (command.covers) setCovers(command.covers as CoverSelection);
+            if (source) {
+              await refreshPreview(
+                source.path,
+                settings.themeId,
+                settings.pageSize,
+                settings.styleOverrides,
+                settings.toc,
+              );
+            }
+          } else if (command.operation === 'document') {
+            if (command.sourcePath) {
+              if (command.discardChanges) dispatchStyle({ type: 'discard' });
+              const documentStyle = command.discardChanges
+                ? customStyle
+                : effectiveStyle;
+              const selected = {
+                path: command.sourcePath,
+                name:
+                  command.sourcePath.split(/[\\/]/u).at(-1) ??
+                  command.sourcePath,
+              };
+              setSource(selected);
+              setTitle(selected.name);
+              setHtml('');
+              setDiagnostics([]);
+              await refreshPreview(
+                selected.path,
+                themeId,
+                pageSize,
+                documentStyle,
+                toc,
+              );
+            } else {
+              setSource(null);
+              setTitle('No publication loaded');
+              setHtml('');
+              setDiagnostics([]);
+              setCovers({});
+              setToc({ ...DEFAULT_TOC_SETTINGS });
+              dispatchStyle({ type: 'close-document' });
+            }
+          } else if (command.operation === 'save') {
+            if (command.sections?.includes('style'))
+              dispatchStyle({ type: 'saved', style: effectiveStyle });
+          } else if (command.operation === 'view') {
+            if (command.zoom !== undefined) setZoomMode(command.zoom);
+            if (
+              command.scrollY !== undefined ||
+              command.heading !== undefined
+            ) {
+              const found = await new Promise<boolean>((resolveRequest) => {
+                pendingViewRequestRef.current = resolveRequest;
+                setPreviewScrollRequest({
+                  ...(command.scrollY !== undefined
+                    ? { scrollY: command.scrollY }
+                    : {}),
+                  ...(command.heading !== undefined
+                    ? { heading: command.heading }
+                    : {}),
+                  nonce: Date.now(),
+                });
+                window.setTimeout(() => {
+                  if (pendingViewRequestRef.current === resolveRequest) {
+                    pendingViewRequestRef.current = null;
+                    resolveRequest(false);
+                  }
+                }, 2_000);
+              });
+              if (!found && command.heading)
+                throw new Error(`heading_not_found: ${command.heading}`);
+              if (!found)
+                throw new Error('The preview viewport is not available.');
+            }
+          }
+          await completeAfterRender(command);
+        } catch (error) {
+          await completeAfterRender(
+            command,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      })();
+    });
+    return unsubscribe;
+  }, [
+    customStyle,
+    effectiveStyle,
+    pageSize,
+    refreshPreview,
+    source,
+    themeId,
+    toc,
+  ]);
 
   function refreshCurrentPreview(
     path: string,
@@ -616,12 +826,16 @@ export function App(): React.JSX.Element {
     const unsubscribeZoom = menuApi.onPreviewZoomRequest((action) =>
       menuCommandsRef.current.zoom(action),
     );
+    const unsubscribeConnect = window.desktopApi.mcp.onOpenRequest(() =>
+      setMcpDialogOpen(true),
+    );
     return () => {
       unsubscribePdf();
       unsubscribeHtml();
       unsubscribeZoom();
       unsubscribeOpen();
       unsubscribeClose();
+      unsubscribeConnect();
     };
   }, []);
 
@@ -734,6 +948,7 @@ export function App(): React.JSX.Element {
         appearance={uiPreferences.appearance}
         inspectorVisible={inspectorVisible}
         onOpen={() => void openMarkdown()}
+        onConnectAI={() => setMcpDialogOpen(true)}
         onExportPdf={() => void exportPdf()}
         onExportHtml={() => void exportHtml()}
         onAppearance={(next) => updateUiPreferences({ appearance: next })}
@@ -759,6 +974,10 @@ export function App(): React.JSX.Element {
           onOpen={() => void openMarkdown()}
           onDrop={(file) => void openDroppedMarkdown(file)}
           onDropError={setStatus}
+          onPreviewReady={onMcpPreviewReady}
+          onViewMetrics={onPreviewViewMetrics}
+          onViewRequestResult={onPreviewViewRequestResult}
+          scrollRequest={previewScrollRequest}
         />
         <PropertiesPanel
           width={uiPreferences.inspectorWidth}
@@ -900,6 +1119,7 @@ export function App(): React.JSX.Element {
         onDiagnostics={() => setDiagnosticsOpen((open) => !open)}
         onZoom={setZoomMode}
       />
+      {mcpDialogOpen && <McpConnectionDialog onClose={closeMcpDialog} />}
     </main>
   );
 }

@@ -23,6 +23,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@markdown-publication/publishing-runtime": "workspace:*",
     "js-yaml": "4.3.1",
     "zod": "4.4.3"
   },

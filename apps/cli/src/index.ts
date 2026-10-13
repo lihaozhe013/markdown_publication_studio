@@ -30,14 +30,13 @@ import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import cliPackage from '../package.json' with { type: 'json' };
 import { load as loadYaml } from 'js-yaml';
-import { z } from 'zod';
+import { z } from 'zod/v4';
+import { buildPublicationRequest } from '@markdown-publication/publishing-runtime';
 import {
   BUILT_IN_THEMES,
   CLI_WORKER_PROTOCOL_VERSION,
   CliWorkerRequestSchema,
   CliWorkerResponseSchema,
-  DEFAULT_PAGE_NUMBER_SETTINGS,
-  DEFAULT_TOC_SETTINGS,
   PAGE_SIZE_DEFINITIONS,
   PageNumberFirstPageModeSchema,
   PageNumberFontIdSchema,
@@ -45,19 +44,16 @@ import {
   PageSizeIdSchema,
   PageNumberSettingsSchema,
   PublishConfigurationSchema,
-  PublicationStyleOverridesSchema,
   ThemeIdSchema,
   TOC_PRESET_DEFINITIONS,
   type CliWorkerRequest,
   type CliWorkerResponse,
   type PublicationDiagnostic,
-  type PublishConfiguration,
 } from '@markdown-publication/shared';
 
 const PRODUCT_ID = 'com.markdownpublication.studio';
 const PRODUCT_NAME = 'Markdown Publication Studio';
 const DEFAULT_TIMEOUT_MS = 120_000;
-const CONFIG_MAX_BYTES = 1024 * 1024;
 
 const CLI_RESULT_SCHEMA = z
   .object({
@@ -592,34 +588,6 @@ function normalizeDiagnosticError(error: unknown): CliError {
   );
 }
 
-async function loadPublishConfiguration(
-  configPath: string | undefined,
-): Promise<{ config: PublishConfiguration; configDirectory: string }> {
-  if (!configPath)
-    return { config: { version: 1 }, configDirectory: process.cwd() };
-  const absoluteConfigPath = resolve(configPath);
-  const configStat = await stat(absoluteConfigPath);
-  if (configStat.size > CONFIG_MAX_BYTES) {
-    throw new CliError(
-      'Configuration files must be 1 MiB or smaller.',
-      2,
-      'usage',
-    );
-  }
-  const source = await readFile(absoluteConfigPath, 'utf8');
-  const parsed = loadYaml(source, { maxAliasCount: 100 });
-  const config = PublishConfigurationSchema.parse(parsed);
-  return { config, configDirectory: dirname(absoluteConfigPath) };
-}
-
-function resolveConfigPath(
-  value: string | undefined,
-  baseDirectory: string,
-): string | undefined {
-  if (value === undefined) return undefined;
-  return isAbsolute(value) ? value : resolve(baseDirectory, value);
-}
-
 async function buildWorkerRequest(
   command: 'build' | 'validate',
   parsed: ParsedCommand,
@@ -631,101 +599,37 @@ async function buildWorkerRequest(
       'usage',
     );
   }
-  const { config, configDirectory } = await loadPublishConfiguration(
-    parsed.options.config,
-  );
-  const positionalSource = parsed.positionals[0];
-  const sourceValue = positionalSource ?? config.source;
-  if (!sourceValue) {
-    throw new CliError(
-      'Provide a Markdown source path or set source in the configuration.',
-      2,
-      'usage',
-    );
-  }
-
-  const sourceBase = positionalSource ? process.cwd() : configDirectory;
-  const sourcePath = resolveConfigPath(sourceValue, sourceBase)!;
-  const outputValue = parsed.options.output ?? config.output;
-  const format = parsed.options.format ?? config.format ?? 'pdf';
-  if (format !== 'pdf' && format !== 'html') {
-    throw new CliError('--format must be pdf or html.', 2, 'usage');
-  }
-  const outputPath =
-    command === 'validate'
-      ? undefined
-      : resolveConfigPath(
-          outputValue ??
-            `${basename(sourcePath, extname(sourcePath))}.${format}`,
-          parsed.options.output !== undefined
-            ? process.cwd()
-            : config.output !== undefined
-              ? configDirectory
-              : dirname(sourcePath),
-        );
-
-  const raw = {
-    schemaVersion: 1,
-    command,
-    sourcePath,
-    ...(outputPath ? { outputPath } : {}),
-    format,
-    themeId: parsed.options.theme ?? config.themeId ?? 'rose',
-    pageSize: parsed.options['page-size'] ?? config.pageSize ?? 'A4',
-    toc: parsed.options.toc
-      ? { ...(config.toc ?? DEFAULT_TOC_SETTINGS), enabled: true }
-      : (config.toc ?? DEFAULT_TOC_SETTINGS),
-    pageNumber: parsed.options['page-numbers']
-      ? {
-          ...(config.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS),
-          enabled: true,
-        }
-      : (config.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS),
-    covers: {
-      ...(config.covers?.front
-        ? {
-            front: {
-              path: resolveConfigPath(config.covers.front, configDirectory),
-            },
-          }
+  try {
+    return await buildPublicationRequest({
+      command,
+      ...(parsed.positionals[0]
+        ? { sourcePath: resolve(process.cwd(), parsed.positionals[0]) }
         : {}),
-      ...(config.covers?.back
-        ? {
-            back: {
-              path: resolveConfigPath(config.covers.back, configDirectory),
-            },
-          }
+      ...(parsed.options.config
+        ? { configPath: resolve(process.cwd(), parsed.options.config) }
         : {}),
+      ...(parsed.options.output
+        ? { outputPath: resolve(process.cwd(), parsed.options.output) }
+        : {}),
+      ...(parsed.options.format ? { format: parsed.options.format } : {}),
+      ...(parsed.options.theme
+        ? { themeId: parsed.options.theme as never }
+        : {}),
+      ...(parsed.options['page-size']
+        ? { pageSize: parsed.options['page-size'] as never }
+        : {}),
+      ...(parsed.options.toc ? { enableToc: true } : {}),
+      ...(parsed.options['page-numbers'] ? { enablePageNumber: true } : {}),
       ...(parsed.options['front-cover']
-        ? {
-            front: {
-              path: resolveConfigPath(
-                parsed.options['front-cover'],
-                process.cwd(),
-              ),
-            },
-          }
+        ? { frontCover: resolve(process.cwd(), parsed.options['front-cover']) }
         : {}),
       ...(parsed.options['back-cover']
-        ? {
-            back: {
-              path: resolveConfigPath(
-                parsed.options['back-cover'],
-                process.cwd(),
-              ),
-            },
-          }
+        ? { backCover: resolve(process.cwd(), parsed.options['back-cover']) }
         : {}),
-    },
-    styleOverrides:
-      config.styleOverrides ??
-      PublicationStyleOverridesSchema.parse({ version: 1 }),
-    strict: Boolean(parsed.options.strict),
-    force: Boolean(parsed.options.force),
-  };
-
-  try {
-    return CliWorkerRequestSchema.parse(raw);
+      strict: Boolean(parsed.options.strict),
+      overwrite: Boolean(parsed.options.force),
+      workingDirectory: process.cwd(),
+    });
   } catch (error) {
     throw new CliError(
       error instanceof z.ZodError

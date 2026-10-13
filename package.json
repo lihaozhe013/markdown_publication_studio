@@ -26,7 +26,7 @@
     "typecheck": "tsc -b tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:desktop": "pnpm build && electron scripts/check-desktop-ui.mjs"
+    "test:desktop": "pnpm build && electron scripts/check-desktop-ui.mjs && electron scripts/check-mcp-stdio.mjs"
   },
   "dependencies": {
     "@markdown-publication/publication-core": "workspace:*",

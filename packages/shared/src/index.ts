@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 export const UiPreferencesSchema = z.object({
   appearance: z.enum(['system', 'light', 'dark']),
@@ -599,6 +599,31 @@ export interface PublicationDiagnostic {
   details?: Record<string, unknown>;
 }
 
+export const PublicationDiagnosticSchema = z
+  .object({
+    severity: z.enum(['info', 'warning', 'error']),
+    code: z.string(),
+    message: z.string(),
+    sourcePath: z.string().optional(),
+    line: z.number().optional(),
+    chapterId: z.string().optional(),
+    feature: z
+      .enum([
+        'asset',
+        'code',
+        'cover',
+        'html',
+        'math',
+        'mermaid',
+        'page-number',
+        'toc',
+        'render',
+      ])
+      .optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 export interface MarkdownFileReference {
   path: string;
   name: string;
@@ -647,6 +672,20 @@ export interface DesktopApi {
   export: {
     start(request: PdfExportRequest): Promise<ExportResult | null>;
     html(request: HtmlExportRequest): Promise<ExportResult | null>;
+  };
+  mcp: {
+    getSetup(): Promise<import('./mcp.js').McpConnectionSetup>;
+    copyPrompt(
+      mode: import('./mcp.js').McpPromptMode,
+    ): Promise<{ copied: boolean }>;
+    getDiagnostics(): Promise<Record<string, unknown>>;
+    cancelActiveJob(): Promise<Record<string, unknown> | undefined>;
+    reportSnapshot(snapshot: import('./mcp.js').McpRendererSnapshot): void;
+    onOpenRequest(listener: () => void): () => void;
+    onCommand(
+      listener: (command: import('./mcp.js').McpRendererCommand) => void,
+    ): () => void;
+    completeCommand(reply: import('./mcp.js').McpRendererCommandReply): void;
   };
 }
 

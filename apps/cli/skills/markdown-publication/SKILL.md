@@ -26,3 +26,11 @@ when any warning should fail the command.
 Read [the configuration and automation reference](references/cli.md) when
 creating a `publish.yaml`, selecting PDF settings, installing this skill for
 another agent, or handling a CLI failure.
+
+When the desktop application is available and the task concerns the document
+already open in its preview, use its **Connect AI** MCP session tools so the
+current unsaved style and cover settings are respected. File MCP tools can also
+validate or export without starting the GUI. Read the
+[desktop MCP reference](../../../docs/mcp.md) for connection, revision, and
+output-safety behavior. Do not install a separate MCP package; the desktop
+executable includes its own runtime.

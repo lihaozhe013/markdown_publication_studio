@@ -31,6 +31,12 @@ async function run() {
   });
   const rendererErrors = [];
   app.on('web-contents-created', (_event, contents) => {
+    contents.on('unresponsive', () =>
+      console.error('Desktop UI check: renderer unresponsive.'),
+    );
+    contents.on('render-process-gone', (_event, details) =>
+      console.error(`Desktop UI check: renderer exited (${details.reason}).`),
+    );
     contents.on('preload-error', (_event, _path, error) =>
       rendererErrors.push(error.message),
     );
@@ -95,6 +101,16 @@ async function run() {
 
   const pause = (milliseconds) =>
     new Promise((resolve) => setTimeout(resolve, milliseconds));
+  let window;
+  const evaluate = (code) =>
+    window.webContents.executeJavaScript(code, true).catch((error) => {
+      throw new Error(
+        `${error.message}\nRenderer check: ${code}\n` +
+          `Loading: ${window.webContents.isLoading()}\n` +
+          `URL: ${window.webContents.getURL()}\n` +
+          `Renderer errors: ${rendererErrors.join(' | ')}`,
+      );
+    });
   async function waitFor(predicate, label) {
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
@@ -103,11 +119,6 @@ async function run() {
     }
     throw new Error(`Timed out: ${label}`);
   }
-  let window;
-  const evaluate = (code) =>
-    window.webContents.executeJavaScript(code, true).catch((error) => {
-      throw new Error(`${error.message}\nRenderer check: ${code}`);
-    });
   const click = (selector) =>
     evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const select = (selector, value) =>
@@ -185,11 +196,15 @@ async function run() {
   }, 180000);
   try {
     await import(pathToFileURL(join(repository, 'out/main/index.js')).href);
-    await waitFor(
-      () => BrowserWindow.getAllWindows().length > 0,
-      'main window',
-    );
     window = BrowserWindow.getAllWindows()[0];
+    if (!window) {
+      window = await new Promise((resolve) =>
+        app.once('browser-window-created', (_event, createdWindow) =>
+          resolve(createdWindow),
+        ),
+      );
+    }
+    window.showInactive();
     await waitFor(
       async () =>
         evaluate(
@@ -197,6 +212,21 @@ async function run() {
         ),
       'renderer and settings startup',
     );
+    await click('.connect-ai-button');
+    await waitFor(
+      async () =>
+        evaluate(
+          `Boolean(document.querySelector('.mcp-dialog')) && document.querySelector('#mcp-prompt-preview').value.includes('publication_describe')`,
+        ),
+      'Connect AI setup prompt',
+    );
+    await click('.mcp-mode-switch button:nth-child(2)');
+    assert.ok(
+      await evaluate(
+        `document.querySelector('#mcp-prompt-preview').value.includes('temporary MCP connection')`,
+      ),
+    );
+    await click('.mcp-dialog-close');
     window.setContentSize(1280, 800);
     await capture('empty-light');
     await click('.document-toolbar button');

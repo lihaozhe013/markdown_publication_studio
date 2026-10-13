@@ -127,6 +127,23 @@ The npm package also includes a standalone
 [agent prompt for installing `mps` from a local tarball](apps/cli/prompts/install-mps-cli.md).
 It is distributed separately from the Agent Skill.
 
+## Desktop MCP server
+
+The desktop application also provides a bundled stdio MCP server, so AI agents
+can publish files or work with the currently open GUI session without requiring
+Node.js or the CLI. Open **Connect AI** from the toolbar or **Help → Connect
+AI** to copy either a persistent setup prompt or a one-time task prompt. The
+dialog shows the exact executable, arguments, launch status, connection details,
+and GUI task diagnostics.
+
+File validation and PDF/HTML exports run in isolated workers without opening the
+GUI. Session tools can open a document, inspect or change the current
+publication settings, export the current draft, adjust preview view, and capture
+the continuous preview. Agent style changes stay in the current session until
+explicitly saved as global defaults. MCP never exposes arbitrary shell or
+JavaScript execution. See [Desktop MCP and AI Connection](docs/mcp.md) for tool
+schemas, path rules, revision handling, and security boundaries.
+
 ## Architecture
 
 The project is a pnpm workspace monorepo:
@@ -137,6 +154,7 @@ markdown-publication-studio/
   apps/desktop/                -- Electron desktop application
   packages/publication-core/   -- Markdown compilation pipeline
   packages/shared/             -- Shared types, Zod schemas, IPC contracts
+  packages/publishing-runtime/ -- Shared CLI, GUI worker, and MCP request construction
   themes/                      -- CSS themes and bundled fonts
 ```
 
@@ -145,7 +163,8 @@ filesystem access and IPC handlers, the preload script exposes a minimal typed
 API surface via `contextBridge`, and the renderer is a React sandbox with no
 Node.js access. All BrowserWindows run with `nodeIntegration: false`,
 `contextIsolation: true`, and `sandbox: true`. All IPC payloads are validated
-with Zod schemas.
+with Zod schemas. The MCP stdio process is a separate Electron startup mode; its
+local GUI bridge uses loopback HTTP with a random owner-only token.
 
 ### Publishing Pipeline
 

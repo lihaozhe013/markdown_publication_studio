@@ -5,10 +5,11 @@ import {
   ipcMain,
   type OpenDialogOptions,
 } from 'electron';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   UiPreferencesSchema,
@@ -45,6 +46,34 @@ import {
 import { setupApplicationMenu, setMenuTargetWindow } from './menu.js';
 import { runCliWorker } from './cli-worker.js';
 import { registerCliRuntime } from './services/cli-runtime-registry.js';
+import { runMcpServer } from './mcp-server.js';
+import { McpSessionClient } from './services/mcp-session-client.js';
+import { McpSessionHost } from './services/mcp-session-host.js';
+import {
+  copyMcpPrompt,
+  getMcpConnectionSetup,
+} from './services/mcp-connection-service.js';
+import {
+  McpPromptModeSchema,
+  McpRendererCommandReplySchema,
+  McpRendererSnapshotSchema,
+} from '@markdown-publication/shared/mcp';
+
+const mcpArgumentIndex = process.argv.indexOf('--mps-mcp');
+const mcpRequested = mcpArgumentIndex >= 0;
+const mcpRuntimeDirectory = mcpRequested
+  ? mkdtempSync(join(tmpdir(), 'mps-mcp-runtime-'))
+  : undefined;
+if (mcpRuntimeDirectory) {
+  mkdirSync(join(mcpRuntimeDirectory, 'session'), { recursive: true });
+  mkdirSync(join(mcpRuntimeDirectory, 'logs'), { recursive: true });
+  app.setPath('userData', mcpRuntimeDirectory);
+  app.setPath('sessionData', join(mcpRuntimeDirectory, 'session'));
+  app.setPath('logs', join(mcpRuntimeDirectory, 'logs'));
+  process.once('exit', () =>
+    rmSync(mcpRuntimeDirectory, { recursive: true, force: true }),
+  );
+}
 
 const cliWorkerArgumentIndex = process.argv.indexOf('--mps-worker');
 const cliWorkerRequested = cliWorkerArgumentIndex >= 0;
@@ -79,6 +108,9 @@ const publicationService = new PublicationService(
 const appSettingsService = new AppSettingsService();
 const approvedSourcePaths = new Set<string>();
 const approvedCoverAssets = new Map<string, CoverAssetFile>();
+let mainWindow: BrowserWindow | undefined;
+let mcpSessionHost: McpSessionHost | undefined;
+let applicationIsQuitting = false;
 
 function resolveCoverAsset(reference: CoverAssetReference): CoverAssetFile {
   const asset = approvedCoverAssets.get(reference.id);
@@ -116,6 +148,10 @@ function createMainWindow(): BrowserWindow {
       navigateOnDragDrop: false,
     },
   });
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = undefined;
+  });
   setMenuTargetWindow(window);
   applyWindowSecurity(window);
   window.webContents.on('preload-error', (_event, preloadPath, error) => {
@@ -150,6 +186,32 @@ function createMainWindow(): BrowserWindow {
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.handle('mcp:get-setup', () => {
+    if (!mcpSessionHost) throw new Error('The GUI MCP bridge is not ready.');
+    return getMcpConnectionSetup(mcpSessionHost);
+  });
+  ipcMain.handle('mcp:copy-prompt', (_event, rawMode: unknown) => {
+    if (!mcpSessionHost) throw new Error('The GUI MCP bridge is not ready.');
+    return copyMcpPrompt(McpPromptModeSchema.parse(rawMode), mcpSessionHost);
+  });
+  ipcMain.handle(
+    'mcp:get-diagnostics',
+    () => mcpSessionHost?.getDiagnostics() ?? { status: 'starting' },
+  );
+  ipcMain.handle('mcp:cancel-active-job', () =>
+    mcpSessionHost?.cancelActiveJob(),
+  );
+  ipcMain.on('mcp:report-snapshot', (_event, rawSnapshot: unknown) => {
+    mcpSessionHost?.reportSnapshot(
+      McpRendererSnapshotSchema.parse(rawSnapshot),
+    );
+  });
+  ipcMain.on('mcp:complete-command', (_event, rawReply: unknown) => {
+    void mcpSessionHost?.completeCommand(
+      McpRendererCommandReplySchema.parse(rawReply),
+    );
+  });
+
   ipcMain.handle('settings:get-ui-preferences', () =>
     appSettingsService.loadUiPreferences(),
   );
@@ -399,10 +461,28 @@ app.whenReady().then(async () => {
     return;
   }
 
+  if (mcpRequested) {
+    await runMcpServer(new McpSessionClient());
+    return;
+  }
+
   appLogger.info('[startup] Application is ready', {
     logDirectory: app.getPath('logs'),
   });
   await registerCliRuntime();
+  mcpSessionHost = new McpSessionHost({
+    appSettings: appSettingsService,
+    getWindow: () => mainWindow,
+    registerSource: (path) => approvedSourcePaths.add(resolve(path)),
+    revokeSource: (path) => approvedSourcePaths.delete(resolve(path)),
+    approveCover: async (path) => ({
+      path: resolve(path),
+      reference: await inspectCoverAsset(path, randomUUID()),
+    }),
+    registerCover: (asset) => approvedCoverAssets.set(asset.id, asset),
+    resolveCoverPath: (id) => approvedCoverAssets.get(id)?.path,
+  });
+  await mcpSessionHost.start();
   registerIpcHandlers();
   setupApplicationMenu();
   createMainWindow();
@@ -413,8 +493,16 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on('before-quit', (event) => {
+  if (mcpSessionHost && !applicationIsQuitting) {
+    event.preventDefault();
+    applicationIsQuitting = true;
+    void mcpSessionHost.close().finally(() => app.quit());
+  }
+});
+
 app.on('window-all-closed', () => {
-  if (!cliWorkerRequested && process.platform !== 'darwin') {
+  if (!cliWorkerRequested && !mcpRequested && process.platform !== 'darwin') {
     app.quit();
   }
 });

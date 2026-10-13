@@ -53,11 +53,7 @@ import {
   copyMcpPrompt,
   getMcpConnectionSetup,
 } from './services/mcp-connection-service.js';
-import {
-  McpPromptModeSchema,
-  McpRendererCommandReplySchema,
-  McpRendererSnapshotSchema,
-} from '@markdown-publication/shared/mcp';
+import { McpPromptModeSchema } from '@markdown-publication/shared/mcp';
 
 const mcpArgumentIndex = process.argv.indexOf('--mps-mcp');
 const mcpRequested = mcpArgumentIndex >= 0;
@@ -202,14 +198,10 @@ function registerIpcHandlers(): void {
     mcpSessionHost?.cancelActiveJob(),
   );
   ipcMain.on('mcp:report-snapshot', (_event, rawSnapshot: unknown) => {
-    mcpSessionHost?.reportSnapshot(
-      McpRendererSnapshotSchema.parse(rawSnapshot),
-    );
+    mcpSessionHost?.reportSnapshot(rawSnapshot);
   });
   ipcMain.on('mcp:complete-command', (_event, rawReply: unknown) => {
-    void mcpSessionHost?.completeCommand(
-      McpRendererCommandReplySchema.parse(rawReply),
-    );
+    void mcpSessionHost?.completeCommand(rawReply);
   });
 
   ipcMain.handle('settings:get-ui-preferences', () =>

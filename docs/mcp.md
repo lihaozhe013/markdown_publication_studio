@@ -128,3 +128,17 @@ stdio connection closes.
 Linux rendering and screenshots require an available graphical session. The
 desktop application does not promise screenshot or rendering support in a
 headless environment without a virtual display.
+
+## Linux package verification
+
+After `pnpm build:linux`, exercise the actual AppImage GUI with:
+
+```sh
+node scripts/check-packaged-gui.mjs release/Markdown-Publication-Studio-linux-0.1.0.AppImage
+```
+
+The check uses isolated application settings, verifies the initial GUI session
+snapshot, opens Connect AI, and opens a Markdown document through the bridge
+until its preview is ready. It requires an available graphical session and
+closes its application processes afterward. This complements the stdio check,
+which does not initialize the GUI or publish renderer snapshots.

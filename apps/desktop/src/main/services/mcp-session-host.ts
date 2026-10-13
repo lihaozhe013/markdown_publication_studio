@@ -320,7 +320,11 @@ export class McpSessionHost {
       revision,
       source: snapshot.source,
       settings: {
-        ...snapshot.settings,
+        themeId: snapshot.settings.themeId,
+        pageSize: snapshot.settings.pageSize,
+        toc: snapshot.settings.toc,
+        pageNumber: snapshot.settings.pageNumber,
+        styleOverrides: snapshot.settings.styleOverrides,
         covers: {
           front: this.coverPath(snapshot.settings.covers.front),
           back: this.coverPath(snapshot.settings.covers.back),

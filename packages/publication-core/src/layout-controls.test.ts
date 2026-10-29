@@ -45,6 +45,40 @@ describe('page-ending layout controls', () => {
     expect(controls[0]?.map).toEqual([5, 6]);
   });
 
+  it('parses a standalone page-template switch as a page boundary', () => {
+    const markdown = parser();
+    const source = ['First', '\\pagetemplate{section}', 'Second'].join('\n');
+    const token = markdown
+      .parse(source, {})
+      .find((item) => item.type === 'publication_pagetemplate');
+    expect(token?.map).toEqual([1, 2]);
+    expect(token?.meta).toEqual({ template: 'section' });
+    expect(markdown.render(source)).toContain(
+      'class="publication-page-break publication-page-template publication-page-template--section" data-page-template="section" data-layout-line="2"',
+    );
+  });
+
+  it('rejects unsafe or malformed template names and literal contexts', () => {
+    const markdown = parser();
+    const source = [
+      '\\pagetemplate{Section One}',
+      '',
+      '```text',
+      '\\pagetemplate{section}',
+      '```',
+      '',
+      'Inline \\pagetemplate{section} text.',
+      '',
+      '    \\pagetemplate{section}',
+    ].join('\n');
+    const templates = markdown
+      .parse(source, {})
+      .filter((token) => token.type === 'publication_pagetemplate');
+    expect(templates).toHaveLength(1);
+    expect(templates[0]?.meta).toEqual({ template: 'invalid' });
+    expect(markdown.render(source)).toContain('data-page-template="invalid"');
+  });
+
   it('does not interpret directives inside literal Markdown blocks', () => {
     const source = [
       '```text',

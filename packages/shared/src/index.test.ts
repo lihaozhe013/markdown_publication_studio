@@ -5,6 +5,7 @@ import {
   CoverAssetReferenceSchema,
   CoverSelectionSchema,
   DEFAULT_PAGE_SIZE,
+  DEFAULT_PAGE_LAYOUT_SETTINGS,
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
@@ -79,8 +80,13 @@ describe('Page number settings', () => {
         .pageNumber,
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
     expect(
-      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
-    ).not.toHaveProperty('pageNumber');
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageNumber,
+    ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageLayout,
+    ).toEqual(DEFAULT_PAGE_LAYOUT_SETTINGS);
     expect(
       PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
         .pageSize,

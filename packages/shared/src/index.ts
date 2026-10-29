@@ -382,6 +382,58 @@ export function resolveNumberedPage(
   return { page: pageIndex + 1, pages: pageCount };
 }
 
+export const PageLayoutSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    restartBodyAfterToc: z.boolean(),
+  })
+  .strict();
+
+export type PageLayoutSettings = z.infer<typeof PageLayoutSettingsSchema>;
+
+export const DEFAULT_PAGE_LAYOUT_SETTINGS = {
+  enabled: true,
+  restartBodyAfterToc: false,
+} as const satisfies PageLayoutSettings;
+
+export const PageTemplateIdSchema = z.enum(['default', 'toc', 'section']);
+export const PaginatedPageKindSchema = z.enum(['toc', 'body']);
+
+export const PaginatedPageSchema = z
+  .object({
+    /** Position in the finalized PDF, including planned cover pages. */
+    physicalPage: z.number().int().positive(),
+    /** Position among generated pages, matching the paginated artifact. */
+    generatedPage: z.number().int().positive(),
+    kind: PaginatedPageKindSchema,
+    template: PageTemplateIdSchema,
+    logicalPage: z.number().int().nonnegative().nullable(),
+    logicalTotal: z.number().int().nonnegative().nullable(),
+    label: z.string().nullable(),
+    folio: z.string().nullable(),
+  })
+  .strict();
+
+export const PaginationPlanSchema = z
+  .object({
+    pages: z.array(PaginatedPageSchema),
+    tocPages: z.array(z.number().int().positive()),
+    bodyStartPage: z.number().int().positive().nullable(),
+    restartBodyAfterToc: z.boolean(),
+    coverPages: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const PaginationSummarySchema = PaginationPlanSchema.extend({
+  revision: z.string().min(1),
+});
+
+export type PaginatedPage = z.infer<typeof PaginatedPageSchema>;
+export type PaginatedPageKind = z.infer<typeof PaginatedPageKindSchema>;
+export type PaginationPlan = z.infer<typeof PaginationPlanSchema>;
+export type PaginationSummary = z.infer<typeof PaginationSummarySchema>;
+export type PageTemplateId = z.infer<typeof PageTemplateIdSchema>;
+
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
@@ -390,6 +442,8 @@ export const PreviewRequestSchema = z.object({
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
+  pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+  pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
 });
 
 export const PdfExportRequestSchema = z.object({
@@ -401,6 +455,7 @@ export const PdfExportRequestSchema = z.object({
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
   pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+  pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
   covers: CoverSelectionSchema.default({}),
 });
 
@@ -423,6 +478,7 @@ export const PublishConfigurationSchema = z
     pageSize: PageSizeIdSchema.optional(),
     toc: TocSettingsSchema.optional(),
     pageNumber: PageNumberSettingsSchema.optional(),
+    pageLayout: PageLayoutSettingsSchema.optional(),
     covers: z
       .object({
         front: z.string().min(1).optional(),
@@ -445,6 +501,7 @@ export const CliWorkerRequestSchema = z
     pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
     toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
     pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+    pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
     covers: z
       .object({
         front: z
@@ -471,7 +528,13 @@ export const CliWorkerResponseSchema = z
     schemaVersion: z.literal(1),
     command: z.enum(['build', 'validate']),
     ok: z.boolean(),
-    data: z.object({ outputPath: z.string().optional() }).strict().optional(),
+    data: z
+      .object({
+        outputPath: z.string().optional(),
+        pagination: PaginationSummarySchema.optional(),
+      })
+      .strict()
+      .optional(),
     diagnostics: z.array(
       z.object({
         severity: z.enum(['info', 'warning', 'error']),
@@ -688,11 +751,13 @@ export interface PreviewResult {
   title: string;
   html: string;
   diagnostics: PublicationDiagnostic[];
+  pagination?: PaginationSummary;
 }
 
 export interface ExportResult {
   outputPath: string;
   diagnostics: PublicationDiagnostic[];
+  pagination?: PaginationSummary;
 }
 
 export interface DesktopApi {
@@ -856,3 +921,13 @@ export function compareMermaidGeometry(
     ...(firstDifference === undefined ? {} : { firstDifference }),
   };
 }
+
+export type {
+  LayoutDiagnostic,
+  LayoutOverflowReport,
+  LayoutPageReport,
+  PaginationApplyOptions,
+  PaginationApplyReport,
+  PaginationPassReport,
+  PaginationProgramOptions,
+} from './pagination-program.js';

@@ -58,6 +58,44 @@ async function run() {
     await window.loadURL(pathToFileURL(inputPath).href);
     await window.webContents.executeJavaScript('document.fonts.ready');
     await window.webContents.executeJavaScript(bundle, true);
+    if (process.env.MPS_REPEAT_TABLE_HEADERS === '1') {
+      await window.webContents.executeJavaScript(
+        `
+        class RepeatTableHeaders extends Paged.Handler {
+          afterParsed(content) {
+            window.__headerDebug = [];
+            this.headers = new Map();
+            for (const table of content.querySelectorAll('table[data-ref]')) {
+              const header = table.querySelector(':scope > thead');
+              if (header) this.headers.set(table.dataset.ref, header.cloneNode(true));
+            }
+            window.__headerDebug.push({ event: 'parsed', count: this.headers.size });
+          }
+          afterOverflowAdded(content) {
+            window.__headerDebug.push({ event: 'overflow', tables: content.querySelectorAll('table').length });
+            for (const table of content.querySelectorAll('table[data-ref]')) {
+              const current = table.querySelector(':scope > thead');
+              window.__headerDebug.push({ event: 'table', matched: this.headers.has(table.dataset.ref) });
+              if (current && getComputedStyle(current).visibility === 'visible') continue;
+              current?.remove();
+              const original = this.headers.get(table.dataset.ref);
+              if (!original) continue;
+              const header = original.cloneNode(true);
+              for (const node of [header, ...header.querySelectorAll('*')]) {
+                node.removeAttribute('id');
+                node.removeAttribute('data-id');
+                node.removeAttribute('data-ref');
+              }
+              header.dataset.repeatedHeader = 'true';
+              table.insertBefore(header, table.firstChild);
+            }
+          }
+        }
+        Paged.registerHandlers(RepeatTableHeaders);
+      `,
+        true,
+      );
+    }
     const start = performance.now();
     const report = JSON.parse(
       await window.webContents.executeJavaScript(
@@ -67,9 +105,14 @@ async function run() {
           const pages = [...document.querySelectorAll('.pagedjs_page')];
           return JSON.stringify({
             total: flow.total,
+            headerDebug: window.__headerDebug,
             pages: pages.length,
             afterPage: pages.findIndex(page => page.querySelector('#after')) + 1,
-            pageText: pages.map(page => page.innerText).join('\\n'),
+            pageTexts: pages.map(page => page.innerText),
+            pageSizes: pages.map(page => {
+              const bounds = page.getBoundingClientRect();
+              return [bounds.width, bounds.height];
+            }),
             overflow: pages.map((page, index) => {
               const content = page.querySelector('.pagedjs_page_content');
               return {page: index + 1, scrollWidth: content.scrollWidth,
@@ -118,6 +161,20 @@ async function run() {
     const missingRows = Array.from({ length: 85 }, (_, index) => index).filter(
       (index) => !new RegExp(`Row\\s+${index}(?!\\d)`).test(pdfText),
     );
+    const actualRows = [...pdfText.matchAll(/\bRow\s+(\d+)\b/gu)].map((match) =>
+      Number(match[1]),
+    );
+    const actualCodeLines = [
+      ...pdfText.matchAll(/\bline(\d+)\s*=\s*(\d+)/gu),
+    ].map((match) => [Number(match[1]), Number(match[2])]);
+    const rowOrderValid =
+      actualRows.length === 85 &&
+      actualRows.every((row, index) => row === index);
+    const codeOrderValid =
+      actualCodeLines.length === 110 &&
+      actualCodeLines.every(
+        ([line, value], index) => line === index && value === index,
+      );
     staticWindow = createWindow();
     await staticWindow.loadURL(pathToFileURL(artifactPath).href);
     const staticReport = JSON.parse(
@@ -127,6 +184,11 @@ async function run() {
           afterPage: [...document.querySelectorAll('.pagedjs_page')]
             .findIndex(page => page.querySelector('#after')) + 1,
           hasEnd: document.body.innerText.includes('END-OF-DOCUMENT'),
+          pageTexts: [...document.querySelectorAll('.pagedjs_page')].map(page => page.innerText),
+          pageSizes: [...document.querySelectorAll('.pagedjs_page')].map(page => {
+            const bounds = page.getBoundingClientRect();
+            return [bounds.width, bounds.height];
+          }),
         })`,
       ),
     );
@@ -141,6 +203,21 @@ async function run() {
     const staticPdfInfo = execFileSync('pdfinfo', [staticPdfPath], {
       encoding: 'utf8',
     });
+    const staticPdfText = execFileSync(
+      'pdftotext',
+      ['-layout', staticPdfPath, '-'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    const staticPageTextMatches =
+      JSON.stringify(staticReport.pageTexts) ===
+      JSON.stringify(report.pageTexts);
+    const staticPageSizesMatch =
+      JSON.stringify(staticReport.pageSizes) ===
+      JSON.stringify(report.pageSizes);
+    delete staticReport.pageTexts;
+    delete staticReport.pageSizes;
     console.log(
       JSON.stringify(
         {
@@ -149,14 +226,20 @@ async function run() {
           elapsedMs,
           pageCount: report.pages,
           enginePageCount: report.total,
+          headerDebug: report.headerDebug,
           afterPage: report.afterPage,
           pdfPageCount: Number(pdfInfo.match(/^Pages:\s*(\d+)/m)?.[1]),
           staticPdfPageCount: Number(
             staticPdfInfo.match(/^Pages:\s*(\d+)/m)?.[1],
           ),
           staticReport,
+          staticPageTextMatches,
+          staticPageSizesMatch,
+          staticPdfTextMatches: pdfText === staticPdfText,
           overflow: report.overflow,
           missingRows,
+          rowOrderValid,
+          codeOrderValid,
           tablePagesMissingHeader,
           mergedCodeLines,
           hasLastCodeLine: pdfText.includes('line109'),

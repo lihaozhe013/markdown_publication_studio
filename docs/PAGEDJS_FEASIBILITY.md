@@ -66,6 +66,17 @@ continuation table headers on pages 17–20. Its archive SHA-256 is
 `5537947d453920f1171c65fd74911075507ef429090034ba5d9c37bd434f70c2`. The beta
 remains unselected and requires the same safety and fixture validation.
 
+An experimental beta-only hook can be enabled with `MPS_REPEAT_TABLE_HEADERS=1`.
+It replaces the engine's collapsed continuation headers during overflow
+insertion, before layout is checked. In the synthetic fixture, PDF extraction
+then found all 85 table rows and 110 code lines in order, with a visible table
+header on every table page. The 24 static page texts, page sizes, and extracted
+PDF text also matched before and after serialization. This is an encouraging
+result for one fixture, not a general correctness or accessibility guarantee:
+merged cells, nested tables, oversized rows, inline header styles, links, and
+real compiled documents still need tests. The hook is only part of the probe and
+is not a production dependency or selected backend.
+
 The input carries the publication CSP and the experiment uses sandboxed Electron
 windows. The layout script is injected as trusted application code for this
 experiment; the static result is loaded without document scripts. This does not

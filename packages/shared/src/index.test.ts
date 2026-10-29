@@ -36,24 +36,24 @@ describe('Built-in themes', () => {
     expect(ThemeIdSchema.parse('claude')).toBe('claude');
     expect(ThemePageCanvasModeSchema.parse('inset')).toBe('inset');
     expect(ThemePageCanvasModeSchema.parse('full-bleed')).toBe('full-bleed');
-    expect(BUILT_IN_THEMES.map((theme) => theme.id)).toEqual([
+    expect(BUILT_IN_THEMES.slice(0, 4).map((theme) => theme.id)).toEqual([
       'rose',
       'github-markdown',
       'modern-serif',
       'claude',
     ]);
-    expect(BUILT_IN_THEMES.map((theme) => theme.pageCanvasMode)).toEqual([
-      'inset',
-      'inset',
-      'inset',
-      'full-bleed',
-    ]);
-    expect(BUILT_IN_THEMES.map((theme) => theme.codeTheme)).toEqual([
-      'github-light',
-      'github-dark',
-      'github-dark',
-      'github-light',
-    ]);
+    expect(
+      BUILT_IN_THEMES.slice(0, 4).map((theme) => theme.pageCanvasMode),
+    ).toEqual(['inset', 'inset', 'inset', 'full-bleed']);
+    expect(BUILT_IN_THEMES.slice(0, 4).map((theme) => theme.codeTheme)).toEqual(
+      ['github-light', 'github-dark', 'github-dark', 'github-light'],
+    );
+    expect(BUILT_IN_THEMES.map((theme) => theme.id)).toEqual(
+      ThemeIdSchema.options,
+    );
+    expect(new Set(ThemeIdSchema.options).size).toBe(
+      ThemeIdSchema.options.length,
+    );
     expect(getBuiltInTheme('claude')).toEqual(
       expect.objectContaining({
         pageCanvasMode: 'full-bleed',

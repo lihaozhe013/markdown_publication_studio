@@ -1,0 +1,27 @@
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('../fonts/IBM_Plex_Sans/IBMPlexSans-Regular-Variable.ttf')
+    format('truetype');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('../fonts/IBM_Plex_Sans/IBMPlexSans-Italic-Variable.ttf')
+    format('truetype');
+  font-weight: 100 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+.markdown-body:where(
+  [data-theme='minimal-print'],
+  [data-theme='notebook'],
+  [data-theme='solarized-light'],
+  [data-theme='nordic-light']
+) {
+  --fontStack-sansSerif: 'IBM Plex Sans', 'Source Han Sans SC', sans-serif;
+  font-family: var(--fontStack-sansSerif);
+}

@@ -300,7 +300,7 @@ function printHelp(): void {
   process.stdout.write(`  --format pdf|html   Output format (default: pdf)\n`);
   process.stdout.write(`  -o, --output path   Output path\n`);
   process.stdout.write(
-    `  --theme id          rose, github-markdown, modern-serif, claude\n`,
+    `  --theme id          publication theme ID (see mps describe --json)\n`,
   );
   process.stdout.write(`  --page-size size    A4 or Letter\n`);
   process.stdout.write(`  --toc               Enable PDF table of contents\n`);

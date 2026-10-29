@@ -23,16 +23,22 @@ portable and require nothing beyond a viewer.
 
 **Built-in Themes**
 
-Four themes are included:
+Ten themes are included:
 
 - _Rose_ -- a soft palette inspired by Material 3
 - _Github_ -- a clean, technical layout
 - _Modern Serif_ -- a serif-led reading layout
 - _Claude_ -- a warm paper palette with spacious serif typography
+- _Academic Paper_ -- compact serif typography for research and course notes
+- _Classic Book_ -- traditional typography for long-form reading
+- _Minimal Print_ -- a restrained monochrome layout
+- _Notebook_ -- a spacious, neutral note-taking layout
+- _Solarized Light_ -- a warm reading palette with Solarized code highlighting
+- _Nordic Light_ -- a cool, restrained technical layout
 
-Local theme fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4, Noto
-Sans SC, etc.) are embedded as base64 data URIs so that exported documents
-render identically on any machine.
+Local theme fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4, EB
+Garamond, IBM Plex Sans, Source Han Sans SC, etc.) are embedded as base64 data
+URIs so that exported documents render identically on any machine.
 
 **Page Numbering**
 

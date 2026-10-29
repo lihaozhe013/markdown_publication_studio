@@ -1,0 +1,68 @@
+/* Publication adaptations of light developer color palettes. */
+.markdown-body[data-theme='solarized-light'],
+.markdown-body[data-theme='nordic-light'] {
+  color-scheme: light;
+  --bgColor-default: #ffffff;
+  --borderColor-muted: var(--borderColor-default);
+  background: #fff;
+  color: var(--fgColor-default);
+  font-size: 11pt;
+  line-height: 1.65;
+}
+
+.markdown-body[data-theme='solarized-light'] {
+  --fgColor-default: #435a60;
+  --fgColor-muted: #52696f;
+  --fgColor-accent: #006b90;
+  --bgColor-muted: #f7f3e6;
+  --bgColor-neutral-muted: #f3eddb;
+  --borderColor-default: #c8bf9f;
+}
+
+.markdown-body[data-theme='nordic-light'] {
+  --fgColor-default: #2e3440;
+  --fgColor-muted: #46546a;
+  --fgColor-accent: #315f78;
+  --bgColor-muted: #eceff4;
+  --bgColor-neutral-muted: #e5e9f0;
+  --borderColor-default: #bac5d4;
+}
+
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  .chapter {
+  background: #fff;
+  color: var(--fgColor-default);
+}
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  a {
+  color: var(--fgColor-accent);
+}
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  h1,
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  h2,
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  h3,
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  h4 {
+  color: var(--fgColor-default);
+  border-color: var(--borderColor-default);
+  break-after: avoid;
+}
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  blockquote {
+  color: var(--fgColor-muted);
+  background: var(--bgColor-muted);
+  border-left: 3px solid var(--fgColor-accent);
+  padding: 0.5em 1em;
+}
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  table
+  tr {
+  background: #fff;
+}
+.markdown-body:is([data-theme='solarized-light'], [data-theme='nordic-light'])
+  table
+  tr:nth-child(2n) {
+  background: var(--bgColor-muted);
+}

@@ -356,6 +356,13 @@ plain text
       features: { codeTheme: 'github-light' },
     });
 
+    const solarized = await compiler.compile(source, {
+      projectRoot: '/tmp',
+      features: { codeTheme: 'solarized-light' },
+    });
+
+    expect(solarized.html).toContain('background-color:#FDF6E3');
+    expect(solarized.html).not.toEqual(light.html);
     expect(dark.html).toMatch(/background-color:#24292e/u);
     expect(dark.html).toContain('#F97583');
     expect(light.html).toMatch(/background-color:#fff/u);

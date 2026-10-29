@@ -25,12 +25,11 @@ styleOverrides:
   version: 1
 ```
 
-The configuration can omit optional fields. Supported theme IDs are `rose`,
-`github-markdown`, `modern-serif`, and `claude`; page sizes are `A4` and
-`Letter`. `mps describe --json` is authoritative for the full style and
-page-number schemas. Relative source, output, and cover paths use the
-configuration file's directory. Paths passed directly on the command line use
-the current directory.
+The configuration can omit optional fields. `mps describe --json` lists the
+supported theme IDs; page sizes are `A4` and `Letter`. It is also authoritative
+for the full style and page-number schemas. Relative source, output, and cover
+paths use the configuration file's directory. Paths passed directly on the
+command line use the current directory.
 
 Useful commands:
 

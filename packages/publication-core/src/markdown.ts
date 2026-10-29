@@ -338,7 +338,7 @@ export interface MarkdownCompiler {
 
 export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
   const highlighter = await createHighlighter({
-    themes: ['github-dark', 'github-light'],
+    themes: ['github-dark', 'github-light', 'solarized-light'],
     langs: Object.keys(bundledLanguages) as BundledLanguage[],
   });
 

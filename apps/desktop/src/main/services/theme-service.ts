@@ -14,6 +14,32 @@ const themeStylesheets: Record<ThemeId, readonly string[]> = {
   'github-markdown': ['github.css'],
   'modern-serif': ['modern-serif.css'],
   claude: ['modern-serif.css', 'claude.css'],
+  'academic-paper': [
+    'modern-serif.css',
+    'publication-presets.css',
+    'font-eb-garamond.css',
+  ],
+  'classic-book': [
+    'modern-serif.css',
+    'publication-presets.css',
+    'font-eb-garamond.css',
+  ],
+  'minimal-print': [
+    'github.css',
+    'publication-presets.css',
+    'font-ibm-plex-sans.css',
+  ],
+  notebook: ['github.css', 'publication-presets.css', 'font-ibm-plex-sans.css'],
+  'solarized-light': [
+    'github.css',
+    'palette-presets.css',
+    'font-ibm-plex-sans.css',
+  ],
+  'nordic-light': [
+    'github.css',
+    'palette-presets.css',
+    'font-ibm-plex-sans.css',
+  ],
 };
 
 const stylesheetCache = new Map<ThemeId, Promise<string>>();

@@ -177,11 +177,12 @@ Preview supports page-size-aware rendering, zoom, diagnostics, and debounced
 rebuilds after source, asset, theme, or configuration changes. Measure
 pagination differences with fixtures before promising exact preview/PDF parity.
 
-Ship the Rose, GitHub, Modern Serif, and Claude themes. Theme definitions
-contain identity/version, supported page profiles, typography/spacing tokens,
-code style, cover layouts, CSS, and assets. Common layout controls are available
-in the GUI. Interactive controls are keyboard accessible and use semantic
-HTML/ARIA.
+Ship the Rose, GitHub, Modern Serif, Claude, Academic Paper, Classic Book,
+Minimal Print, Notebook, Solarized Light, and Nordic Light themes. Theme
+definitions contain identity/version, supported page profiles,
+typography/spacing tokens, code style, cover layouts, CSS, and assets. Common
+layout controls are available in the GUI. Interactive controls are keyboard
+accessible and use semantic HTML/ARIA.
 
 ### Desktop publication workspace
 
@@ -322,7 +323,7 @@ MVP acceptance:
   and the packaged Agent Skill installs idempotently for supported skill roots.
 - PDF and HTML render the sample publication with resolved assets and
   diagnostics.
-- All four themes, layout controls, cover composition, and numbering work.
+- All built-in themes, layout controls, cover composition, and numbering work.
 - Combine export and a batch of at least 25 fixture documents complete without
   UI lockup or failure propagation; cancellation behaves predictably.
 - AI integration works when configured; local export works without it.

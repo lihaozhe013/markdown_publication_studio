@@ -17,11 +17,21 @@ export const ThemeIdSchema = z.enum([
   'github-markdown',
   'modern-serif',
   'claude',
+  'academic-paper',
+  'classic-book',
+  'minimal-print',
+  'notebook',
+  'solarized-light',
+  'nordic-light',
 ]);
 
 export const ThemePageCanvasModeSchema = z.enum(['inset', 'full-bleed']);
 
-export const ThemeCodeThemeSchema = z.enum(['github-dark', 'github-light']);
+export const ThemeCodeThemeSchema = z.enum([
+  'github-dark',
+  'github-light',
+  'solarized-light',
+]);
 
 export const PageSizeIdSchema = z.enum(['A4', 'Letter']);
 
@@ -567,6 +577,51 @@ export const BUILT_IN_THEMES: readonly PublicationTheme[] = [
     name: 'Claude',
     description: 'Warm paper, orange accents, and spacious serif typography.',
     pageCanvasMode: 'full-bleed',
+    codeTheme: 'github-light',
+  },
+  {
+    id: 'academic-paper',
+    name: 'Academic Paper',
+    description: 'Compact serif typography for research and course notes.',
+    pageCanvasMode: 'inset',
+    codeTheme: 'github-light',
+  },
+  {
+    id: 'classic-book',
+    name: 'Classic Book',
+    description: 'Traditional book typography for long-form reading.',
+    pageCanvasMode: 'inset',
+    codeTheme: 'github-light',
+  },
+  {
+    id: 'minimal-print',
+    name: 'Minimal Print',
+    description: 'A restrained monochrome layout designed for printing.',
+    pageCanvasMode: 'inset',
+    codeTheme: 'github-light',
+  },
+  {
+    id: 'notebook',
+    name: 'Notebook',
+    description:
+      'A spacious, neutral layout inspired by modern note-taking tools.',
+    pageCanvasMode: 'inset',
+    codeTheme: 'github-light',
+  },
+  {
+    id: 'solarized-light',
+    name: 'Solarized Light',
+    description:
+      'A warm, low-contrast reading palette with Solarized code highlighting.',
+    pageCanvasMode: 'inset',
+    codeTheme: 'solarized-light',
+  },
+  {
+    id: 'nordic-light',
+    name: 'Nordic Light',
+    description:
+      'A cool, restrained technical reading layout inspired by Nordic colors.',
+    pageCanvasMode: 'inset',
     codeTheme: 'github-light',
   },
 ];

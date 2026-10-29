@@ -1,0 +1,25 @@
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('../fonts/EB_Garamond/EBGaramond-Regular-Variable.ttf')
+    format('truetype');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('../fonts/EB_Garamond/EBGaramond-Italic-Variable.ttf')
+    format('truetype');
+  font-weight: 400 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+.markdown-body:where(
+  [data-theme='academic-paper'],
+  [data-theme='classic-book']
+) {
+  --fontStack-sansSerif: 'EB Garamond', 'Source Han Serif SC', serif;
+  font-family: var(--fontStack-sansSerif);
+}

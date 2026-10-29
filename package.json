@@ -8,7 +8,7 @@
   "scripts": {
     "predev": "electron --version",
     "dev": "node scripts/dev.mjs",
-    "build": "pnpm cli:build && electron-vite build --config apps/desktop/electron.vite.config.ts",
+    "build": "pnpm cli:build && electron-vite build --config apps/desktop/electron.vite.config.ts && vite build --config apps/desktop/paginated.vite.config.ts",
     "build:unpack": "pnpm build",
     "build:win": "pnpm build && electron-builder --win --x64 --publish never",
     "build:win:x64": "pnpm build && electron-builder --win --x64 --publish never",
@@ -26,7 +26,8 @@
     "typecheck": "tsc -b tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:desktop": "pnpm build && electron scripts/check-desktop-ui.mjs && electron scripts/check-mcp-stdio.mjs"
+    "test:desktop": "pnpm build && electron scripts/check-desktop-ui.mjs && electron scripts/check-mcp-stdio.mjs",
+    "test:page-first": "pnpm build && electron scripts/check-page-first-publication.mjs"
   },
   "dependencies": {
     "@markdown-publication/publication-core": "workspace:*",

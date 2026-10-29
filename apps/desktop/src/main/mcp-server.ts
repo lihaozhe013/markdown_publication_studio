@@ -309,7 +309,7 @@ export async function runMcpServer(session?: McpSessionGateway): Promise<void> {
         ],
         [
           'session_view',
-          'Set continuous preview zoom or scroll to a vertical position or document heading.',
+          'Set preview zoom or scroll to a vertical position or document heading.',
           McpSessionViewSchema,
           McpSessionStateSchema,
           'session_view',

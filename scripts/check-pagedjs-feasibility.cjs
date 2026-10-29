@@ -561,6 +561,69 @@ async function run() {
         2,
       ),
     );
+    if (process.env.MPS_PAGED_ASSERT === '1') {
+      const failures = [];
+      const requireCheck = (condition, name) => {
+        if (!condition) failures.push(name);
+      };
+      requireCheck(Boolean(fixturePath), 'real fixture');
+      requireCheck(report.pages === report.total, 'engine page count');
+      requireCheck(
+        report.pages === Number(pdfInfo.match(/^Pages:\s*(\d+)/m)?.[1]),
+        'PDF page count',
+      );
+      requireCheck(
+        report.pages === Number(staticPdfInfo.match(/^Pages:\s*(\d+)/m)?.[1]),
+        'static PDF page count',
+      );
+      requireCheck(
+        staticPageTextMatches &&
+          staticPageSizesMatch &&
+          pdfText === staticPdfText,
+        'static artifact parity',
+      );
+      requireCheck(screenGeometry === printGeometry, 'screen/print geometry');
+      requireCheck(report.tocRefillGeometryMatches, 'TOC refill geometry');
+      requireCheck(report.afterStartsPage, 'explicit page break');
+      requireCheck(report.visibleOverflow.length === 0, 'visible overflow');
+      requireCheck(
+        rowOrderValid && codeOrderValid && mergedCodeLines === 0,
+        'ordered table and code',
+      );
+      requireCheck(
+        tablePagesMissingHeader.length === 0,
+        'repeated table headers',
+      );
+      requireCheck(report.mermaidCount > 0, 'Mermaid diagram');
+      requireCheck(
+        report.tocLinks.length > 0 &&
+          report.tocLinks.every(
+            (link) =>
+              link.destinationCount === 1 &&
+              link.label === report.folios[link.destinationPage - 1],
+          ),
+        'TOC references',
+      );
+      requireCheck(
+        report.tocPages.length > 0 &&
+          report.tocPages.every(
+            (page) => report.pageColors[page - 1] === 'rgb(232, 238, 251)',
+          ),
+        'TOC page background',
+      );
+      requireCheck(
+        report.pageColors[report.afterPage - 1] === 'rgb(255, 238, 204)',
+        'section page background',
+      );
+      requireCheck(
+        coverAssembly?.pages === report.pages + 1 &&
+          coverAssembly?.destinationsMatch &&
+          coverAssembly?.annotationsMatch,
+        'cover assembly links',
+      );
+      if (failures.length)
+        throw new Error(`Feasibility checks failed: ${failures.join(', ')}`);
+    }
   } finally {
     if (staticWindow && !staticWindow.isDestroyed()) staticWindow.destroy();
     if (!window.isDestroyed()) window.destroy();

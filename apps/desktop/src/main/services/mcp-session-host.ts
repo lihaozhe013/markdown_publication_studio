@@ -566,7 +566,9 @@ export class McpSessionHost {
           throw new Error(
             'Open a Markdown source before capturing the preview.',
           );
-        const previewDeadline = Date.now() + 15_000;
+        // Paginating a long publication can legitimately take tens of seconds;
+        // keep the wait bounded but large enough for real layouts.
+        const previewDeadline = Date.now() + 60_000;
         while (
           (current.preview.status !== 'ready' ||
             current.preview.revision !== input.revision) &&
@@ -580,7 +582,7 @@ export class McpSessionHost {
           current.preview.revision !== input.revision
         ) {
           throw new Error(
-            'preview_timeout: The preview did not finish loading fonts, images, and layout within 15 seconds for the requested revision.',
+            'preview_timeout: The preview did not finish loading fonts, images, and pagination within 60 seconds for the requested revision.',
           );
         }
       }
@@ -605,7 +607,7 @@ export class McpSessionHost {
         scope: input.scope,
         view: this.state?.view,
         disclaimer:
-          'Continuous preview capture. PDF determines final publication pagination.',
+          'Paginated preview capture from the finalized page revision.',
       };
     }
 

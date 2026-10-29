@@ -82,18 +82,71 @@ windows. The layout script is injected as trusted application code for this
 experiment; the static result is loaded without document scripts. This does not
 prove safe integration with every publication asset or the real renderer iframe.
 
+## Real publication experiments
+
+The optional fixture test
+`apps/desktop/src/main/services/paged-probe-fixture.test.ts` compiles the
+repository's sample Markdown, KaTeX, Shiki, TOC, local SVG, and Mermaid
+placeholder with embedded fonts and theme assets. The probe optionally runs the
+built application's isolated Mermaid renderer before layout. The
+`MPS_PAGED_LONG_TOC=1` fixture adds 40 headings, mixed CJK prose, a source-level
+`\clearpage`, an 85-row table, and a 110-line highlighted code block. Its HTML
+is approximately 80 MiB because it contains the existing embedded font assets.
+
+Passing the complete embedded CSS to the beta engine exceeded three minutes in
+one attempt. With `MPS_PAGED_FAST_STYLES=1`, the probe retains the original
+theme and font CSS in the document but passes only explicit pagination rules to
+the engine. This finished the long Claude/A4 fixture in approximately 23.4
+seconds. Without `MPS_PAGED_NORMALIZE_STYLES=1`, screen and print geometry
+differed; normalizing the existing screen-only chapter and TOC padding made the
+measured geometry identical for the tested fixture. That normalization is
+experimental, not a generic proof for every theme, CSS rule, or size.
+
+With the repeat-header hook, anchored-heading restoration, reserved TOC labels,
+experimental folios, and whole-sheet colors enabled, the long Claude/A4 fixture
+produced 22 generated pages, including three TOC pages. It retained the Mermaid
+SVG and local image, split the table with headers, preserved the numbered table
+rows and code lines in extracted order, and placed the heading after
+`\clearpage` at the top of page 15. All 44 TOC anchors had one destination. A
+front cover inserted into the existing body PDF produced 23 pages and kept all
+44 named destinations and link annotations. The static page text and sizes,
+extracted PDF text, and selected screen/print element geometry matched.
+
+At an experimental 16pt body size the same fixture produced 26 pages, updated 34
+TOC labels, retained all destinations after cover insertion, and matched the
+same measured geometry and text checks. A GitHub/Letter run produced 20 pages
+and passed the same targeted checks. Page backgrounds and folios were visibly
+present in a manually inspected PDF, but are not yet covered by automated color
+and font-fidelity assertions. The reserved TOC labels did not change link-box
+geometry in these runs; a fixed-width field does not replace general bounded
+convergence or a policy for very large labels.
+
+Destroying the sandboxed layout window after one second stopped a long layout in
+approximately 1005ms in one run. This verifies that the main process can
+interrupt this experimental renderer; it is not a production cancellation,
+resource-leak, memory, or responsiveness benchmark. The 15-second MCP preview
+limit remains shorter than the observed long-document layout time.
+
+For example, after `pnpm build`, generate and run the long fixture with:
+
+```sh
+MPS_PAGED_LONG_TOC=1 MPS_PAGED_FIXTURE_PATH=/tmp/paged-long.html \
+  pnpm exec vitest run apps/desktop/src/main/services/paged-probe-fixture.test.ts
+MPS_PAGED_RENDER_MERMAID=1 MPS_PAGED_INCLUDE_COVER=1 \
+  MPS_PAGED_RESTART_BODY=1 MPS_PAGED_DECORATE=1 MPS_PAGED_RESTORE_ANCHORS=1 \
+  MPS_PAGED_NORMALIZE_STYLES=1 MPS_PAGED_FAST_STYLES=1 \
+  MPS_PAGED_FIXTURE_PATH=/tmp/paged-long.html MPS_REPEAT_TABLE_HEADERS=1 \
+  MPS_PAGEDJS_BUNDLE=/tmp/mps-paged-beta/package/dist/paged.js \
+  pnpm exec electron scripts/check-pagedjs-feasibility.cjs
+```
+
 ## Remaining P0 work
 
-The mandatory end-to-end acceptance scenario has not been exercised. In
-particular, this probe does not include the actual Markdown compiler, Shiki,
-KaTeX, Mermaid, local images, imported cover assembly, page templates, folios,
-numbered TOC convergence, literal-safe `\\clearpage` parsing, or source mapping.
-It also does not compare per-page geometry or extract and compare ordered PDF
-text, examine TOC links, measure memory/cancellation, or test Windows/macOS.
-
-Design and verify a safe repeated-table-header mechanism, determine how to
-validate generated wrapper geometry, and verify that long blocks retain their
-formatting without clipping. Measure representative small, medium, and long real
-publications and implement the seven-point feasibility scenario before selecting
-a backend or replacing the existing publication pipeline. A timeout change alone
-is not evidence that layout is responsive or cancellable.
+The fixture-specific experiment still requires automated visual/furniture and
+full ordered-source checks, more fragmentation cases, general TOC convergence,
+real imported cover assets, security validation, and proper memory and
+cancellation measurements. Check all themes, both page sizes, and other
+platforms before claiming compatibility. The tested bundle is still unselected;
+no paginated preview or shared PDF pipeline has been integrated. A timeout
+change alone is not evidence that production layout is responsive or
+cancellable.

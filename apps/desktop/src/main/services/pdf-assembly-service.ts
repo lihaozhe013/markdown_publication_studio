@@ -72,9 +72,13 @@ async function appendImageCover(
   output: PDFDocument,
   asset: LoadedCoverAsset,
   pageSize: PageSizeId,
+  pageIndex: number,
 ): Promise<void> {
   const dimensions = getPageSizeDefinition(pageSize);
-  const page = output.addPage([dimensions.widthPt, dimensions.heightPt]);
+  const page = output.insertPage(pageIndex, [
+    dimensions.widthPt,
+    dimensions.heightPt,
+  ]);
   const image =
     asset.imageFormat === 'png'
       ? await output.embedPng(asset.bytes)
@@ -91,6 +95,7 @@ async function appendPdfCover(
   output: PDFDocument,
   asset: LoadedCoverAsset,
   pageSize: PageSizeId,
+  pageIndex: number,
 ): Promise<void> {
   const source = asset.pdfDocument;
   if (!source) {
@@ -103,7 +108,7 @@ async function appendPdfCover(
   if (!page) {
     throw assemblyError(`Cover PDF "${asset.reference.name}" has no page.`);
   }
-  output.addPage(page);
+  output.insertPage(pageIndex, page);
 }
 
 async function appendCover(
@@ -111,6 +116,7 @@ async function appendCover(
   cover: CoverAssetFile,
   pageSize: PageSizeId,
   assetLoader: CoverAssetLoader,
+  pageIndex: number,
 ): Promise<void> {
   const asset = await assetLoader(cover.path, cover.id);
   if (asset.reference.kind !== cover.kind) {
@@ -119,9 +125,9 @@ async function appendCover(
     );
   }
   if (asset.reference.kind === 'image') {
-    await appendImageCover(output, asset, pageSize);
+    await appendImageCover(output, asset, pageSize, pageIndex);
   } else {
-    await appendPdfCover(output, asset, pageSize);
+    await appendPdfCover(output, asset, pageSize, pageIndex);
   }
 }
 
@@ -147,18 +153,19 @@ export class PdfAssemblyService implements PdfAssembler {
     }
     assertBodyPageSizes(body, input.pageSize);
 
-    const output = await PDFDocument.create();
     if (front) {
-      await appendCover(output, front, input.pageSize, this.assetLoader);
+      await appendCover(body, front, input.pageSize, this.assetLoader, 0);
     }
-
-    const bodyPages = await output.copyPages(body, body.getPageIndices());
-    bodyPages.forEach((page) => output.addPage(page));
-
     if (back) {
-      await appendCover(output, back, input.pageSize, this.assetLoader);
+      await appendCover(
+        body,
+        back,
+        input.pageSize,
+        this.assetLoader,
+        body.getPageCount(),
+      );
     }
 
-    return output.save();
+    return body.save();
   }
 }

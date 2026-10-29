@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
+  DEFAULT_PAGE_LAYOUT_SETTINGS,
   DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
@@ -14,8 +15,10 @@ import {
   type CoverSelection,
   type PublicationDiagnostic,
   type PublicationStyleOverrides,
+  type PageLayoutSettings,
   type PageNumberSettings,
   type PageSizeId,
+  type PaginationSummary,
   type TocSettings,
   type ThemeId,
 } from '@markdown-publication/shared';
@@ -66,12 +69,20 @@ export function App(): React.JSX.Element {
   const [themeId, setThemeId] = useState<ThemeId>('rose');
   const [pageSize, setPageSize] = useState<PageSizeId>(DEFAULT_PAGE_SIZE);
   const [covers, setCovers] = useState<CoverSelection>({});
+  const [pageLayout, setPageLayout] = useState<PageLayoutSettings>({
+    ...DEFAULT_PAGE_LAYOUT_SETTINGS,
+  });
+  const [pagination, setPagination] = useState<PaginationSummary | null>(null);
   const [toc, setToc] = useState<TocSettings>({
     ...DEFAULT_TOC_SETTINGS,
   });
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
+  const pageNumberRef = useRef(pageNumber);
+  pageNumberRef.current = pageNumber;
+  const pageLayoutRef = useRef(pageLayout);
+  pageLayoutRef.current = pageLayout;
   const [styleSession, dispatchStyle] = useReducer(styleSessionReducer, {
     saved: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
     draft: { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },
@@ -212,13 +223,21 @@ export function App(): React.JSX.Element {
     selectedPageSize: PageSizeId,
     selectedStyle: PublicationStyleOverrides,
     selectedToc: TocSettings,
+    overrides: {
+      pageNumber?: PageNumberSettings;
+      pageLayout?: PageLayoutSettings;
+    } = {},
   ): Promise<void> {
+    const selectedPageNumber = overrides.pageNumber ?? pageNumberRef.current;
+    const selectedPageLayout = overrides.pageLayout ?? pageLayoutRef.current;
     previewRequestRef.current = JSON.stringify([
       path,
       selectedTheme,
       selectedPageSize,
       selectedStyle,
       selectedToc,
+      selectedPageNumber,
+      selectedPageLayout,
     ]);
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
@@ -232,11 +251,14 @@ export function App(): React.JSX.Element {
         pageSize: selectedPageSize,
         toc: selectedToc,
         styleOverrides: selectedStyle,
+        pageNumber: selectedPageNumber,
+        pageLayout: selectedPageLayout,
       });
       if (sequence !== previewSequenceRef.current) return;
       setTitle(result.title);
       setHtml(result.html);
       setDiagnostics(result.diagnostics);
+      setPagination(result.pagination ?? null);
       setPreviewFailed(false);
       setStatus('Preview ready.');
     } catch (error) {
@@ -359,6 +381,7 @@ export function App(): React.JSX.Element {
                 settings.pageSize,
                 settings.styleOverrides,
                 settings.toc,
+                { pageNumber: settings.pageNumber },
               );
             }
           } else if (command.operation === 'document') {
@@ -377,6 +400,7 @@ export function App(): React.JSX.Element {
               setTitle(selected.name);
               setHtml('');
               setDiagnostics([]);
+              setPagination(null);
               await refreshPreview(
                 selected.path,
                 themeId,
@@ -389,6 +413,7 @@ export function App(): React.JSX.Element {
               setTitle('No publication loaded');
               setHtml('');
               setDiagnostics([]);
+              setPagination(null);
               setCovers({});
               setToc({ ...DEFAULT_TOC_SETTINGS });
               dispatchStyle({ type: 'close-document' });
@@ -460,6 +485,33 @@ export function App(): React.JSX.Element {
       toc,
     );
   }
+
+  // Numbering and page-layout settings change the artifact; refresh once per
+  // change so folios, contents references, and page templates stay in sync.
+  const previewPageSettingsRef = useRef(
+    JSON.stringify([pageNumber, pageLayout]),
+  );
+  useEffect(() => {
+    const key = JSON.stringify([pageNumber, pageLayout]);
+    if (previewPageSettingsRef.current === key) return undefined;
+    previewPageSettingsRef.current = key;
+    if (!source || exporting || styleSaving) return undefined;
+    const timer = window.setTimeout(() => {
+      void refreshPreview(source.path, themeId, pageSize, styleDraft, toc);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    exporting,
+    pageLayout,
+    pageNumber,
+    pageSize,
+    refreshPreview,
+    source,
+    styleDraft,
+    styleSaving,
+    themeId,
+    toc,
+  ]);
 
   useEffect(() => {
     if (!stylePanelOpen || !source || exporting || styleSaving)
@@ -679,6 +731,7 @@ export function App(): React.JSX.Element {
       setTitle(selected.name);
       setHtml('');
       setDiagnostics([]);
+      setPagination(null);
       setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
@@ -724,6 +777,7 @@ export function App(): React.JSX.Element {
       setTitle(selected.name);
       setHtml('');
       setDiagnostics([]);
+      setPagination(null);
       setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
@@ -855,6 +909,7 @@ export function App(): React.JSX.Element {
         pageSize,
         styleOverrides: effectiveStyle,
         pageNumber,
+        pageLayout,
         covers,
         toc,
       });
@@ -959,6 +1014,7 @@ export function App(): React.JSX.Element {
           html={html}
           sourceLoaded={Boolean(source)}
           pageSize={pageSize}
+          pagination={pagination}
           zoomMode={zoomMode}
           busy={busy}
           ready={settingsReady}
@@ -996,6 +1052,23 @@ export function App(): React.JSX.Element {
             hidden={inspectorTab !== 'layout'}
           >
             <PublicationFormatControls section="layout" {...formatProps} />
+            <div className="panel-block page-layout-controls">
+              <p className="eyebrow">Page layout</p>
+              <label className="page-layout-toggle">
+                <input
+                  type="checkbox"
+                  checked={pageLayout.restartBodyAfterToc}
+                  disabled={busy || styleSaving || !settingsReady}
+                  onChange={(event) =>
+                    setPageLayout((current) => ({
+                      ...current,
+                      restartBodyAfterToc: event.target.checked,
+                    }))
+                  }
+                />
+                <span>Restart page numbers after contents</span>
+              </label>
+            </div>
             <PageNumberControls
               disabled={busy || styleSaving || !settingsReady}
               error={pageNumberError}

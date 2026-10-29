@@ -114,6 +114,7 @@ const commonAttributes = [
   'data-publication-math',
   'data-toc-id',
   'data-language',
+  'data-layout-line',
   'style',
   'width',
   'height',

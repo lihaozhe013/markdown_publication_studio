@@ -140,6 +140,21 @@ MPS_PAGED_RENDER_MERMAID=1 MPS_PAGED_INCLUDE_COVER=1 \
   pnpm exec electron scripts/check-pagedjs-feasibility.cjs
 ```
 
+## Selected backend
+
+The production pipeline uses the evaluated `pagedjs@0.5.0-beta.2` bundle. The
+main process emits it and the isolated layout program next to the main-process
+build output, injects both into a sandboxed hidden window, and never exposes the
+engine to publication source or the desktop preview. The artifact is bound to a
+revision that includes the engine version and Electron version.
+
+The production program keeps the evaluated behaviour: explicit pagination
+stylesheets, repeat-table-header hook, anchor restoration, reserved contents
+labels with geometry verification, whole-sheet template backgrounds, and shared
+folios. Remaining risk is limited to the beta version itself and to complex
+fragmentation cases; both are covered by the acceptance check and listed as
+deferred hardening in the implementation plan.
+
 ## Remaining P0 work
 
 The fixture-specific experiment still requires automated visual/furniture and

@@ -42,11 +42,12 @@ URIs so that exported documents render identically on any machine.
 
 **Page Numbering**
 
-A configurable page number system with seven font choices (including CJK fonts),
-adjustable size and style, a customizable format template (e.g.
-`{page} / {pages}`), and policies for the first page (show all, hide and start
-numbering at 1, or hide and start at 2). Page numbers are embedded into the
-final PDF via pdf-lib with automatic font fallback for CJK characters.
+A configurable page number system with five Latin font choices, adjustable size
+and style, a customizable format template (e.g. `{page} / {pages}`), and
+policies for the first page (show all, hide and start numbering at 1, or hide
+and start at 2). Page numbers are embedded into the final PDF via pdf-lib. CJK
+fonts and CJK format text are not available for page numbers because embedding a
+CJK font would add tens of megabytes to every export.
 
 **Table of Contents**
 
@@ -145,7 +146,7 @@ and GUI task diagnostics.
 File validation and PDF/HTML exports run in isolated workers without opening the
 GUI. Session tools can open a document, inspect or change the current
 publication settings, export the current draft, adjust preview view, and capture
-the continuous preview. Agent style changes stay in the current session until
+the page-first preview. Agent style changes stay in the current session until
 explicitly saved as global defaults. MCP never exposes arbitrary shell or
 JavaScript execution. See [Desktop MCP and AI Connection](docs/mcp.md) for tool
 schemas, path rules, revision handling, and security boundaries.

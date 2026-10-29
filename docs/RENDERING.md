@@ -28,6 +28,21 @@ Markdown
             -> optional cover/back-cover PDF assembly
 ```
 
+## Engine choice
+
+Paged.js `0.5.0-beta.2` was selected after probing Vivliostyle Core and a
+complete-block custom paginator against repository fixtures. Browser pagination
+and extension hooks fit the existing Chromium pipeline, and the MIT license fits
+the distribution model; Vivliostyle's AGPL-3.0 obligations and a custom
+paginator's fragmentation work ruled those options out. The version is pinned in
+the desktop manifest and lockfile, its license and transitive dependencies are
+reviewed with dependency updates, and the engine version participates in the
+artifact revision so a stale preview cannot be printed behind a newer engine.
+
+The engine bundle and the isolated layout program are emitted next to the
+main-process bundle at build time, so packaged builds load them from the
+application archive.
+
 ## Page-first pagination
 
 Paged.js `0.5.0-beta.2` is pinned as the layout engine and bundled as
@@ -74,6 +89,18 @@ application archive. On the reference Linux machine, a two-page sample
 publication paginates in about 4-5 seconds and an 80 MiB request fixture with 44
 headings, 85 table rows, and 110 code lines paginates in about 23 seconds. These
 numbers are measurements, not guarantees.
+
+## Fragmentation and content integrity
+
+The engine fragments flowing content rather than clipping it. Long code blocks
+split by lines with Shiki token colors and source order preserved, tables split
+by rows and repeat their header on continuation pages, and headings stay with
+following content where practical. Figures, display math, and diagrams remain
+atomic where they fit a page. Content must not disappear, reorder, or be hidden
+by clipping; visible escapes produce `layout-overflow` warnings instead of
+silent loss. The acceptance check asserts ordered code lines, ordered table
+rows, repeated headers, and no visible overflow across every built-in theme and
+both paper sizes.
 
 ## Layout directives
 

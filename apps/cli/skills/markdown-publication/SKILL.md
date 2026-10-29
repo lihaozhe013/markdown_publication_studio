@@ -30,7 +30,6 @@ another agent, or handling a CLI failure.
 When the desktop application is available and the task concerns the document
 already open in its preview, use its **Connect AI** MCP session tools so the
 current unsaved style and cover settings are respected. File MCP tools can also
-validate or export without starting the GUI. Read the
-[desktop MCP reference](../../../docs/mcp.md) for connection, revision, and
-output-safety behavior. Do not install a separate MCP package; the desktop
-executable includes its own runtime.
+validate or export without starting the GUI. The `docs/mcp.md` desktop MCP
+reference covers connection, revision, and output-safety behavior. Do not
+install a separate MCP package; the desktop executable includes its own runtime.

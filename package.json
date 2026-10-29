@@ -27,7 +27,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:desktop": "pnpm build && electron scripts/check-desktop-ui.mjs && electron scripts/check-mcp-stdio.mjs",
-    "test:page-first": "pnpm build && electron scripts/check-page-first-publication.mjs"
+    "test:page-first": "pnpm build && electron scripts/check-page-first-publication.mjs",
+    "verify:packaged": "electron scripts/check-packaged-runtime.mjs"
   },
   "dependencies": {
     "@markdown-publication/publication-core": "workspace:*",

@@ -21,7 +21,11 @@ Delivered in this milestone:
 - PDF printing from the finalized artifact with zero page margins, cover
   placement before generated pages, and preserved link destinations.
 - `scripts/check-page-first-publication.mjs`, an end-to-end acceptance check
-  covering all seven acceptance points through the production CLI worker.
+  covering all seven acceptance points through the production CLI worker, every
+  built-in theme at both A4 and Letter, the legacy layout switch, hostile source
+  content, and layout cancellation.
+- `scripts/check-packaged-runtime.mjs`, which verifies an unpacked packaged
+  application can paginate and export from its asar bundle.
 
 Deferred: recto starts, explicit blank pages, Roman front matter, background
 images and watermarks, page virtualization, spreads and thumbnails, arbitrary
@@ -417,6 +421,33 @@ One reproducible publication must demonstrate all of the following together:
 7. Final PDF page order, dimensions, folios, backgrounds, and clickable TOC
    destinations agree with the finalized preview artifact, including after cover
    assembly.
+
+## Validation results
+
+- Unit tests: page-plan numbering, directive parsing and literal exclusions,
+  contents labeling, and preview/PDF pipeline unit coverage pass.
+- Chromium integration: the acceptance check verifies covers, multipage
+  contents, body restart, whole-sheet template colors sampled from rasterized
+  PDF pages, `\clearpage`, repeated table headers, ordered table and code
+  content, folios on every planned page, clickable contents links and named
+  destinations after cover insertion, and repagination after a typography
+  change.
+- Theme/size matrix: all ten built-in themes validate at A4 and Letter with no
+  warnings, correct contents and section templates, and body folios that start
+  at `1 / N`. Disabling page layout restores the flowing profile without a page
+  plan.
+- Security: injected scripts, event handlers, `javascript:` links, and invalid
+  template names do not reach the serialized artifact; invalid template names
+  produce a warning.
+- Cancellation: sending `SIGTERM` during a layout stops the worker in under
+  fifteen seconds in the acceptance run.
+- Packaged runtime: an unpacked Linux build reads the engine and layout program
+  from its asar bundle and exports a page plan that matches the PDF.
+- Not validated here: Windows and macOS packaged builds, and very large
+  publications beyond the measured fixtures. The nightly release workflow runs
+  `scripts/check-packaged-runtime.mjs` on both platforms as an advisory,
+  non-blocking step until it has passed there twice; remove the advisory flag
+  and treat failures as release blockers once validated.
 
 ## Validation strategy
 

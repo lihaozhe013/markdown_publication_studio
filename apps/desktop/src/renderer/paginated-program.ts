@@ -341,6 +341,12 @@ function collectOverflow(
       'h1,h2,h3,h4,p,pre,table,img,svg.mermaid-diagram,.math-block',
     );
     for (const node of candidates) {
+      // Engine bookkeeping fragments are invisible placeholders, not content.
+      if (node.closest('[data-undisplayed]')) continue;
+      const hasContent =
+        (node.textContent ?? '').trim().length > 0 ||
+        node.querySelector('img, svg, .katex') !== null;
+      if (!hasContent) continue;
       const rect = node.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) continue;
       if (

@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +58,7 @@ function sheetColor(pdfPath, page) {
   ).trim();
 }
 
-async function runWorker(request, label) {
+async function runWorker(request, label, environment = {}) {
   const directory = join(artifacts, label);
   await mkdir(directory, { recursive: true });
   const requestPath = join(directory, 'request.json');
@@ -87,7 +87,11 @@ async function runWorker(request, label) {
     const child = spawn(
       process.execPath,
       [repository, '--mps-worker', requestPath],
-      { cwd: repository, stdio: ['ignore', 'ignore', 'pipe'] },
+      {
+        cwd: repository,
+        stdio: ['ignore', 'ignore', 'pipe'],
+        env: { ...process.env, ...environment },
+      },
     );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
@@ -417,6 +421,213 @@ async function main() {
     );
   }
 
+  // Every built-in theme and both paper sizes must paginate cleanly.
+  const themes = [
+    'rose',
+    'github-markdown',
+    'modern-serif',
+    'claude',
+    'academic-paper',
+    'classic-book',
+    'minimal-print',
+    'notebook',
+    'solarized-light',
+    'nordic-light',
+  ];
+  const matrixSource = join(artifacts, 'matrix.md');
+  await writeFile(
+    matrixSource,
+    [
+      '# Matrix publication',
+      '',
+      ...Array.from(
+        { length: 8 },
+        (_, index) =>
+          `## Chapter ${index}\n\n${'Body copy for the theme matrix. '.repeat(12)}\n`,
+      ),
+      '',
+      '| Column | Value |',
+      '| --- | --- |',
+      ...Array.from(
+        { length: 12 },
+        (_, index) => `| Row ${index} | ${index} |`,
+      ),
+      '',
+      '```ts',
+      ...Array.from(
+        { length: 20 },
+        (_, index) => `const value${index} = ${index};`,
+      ),
+      '```',
+      '',
+      '\\clearpage',
+      '',
+      '## Matrix after break',
+      '',
+      '\\pagetemplate{section}',
+      '',
+      '## Matrix section template',
+      '',
+      'Section copy.',
+    ].join('\n'),
+  );
+  for (const themeId of themes) {
+    for (const pageSize of ['A4', 'Letter']) {
+      const result = await runWorker(
+        { command: 'validate', sourcePath: matrixSource, themeId, pageSize },
+        `matrix-${themeId}-${pageSize}`,
+      );
+      const matrixPlan = result.data?.pagination;
+      check(Boolean(matrixPlan), `${themeId}/${pageSize} reports a page plan`);
+      if (!matrixPlan) continue;
+      const matrixBody = matrixPlan.pages.filter(
+        (page) => page.kind === 'body',
+      );
+      const severe = result.diagnostics.filter(
+        (diagnostic) => diagnostic.severity !== 'info',
+      );
+      check(
+        severe.length === 0,
+        `${themeId}/${pageSize} has no warnings or errors`,
+        { diagnostics: severe.map((diagnostic) => diagnostic.code) },
+      );
+      check(
+        matrixPlan.tocPages.length >= 1 &&
+          matrixBody[0]?.folio === `1 / ${matrixBody.length}`,
+        `${themeId}/${pageSize} numbers body pages after contents`,
+        { tocPages: matrixPlan.tocPages, folio: matrixBody[0]?.folio },
+      );
+      check(
+        matrixPlan.pages.some((page) => page.template === 'section') &&
+          matrixPlan.pages.some((page) => page.template === 'toc'),
+        `${themeId}/${pageSize} applies contents and section templates`,
+      );
+    }
+  }
+
+  // The legacy switch must restore flowing output without a page plan.
+  const legacy = await runWorker(
+    {
+      command: 'validate',
+      sourcePath: matrixSource,
+      pageLayout: { enabled: false, restartBodyAfterToc: false },
+    },
+    'legacy',
+  );
+  check(
+    legacy.data?.pagination === undefined,
+    'disabling page layout keeps the flowing profile',
+  );
+
+  // Hostile source stays static: no scripts or event handlers reach the artifact.
+  const hostileSource = join(artifacts, 'hostile.md');
+  await writeFile(
+    hostileSource,
+    [
+      '# Hostile input',
+      '',
+      '<script>window.__publicationPwned = true;</script>',
+      '',
+      '<img src="data:image/png;base64,AAAA" onerror="window.__publicationPwned = true">',
+      '',
+      '<a href="javascript:alert(1)">unsafe link</a>',
+      '',
+      '\u005cpagetemplate{../escape}',
+      '',
+      '## Still static',
+      '',
+      'Body copy.',
+    ].join('\n'),
+  );
+  const dumpDirectory = join(artifacts, 'artifact-dump');
+  const hostileResult = await runWorker(
+    { command: 'validate', sourcePath: hostileSource },
+    'hostile',
+    { MPS_LAYOUT_DUMP_DIR: dumpDirectory },
+  );
+  check(
+    hostileResult.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'page-template-unknown',
+    ),
+    'invalid template names produce an actionable warning',
+  );
+  const artifactFiles = await readdir(dumpDirectory);
+  const artifactFile = artifactFiles.find((name) => name.endsWith('.html'));
+  check(Boolean(artifactFile), 'hostile input produced a layout artifact');
+  if (artifactFile) {
+    const artifactHtml = await readFile(
+      join(dumpDirectory, artifactFile),
+      'utf8',
+    );
+    check(
+      !/<script/iu.test(artifactHtml) &&
+        !/javascript:/iu.test(artifactHtml) &&
+        !/\son\w+\s*=/iu.test(artifactHtml),
+      'the page artifact contains no scripts or inline event handlers',
+    );
+    check(
+      !artifactHtml.includes('../escape'),
+      'invalid template names never reach the artifact',
+    );
+  }
+
+  // Cancellation must stop an in-flight layout instead of leaving it running.
+  const cancelled = await new Promise((resolvePromise) => {
+    const directory = join(artifacts, 'cancel');
+    const requestPath = join(directory, 'request.json');
+    const child = spawn(
+      process.execPath,
+      [repository, '--mps-worker', requestPath],
+      { cwd: repository, stdio: ['ignore', 'ignore', 'pipe'] },
+    );
+    const startedAt = Date.now();
+    const finish = (value) =>
+      resolvePromise({ ...value, elapsed: Date.now() - startedAt });
+    mkdir(directory, { recursive: true }).then(async () => {
+      await writeFile(
+        requestPath,
+        JSON.stringify({
+          schemaVersion: 1,
+          command: 'build',
+          sourcePath,
+          outputPath: join(directory, 'cancelled.pdf'),
+          format: 'pdf',
+          themeId: 'claude',
+          pageSize: 'A4',
+          toc: { enabled: true, preset: 'classic-book' },
+          pageNumber: {
+            enabled: true,
+            fontFamily: 'source-sans-3',
+            fontSizePt: 10,
+            style: 'normal',
+            format: '{page} / {pages}',
+            firstPageMode: 'all-pages',
+          },
+          pageLayout: { enabled: true, restartBodyAfterToc: true },
+          covers: {},
+          strict: false,
+          force: true,
+        }),
+      );
+      setTimeout(() => child.kill('SIGTERM'), 700);
+    });
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish({ exited: false });
+    }, 20_000);
+    child.on('close', (code, signal) => {
+      clearTimeout(deadline);
+      finish({ exited: true, code, signal });
+    });
+  });
+  check(
+    cancelled.exited && cancelled.elapsed < 15_000,
+    'cancelling a layout stops the worker promptly',
+    cancelled,
+  );
+
+  notes.push(`theme/page-size combinations: ${themes.length * 2}`);
+  notes.push(`cancellation stopped after ${cancelled.elapsed} ms`);
   notes.push(`generated pages: ${generatedPages}`);
   notes.push(`PDF pages: ${pdfPages} (with cover)`);
   notes.push(`contents pages: ${plannedWithCover.tocPages.join(', ')}`);

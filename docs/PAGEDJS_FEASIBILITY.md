@@ -148,6 +148,12 @@ build output, injects both into a sandboxed hidden window, and never exposes the
 engine to publication source or the desktop preview. The artifact is bound to a
 revision that includes the engine version and Electron version.
 
+Production validation covers all ten built-in themes at A4 and Letter, hostile
+source content, cancellation, repeated table headers, and an unpacked packaged
+application exporting from its asar bundle. The end-to-end acceptance check
+lives in `scripts/check-page-first-publication.mjs`; the packaged check lives in
+`scripts/check-packaged-runtime.mjs`.
+
 The production program keeps the evaluated behaviour: explicit pagination
 stylesheets, repeat-table-header hook, anchor restoration, reserved contents
 labels with geometry verification, whole-sheet template backgrounds, and shared

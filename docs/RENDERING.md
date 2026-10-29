@@ -66,10 +66,14 @@ serialized artifact for diagnostics. The files contain publication content and
 must stay out of source control.
 
 Cancellation destroys the layout window; long layouts are bounded by an explicit
-deadline of 180 seconds per step. On the reference Linux machine, a two-page
-sample publication paginates in about 4-5 seconds and an 80 MiB request fixture
-with 44 headings, 85 table rows, and 110 code lines paginates in about 23
-seconds. These numbers are measurements, not guarantees.
+deadline of 180 seconds per step. `pnpm test:page-first` exercises the complete
+acceptance scenario, the ten-theme and two-paper-size matrix, hostile source
+content, and cancellation. `pnpm verify:packaged` runs the same pipeline from an
+unpacked application build and requires the engine assets to be present in the
+application archive. On the reference Linux machine, a two-page sample
+publication paginates in about 4-5 seconds and an 80 MiB request fixture with 44
+headings, 85 table rows, and 110 code lines paginates in about 23 seconds. These
+numbers are measurements, not guarantees.
 
 ## Layout directives
 

@@ -189,9 +189,11 @@ async function main() {
   const coverPath = join(artifacts, 'cover.pdf');
   await writeFile(coverPath, await cover.save());
 
+  const previewDump = join(artifacts, 'preview-dump');
   const validated = await runWorker(
     { command: 'validate', sourcePath },
     'validate',
+    { MPS_LAYOUT_DUMP_DIR: previewDump },
   );
   const plan = validated.data?.pagination;
   check(Boolean(plan), 'validation reports a page plan');
@@ -233,6 +235,78 @@ async function main() {
 
   const sectionPages = plan.pages.filter((page) => page.template === 'section');
   check(sectionPages.length >= 1, 'a section uses the section template');
+
+  // The preview artifact is the same document that Chromium prints, so assert
+  // its pages, folios, and contents references directly.
+  const dumpFiles = await readdir(previewDump);
+  const previewFile = dumpFiles.find((name) => name.endsWith('.html'));
+  check(Boolean(previewFile), 'the preview artifact was captured');
+  if (previewFile) {
+    const artifactHtml = await readFile(join(previewDump, previewFile), 'utf8');
+    const artifactPages = artifactHtml
+      .split('<div class="pagedjs_page ')
+      .slice(1);
+    check(
+      artifactPages.length === generatedPages,
+      'the preview artifact contains every planned page',
+      { artifactPages: artifactPages.length, generatedPages },
+    );
+    const artifactFolios = artifactPages.map(
+      (page) =>
+        /<div class="publication-folio"[^>]*>([^<]*)<\/div>/u.exec(page)?.[1] ??
+        null,
+    );
+    check(
+      artifactFolios.every(
+        (folio, index) => folio === plan.pages[index]?.folio,
+      ),
+      'every preview page shows its planned folio',
+      { artifactFolios },
+    );
+    const labelOfTarget = new Map();
+    for (const target of new Set(
+      [...artifactHtml.matchAll(/data-toc-page-for="([^"]+)"/gu)].map(
+        (match) => match[1],
+      ),
+    )) {
+      const label = new RegExp(
+        `data-toc-page-for="${target}"[^>]*>([^<]*)<`,
+        'u',
+      ).exec(artifactHtml)?.[1];
+      if (label) labelOfTarget.set(target, label);
+    }
+    const targetPages = new Map();
+    artifactPages.forEach((page, index) => {
+      for (const target of labelOfTarget.keys()) {
+        if (page.includes(`id="${target}"`)) targetPages.set(target, index + 1);
+      }
+    });
+    check(
+      labelOfTarget.size >= 20,
+      'the preview contents page carries page references',
+      { references: labelOfTarget.size },
+    );
+    check(
+      [...labelOfTarget].every(
+        ([target, label]) =>
+          label === plan.pages[(targetPages.get(target) ?? 0) - 1]?.label,
+      ),
+      'every contents reference matches its destination page label',
+    );
+    const templateColors = artifactPages.map(
+      (page) =>
+        /pagedjs_pagebox" style="background-color: ([^;"]+)/u.exec(page)?.[1] ??
+        null,
+    );
+    check(
+      artifactPages.every(
+        (page, index) =>
+          (plan.pages[index]?.template === 'default') ===
+          (templateColors[index] === 'rgb(255, 255, 255)'),
+      ),
+      'preview page backgrounds follow the planned templates',
+    );
+  }
 
   const build = await runWorker(
     {

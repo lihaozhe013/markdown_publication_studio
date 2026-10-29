@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import { describe, expect, it } from 'vitest';
 import { registerLayoutControls } from './layout-controls.js';
 import { createMarkdownCompiler } from './markdown.js';
+import { prepareMath } from './math.js';
 
 function parser(): InstanceType<typeof MarkdownIt> {
   const markdown = new MarkdownIt({ html: true });
@@ -69,6 +70,19 @@ describe('page-ending layout controls', () => {
     ).toHaveLength(0);
   });
 
+  it('preserves source line positions across multiline display formulas', () => {
+    for (const source of [
+      '$$\nx + y\n$$\n\\clearpage',
+      '\\[\nx + y\n\\]\n\\clearpage',
+    ]) {
+      const prepared = prepareMath(source, true);
+      expect(prepared.source.split('\n')).toHaveLength(
+        source.split('\n').length,
+      );
+      expect(prepared.source.split('\n')[3]).toBe('\\clearpage');
+    }
+  });
+
   it('preserves math and sanitized source line data in compiled chapters', async () => {
     const compiler = await createMarkdownCompiler();
     const chapter = await compiler.compile(
@@ -77,7 +91,9 @@ describe('page-ending layout controls', () => {
         content: [
           '# Example',
           '',
-          '$$\\text{\\clearpage}$$',
+          '$$',
+          '\\text{\\clearpage}',
+          '$$',
           '',
           'Before.',
           '',
@@ -91,7 +107,7 @@ describe('page-ending layout controls', () => {
     expect(chapter.html.match(/class="publication-page-break"/gu)).toHaveLength(
       1,
     );
-    expect(chapter.html).toContain('data-layout-line="7"');
+    expect(chapter.html).toContain('data-layout-line="9"');
     expect(chapter.html).toContain('After.');
     expect(chapter.html).toContain('Before.');
   }, 60000);

@@ -91,16 +91,26 @@ function createPlaceholder(
   return `<${tag} data-publication-math="${id}"></${tag}>`;
 }
 
+function preserveSourceLines(original: string, replacement: string): string {
+  return replacement + '\n'.repeat((original.match(/\n/gu) ?? []).length);
+}
+
 function replaceMathInText(
   text: string,
   placeholders: MathPlaceholder[],
 ): string {
   const withDisplayMath = text
-    .replace(/\\\[([\s\S]*?)\\\]/gu, (_match, expression: string) =>
-      createPlaceholder(placeholders, expression, true),
+    .replace(/\\\[([\s\S]*?)\\\]/gu, (match, expression: string) =>
+      preserveSourceLines(
+        match,
+        createPlaceholder(placeholders, expression, true),
+      ),
     )
-    .replace(/\$\$([\s\S]*?)\$\$/gu, (_match, expression: string) =>
-      createPlaceholder(placeholders, expression, true),
+    .replace(/\$\$([\s\S]*?)\$\$/gu, (match, expression: string) =>
+      preserveSourceLines(
+        match,
+        createPlaceholder(placeholders, expression, true),
+      ),
     );
 
   return withDisplayMath

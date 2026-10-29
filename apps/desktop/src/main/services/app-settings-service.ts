@@ -45,6 +45,43 @@ function propertyFrom(value: unknown, property: string): unknown {
   return property in value ? value[property as keyof typeof value] : undefined;
 }
 
+// Older releases allowed CJK page-number fonts and CJK format text, which
+// embedded a full CJK font into every PDF. Replace only the unsupported fields
+// so the remaining user preferences survive the upgrade.
+function migratePageNumberSettings(
+  value: unknown,
+): PageNumberSettings | undefined {
+  const parsed = PageNumberSettingsSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  if (typeof value !== 'object' || value === null) return undefined;
+
+  const withFontReplaced = {
+    ...(value as Record<string, unknown>),
+    fontFamily: DEFAULT_PAGE_NUMBER_SETTINGS.fontFamily,
+  };
+  const fontMigrated = PageNumberSettingsSchema.safeParse(withFontReplaced);
+  if (fontMigrated.success) {
+    appLogger.warn(
+      '[page-number] Replaced an unsupported persisted page-number font with the default.',
+    );
+    return fontMigrated.data;
+  }
+
+  const fullyReplaced = {
+    ...withFontReplaced,
+    format: DEFAULT_PAGE_NUMBER_SETTINGS.format,
+  };
+  const fullyMigrated = PageNumberSettingsSchema.safeParse(fullyReplaced);
+  if (fullyMigrated.success) {
+    appLogger.warn(
+      '[page-number] Replaced an unsupported persisted page-number font and format with defaults.',
+    );
+    return fullyMigrated.data;
+  }
+
+  return undefined;
+}
+
 export class AppSettingsService {
   private writeQueue: Promise<void> = Promise.resolve();
 
@@ -100,14 +137,13 @@ export class AppSettingsService {
       const uiPreferences = UiPreferencesSchema.safeParse(
         propertyFrom(parsed, 'uiPreferences'),
       );
-      const pageNumberResult = PageNumberSettingsSchema.safeParse(
-        propertyFrom(parsed, 'pageNumber'),
-      );
+      const rawPageNumber = propertyFrom(parsed, 'pageNumber');
+      const pageNumber = migratePageNumberSettings(rawPageNumber);
       const persistedCustomStyle = propertyFrom(parsed, 'customStyle');
       const customStyleResult =
         PublicationStyleOverridesSchema.safeParse(persistedCustomStyle);
 
-      if (!pageNumberResult.success) {
+      if (rawPageNumber !== undefined && pageNumber === undefined) {
         appLogger.warn(
           '[page-number] Invalid persisted settings; using defaults.',
         );
@@ -120,9 +156,7 @@ export class AppSettingsService {
         uiPreferences: uiPreferences.success
           ? uiPreferences.data
           : { ...DEFAULT_UI_PREFERENCES },
-        pageNumber: pageNumberResult.success
-          ? pageNumberResult.data
-          : { ...DEFAULT_PAGE_NUMBER_SETTINGS },
+        pageNumber: pageNumber ?? { ...DEFAULT_PAGE_NUMBER_SETTINGS },
         customStyle: customStyleResult.success
           ? customStyleResult.data
           : { ...DEFAULT_PUBLICATION_STYLE_OVERRIDES },

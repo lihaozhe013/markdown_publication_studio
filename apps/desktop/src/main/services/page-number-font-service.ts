@@ -28,11 +28,6 @@ const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
     relativePath: 'fonts/Open_Sans/static/OpenSans-Regular.ttf',
     allowSubsetting: true,
   },
-  'source-han-sans': {
-    familyName: 'Source Han Sans SC VF',
-    relativePath: 'fonts/SourceHanSansSC-VF.ttf',
-    allowSubsetting: false,
-  },
   'jetbrains-mono': {
     familyName: 'JetBrains Mono',
     relativePath: 'fonts/JetBrains_Mono/static/JetBrainsMono-Regular.ttf',
@@ -46,11 +41,6 @@ const pageNumberFonts: Record<PageNumberFontId, PageNumberFontDefinition> = {
   'source-serif-4': {
     familyName: 'Source Serif 4',
     relativePath: 'fonts/SourceSerif4-VariableFont_opsz,wght.ttf',
-    allowSubsetting: false,
-  },
-  'source-han-serif': {
-    familyName: 'Source Han Serif SC VF',
-    relativePath: 'fonts/SourceHanSerifSC-VF.ttf',
     allowSubsetting: false,
   },
 };

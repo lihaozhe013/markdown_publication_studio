@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import {
   PageNumberFirstPageModeSchema,
   PageNumberFontIdSchema,
   PageNumberStyleSchema,
+  isSupportedPageNumberFormatCharacter,
   type PageNumberSettings,
   type PageNumberFontId,
 } from '@markdown-publication/shared';
@@ -9,12 +11,30 @@ import {
 const pageNumberFonts: readonly { id: PageNumberFontId; name: string }[] = [
   { id: 'inter', name: 'Inter' },
   { id: 'open-sans', name: 'Open Sans' },
-  { id: 'source-han-sans', name: 'Source Han Sans SC' },
   { id: 'jetbrains-mono', name: 'JetBrains Mono' },
   { id: 'source-sans-3', name: 'Source Sans 3' },
   { id: 'source-serif-4', name: 'Source Serif 4' },
-  { id: 'source-han-serif', name: 'Source Han Serif SC' },
 ];
+
+interface PageNumberFormatInput {
+  value: string;
+  removed: string[];
+}
+
+export function filterPageNumberFormatInput(
+  value: string,
+): PageNumberFormatInput {
+  const kept: string[] = [];
+  const removed = new Set<string>();
+  for (const character of Array.from(value)) {
+    if (isSupportedPageNumberFormatCharacter(character)) {
+      kept.push(character);
+    } else {
+      removed.add(character);
+    }
+  }
+  return { value: kept.join(''), removed: [...removed] };
+}
 
 interface PageNumberControlsProps {
   disabled: boolean;
@@ -36,6 +56,16 @@ export function PageNumberControls({
   onFieldChange,
   onFormatChange,
 }: PageNumberControlsProps): React.JSX.Element {
+  const [removedCharacters, setRemovedCharacters] = useState<readonly string[]>(
+    [],
+  );
+
+  function handleFormatInput(value: string): void {
+    const filtered = filterPageNumberFormatInput(value);
+    setRemovedCharacters(filtered.removed);
+    onFormatChange(filtered.value);
+  }
+
   return (
     <div className="panel-block page-number-panel">
       <p className="eyebrow">
@@ -59,6 +89,7 @@ export function PageNumberControls({
         <select
           id="page-number-font"
           value={settings.fontFamily}
+          aria-describedby="page-number-font-help"
           onChange={(event) => {
             const parsed = PageNumberFontIdSchema.safeParse(event.target.value);
             if (parsed.success) onFieldChange('fontFamily', parsed.data);
@@ -70,6 +101,10 @@ export function PageNumberControls({
             </option>
           ))}
         </select>
+        <p className="muted page-number-help" id="page-number-font-help">
+          CJK fonts are not offered for page numbers because embedding one adds
+          tens of megabytes to every PDF.
+        </p>
 
         <label htmlFor="page-number-size">Size (pt)</label>
         <input
@@ -104,15 +139,30 @@ export function PageNumberControls({
           type="text"
           value={settings.format}
           maxLength={160}
-          onChange={(event) => onFormatChange(event.target.value)}
+          spellCheck={false}
+          aria-describedby="page-number-format-help"
+          onChange={(event) => handleFormatInput(event.target.value)}
           onBlur={() => onCommitFormat(settings)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.currentTarget.blur();
           }}
         />
-        <p className="muted page-number-help">
-          Use {'{page}'} and {'{pages}'}. Applied to PDF export only.
+        <p className="muted page-number-help" id="page-number-format-help">
+          Use {'{page}'} and {'{pages}'} with basic Latin letters, digits, and
+          punctuation. Applied to PDF export only.
         </p>
+        {removedCharacters.length > 0 ? (
+          <p
+            className="diagnostic error page-number-help"
+            role="status"
+            aria-live="polite"
+          >
+            Removed unsupported{' '}
+            {removedCharacters.length === 1 ? 'character' : 'characters'}:{' '}
+            {removedCharacters.join(' ')}. Page numbers support basic Latin text
+            only.
+          </p>
+        ) : null}
 
         <label htmlFor="page-number-first-page">First page</label>
         <select

@@ -132,7 +132,7 @@ export const CoverSelectionSchema = z
   })
   .strict();
 
-export const PageNumberFontIdSchema = z.enum([
+export const PublicationFontIdSchema = z.enum([
   'inter',
   'open-sans',
   'source-han-sans',
@@ -140,6 +140,16 @@ export const PageNumberFontIdSchema = z.enum([
   'source-sans-3',
   'source-serif-4',
   'source-han-serif',
+]);
+
+// CJK fonts are intentionally excluded: embedding a full CJK font for a few
+// footer glyphs adds tens of megabytes to every exported PDF.
+export const PageNumberFontIdSchema = z.enum([
+  'inter',
+  'open-sans',
+  'jetbrains-mono',
+  'source-sans-3',
+  'source-serif-4',
 ]);
 
 export const PageNumberStyleSchema = z.enum(['normal', 'bold', 'italic']);
@@ -153,8 +163,24 @@ export const PageNumberFirstPageModeSchema = z.enum([
 const pageNumberFormatTokenPattern = /\{([^{}]*)\}/gu;
 const pageNumberFormatTokens = new Set(['page', 'pages']);
 
+export function isSupportedPageNumberFormatCharacter(
+  character: string,
+): boolean {
+  const codePoint = character.codePointAt(0);
+  return codePoint !== undefined && codePoint >= 0x20 && codePoint <= 0x7e;
+}
+
+export function findUnsupportedPageNumberFormatCharacter(
+  value: string,
+): string | undefined {
+  return Array.from(value).find(
+    (character) => !isSupportedPageNumberFormatCharacter(character),
+  );
+}
+
 export function isValidPageNumberFormat(value: string): boolean {
-  if (value.length === 0 || value.length > 160 || /[\r\n]/u.test(value)) {
+  if (value.length === 0 || value.length > 160) return false;
+  if (findUnsupportedPageNumberFormatCharacter(value) !== undefined) {
     return false;
   }
 
@@ -171,9 +197,17 @@ export function isValidPageNumberFormat(value: string): boolean {
 export const PageNumberFormatSchema = z
   .string()
   .trim()
-  .refine(isValidPageNumberFormat, {
-    message:
-      'Use at least one supported placeholder: {page} or {pages}. Unknown placeholders are not allowed.',
+  .superRefine((value, context) => {
+    if (isValidPageNumberFormat(value)) return;
+
+    const unsupported = findUnsupportedPageNumberFormatCharacter(value);
+    context.addIssue({
+      code: 'custom',
+      message:
+        unsupported === undefined
+          ? 'Use at least one supported placeholder: {page} or {pages}. Unknown placeholders are not allowed.'
+          : `Page-number format does not support ${JSON.stringify(unsupported)}. Use basic Latin letters, digits, and punctuation with {page} or {pages}; CJK characters would embed a large CJK font into the PDF.`,
+    });
   });
 
 export const PageNumberSettingsSchema = z.object({
@@ -184,8 +218,6 @@ export const PageNumberSettingsSchema = z.object({
   format: PageNumberFormatSchema,
   firstPageMode: PageNumberFirstPageModeSchema,
 });
-
-export const PublicationFontIdSchema = PageNumberFontIdSchema;
 
 export const PublicationFontWeightSchema = z.union([
   z.literal(300),
@@ -345,7 +377,7 @@ export const DEFAULT_PUBLICATION_STYLE_OVERRIDES = {
 
 export const DEFAULT_PAGE_NUMBER_SETTINGS = {
   enabled: false,
-  fontFamily: 'source-han-sans',
+  fontFamily: 'source-sans-3',
   fontSizePt: 10,
   style: 'normal',
   format: '{page} / {pages}',

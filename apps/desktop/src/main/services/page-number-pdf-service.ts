@@ -27,36 +27,9 @@ interface NumberedPageText {
   text: string;
 }
 
-function requiresFallback(
-  text: string,
-  primaryAsset: PageNumberFontAsset,
-): boolean {
-  return Array.from(text).some((character) => {
-    const codePoint = character.codePointAt(0);
-    return codePoint !== undefined && !primaryAsset.hasGlyph(codePoint);
-  });
-}
-
-function findUnrenderableCharacter(
-  text: string,
-  primaryAsset: PageNumberFontAsset,
-  fallbackAsset: PageNumberFontAsset,
-): string | undefined {
-  for (const character of Array.from(text)) {
-    const codePoint = character.codePointAt(0);
-    if (codePoint === undefined || primaryAsset.hasGlyph(codePoint)) {
-      continue;
-    }
-    if (fallbackAsset.hasGlyph(codePoint)) continue;
-    return character;
-  }
-  return undefined;
-}
-
 function createMissingGlyphError(
   character: string,
-  primaryAsset: PageNumberFontAsset,
-  fallbackAsset: PageNumberFontAsset | undefined,
+  fontAsset: PageNumberFontAsset,
 ): Error {
   const codePoint = character.codePointAt(0);
   const codePointLabel =
@@ -65,35 +38,21 @@ function createMissingGlyphError(
       : `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
   const characterLabel = JSON.stringify(character);
   return new Error(
-    `[page-number] No bundled font can render character ${characterLabel} (${codePointLabel}) in the page-number format. Selected font: ${primaryAsset.familyName}; fallback font: ${fallbackAsset?.familyName ?? 'none'}.`,
+    `[page-number] The selected page-number font (${fontAsset.familyName}) cannot render character ${characterLabel} (${codePointLabel}). Use basic Latin letters, digits, and punctuation with {page} or {pages}.`,
   );
 }
 
 function createTextRuns(
   text: string,
-  primaryFont: PDFFont,
-  primaryAsset: PageNumberFontAsset,
-  fallbackFont: PDFFont | undefined,
-  fallbackAsset: PageNumberFontAsset | undefined,
+  font: PDFFont,
+  fontAsset: PageNumberFontAsset,
 ): TextRun[] {
   const runs: TextRun[] = [];
   for (const character of Array.from(text)) {
     const codePoint = character.codePointAt(0);
-    const font =
-      codePoint !== undefined && primaryAsset.hasGlyph(codePoint)
-        ? primaryFont
-        : codePoint !== undefined &&
-            fallbackFont !== undefined &&
-            fallbackAsset !== undefined &&
-            fallbackAsset.hasGlyph(codePoint)
-          ? fallbackFont
-          : (() => {
-              throw createMissingGlyphError(
-                character,
-                primaryAsset,
-                fallbackAsset,
-              );
-            })();
+    if (codePoint === undefined || !fontAsset.hasGlyph(codePoint)) {
+      throw createMissingGlyphError(character, fontAsset);
+    }
     const previous = runs.at(-1);
     if (previous?.font === font) {
       previous.text += character;
@@ -139,23 +98,15 @@ function drawPageNumber(
   page: PDFPage,
   text: string,
   settings: PageNumberSettings,
-  primaryAsset: PageNumberFontAsset,
-  fallbackAsset: PageNumberFontAsset | undefined,
-  primaryFont: PDFFont,
-  fallbackFont: PDFFont | undefined,
+  fontAsset: PageNumberFontAsset,
+  font: PDFFont,
 ): void {
   const fontSize = settings.fontSizePt;
-  const runs = createTextRuns(
-    text,
-    primaryFont,
-    primaryAsset,
-    fallbackFont,
-    fallbackAsset,
-  );
+  const runs = createTextRuns(text, font, fontAsset);
   const width = textWidth(runs, fontSize);
   const pageWidth = page.getWidth();
   const bottomMargin = DEFAULT_BOTTOM_MARGIN_MM * MILLIMETERS_TO_POINTS;
-  const fontHeight = primaryFont.heightAtSize(fontSize);
+  const fontHeight = font.heightAtSize(fontSize);
   const x = (pageWidth - width) / 2;
   const y = Math.max(4, (bottomMargin - fontHeight) / 2);
 
@@ -181,7 +132,7 @@ export class PageNumberPdfService {
 
     const pdf = await PDFDocument.load(pdfBytes);
     pdf.registerFontkit(fontkit);
-    const primaryAsset = await this.fontLoader(settings.fontFamily);
+    const fontAsset = await this.fontLoader(settings.fontFamily);
     const pageCount = pdf.getPageCount();
     const numberedPages: NumberedPageText[] = pdf
       .getPages()
@@ -203,49 +154,11 @@ export class PageNumberPdfService {
           },
         ];
       });
-    const fallbackRequired = numberedPages.some(({ text }) =>
-      requiresFallback(text, primaryAsset),
-    );
-    const fallbackAsset = fallbackRequired
-      ? await this.fontLoader('source-han-sans')
-      : undefined;
 
-    if (fallbackAsset) {
-      const unrenderable = numberedPages
-        .map(({ text }) =>
-          findUnrenderableCharacter(text, primaryAsset, fallbackAsset),
-        )
-        .find((character) => character !== undefined);
-      if (unrenderable !== undefined) {
-        throw createMissingGlyphError(
-          unrenderable,
-          primaryAsset,
-          fallbackAsset,
-        );
-      }
-    }
-
-    const primaryFont = await embedFont(
-      pdf,
-      primaryAsset,
-      primaryAsset.allowSubsetting && !fallbackRequired,
-    );
-    const fallbackFont = fallbackAsset
-      ? primaryAsset.familyName === fallbackAsset.familyName
-        ? primaryFont
-        : await embedFont(pdf, fallbackAsset, false)
-      : undefined;
+    const font = await embedFont(pdf, fontAsset, fontAsset.allowSubsetting);
 
     numberedPages.forEach(({ page, text }) => {
-      drawPageNumber(
-        page,
-        text,
-        settings,
-        primaryAsset,
-        fallbackAsset,
-        primaryFont,
-        fallbackFont,
-      );
+      drawPageNumber(page, text, settings, fontAsset, font);
     });
 
     return pdf.save();

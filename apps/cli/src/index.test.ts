@@ -44,7 +44,7 @@ describe('CLI configuration', () => {
         '  front: ./cover.png',
         'pageNumber:',
         '  enabled: true',
-        '  fontFamily: source-han-sans',
+        '  fontFamily: source-sans-3',
         '  fontSizePt: 10',
         '  style: normal',
         "  format: '{page} / {pages}'",

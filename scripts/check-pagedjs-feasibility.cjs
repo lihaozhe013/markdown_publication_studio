@@ -102,9 +102,19 @@ async function run() {
       }),
     );
     const pdfInfo = execFileSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
-    const pdfText = execFileSync('pdftotext', [pdfPath, '-'], {
+    const pdfText = execFileSync('pdftotext', ['-layout', pdfPath, '-'], {
       encoding: 'utf8',
     });
+    const tablePages = pdfText
+      .split('\f')
+      .map((text, index) => ({ page: index + 1, text }))
+      .filter(({ text }) => /\bRow\s+\d+/u.test(text));
+    const tablePagesMissingHeader = tablePages
+      .filter(({ text }) => !/\bColumn\b/u.test(text))
+      .map(({ page }) => page);
+    const mergedCodeLines = pdfText
+      .split('\n')
+      .filter((line) => /\bline\d+\b.*\bline\d+\b/u.test(line)).length;
     const missingRows = Array.from({ length: 85 }, (_, index) => index).filter(
       (index) => !new RegExp(`Row\\s+${index}(?!\\d)`).test(pdfText),
     );
@@ -147,6 +157,8 @@ async function run() {
           staticReport,
           overflow: report.overflow,
           missingRows,
+          tablePagesMissingHeader,
+          mergedCodeLines,
           hasLastCodeLine: pdfText.includes('line109'),
           hasEnd: pdfText.includes('END-OF-DOCUMENT'),
         },

@@ -47,11 +47,24 @@ Chromium 150.0.7871.224 produced these results:
   ordered content preservation, correct colors, complete links, or correct
   visual rendering.
 - Page 16's measured content scroll width was 2466 pixels versus a 673-pixel
-  client width. The cause and resulting visual impact are not yet established;
-  this fails the plan's no-unexplained-overflow gate.
+  client width. The excess belongs to a Paged.js-generated wrapper; its chapter
+  and table descendants each measured approximately 673 pixels wide. A visual
+  inspection of that table page showed no obvious clipping. The wrapper needs a
+  deliberate validation rule rather than an assumption that all scroll-width
+  excess indicates visible overflow.
+- Table continuation pages 17–20 lacked the original header. The stable release
+  also collapsed multiple code lines onto single visual lines after splitting a
+  long code block: PDF text extraction found 29 such merged lines. The last code
+  token being present is therefore insufficient to establish code preservation.
 - The observed layout time alone exceeds the current MCP capture's 15-second
   preview deadline. End-to-end responsiveness, cancellation, and memory were not
   measured.
+
+A second run using the published `0.5.0-beta.2` bundle produced 24 pages in 20.4
+seconds. It preserved synthetic code line separation but still omitted
+continuation table headers on pages 17–20. Its archive SHA-256 is
+`5537947d453920f1171c65fd74911075507ef429090034ba5d9c37bd434f70c2`. The beta
+remains unselected and requires the same safety and fixture validation.
 
 The input carries the publication CSP and the experiment uses sandboxed Electron
 windows. The layout script is injected as trusted application code for this
@@ -67,8 +80,9 @@ numbered TOC convergence, literal-safe `\\clearpage` parsing, or source mapping.
 It also does not compare per-page geometry or extract and compare ordered PDF
 text, examine TOC links, measure memory/cancellation, or test Windows/macOS.
 
-Investigate the horizontal overflow and determine whether the engine can
-preserve long blocks without clipping. Measure representative small, medium, and
-long real publications and implement the seven-point feasibility scenario before
-selecting a backend or replacing the existing publication pipeline. A timeout
-change alone is not evidence that layout is responsive or cancellable.
+Design and verify a safe repeated-table-header mechanism, determine how to
+validate generated wrapper geometry, and verify that long blocks retain their
+formatting without clipping. Measure representative small, medium, and long real
+publications and implement the seven-point feasibility scenario before selecting
+a backend or replacing the existing publication pipeline. A timeout change alone
+is not evidence that layout is responsive or cancellable.

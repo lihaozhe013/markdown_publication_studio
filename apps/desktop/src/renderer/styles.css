@@ -766,6 +766,11 @@ button svg {
   padding: 14px 16px 12px;
   margin: 0;
 }
+.style-panel-scroll .theme-panel {
+  margin: 0 -14px 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
 .theme-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -820,12 +825,12 @@ button svg {
 }
 .advanced-style-panel {
   display: flex;
-  flex: 1;
+  flex: 1 1 0%;
   flex-direction: column;
   min-height: 0;
 }
 .style-panel-scroll {
-  flex: 1;
+  flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;

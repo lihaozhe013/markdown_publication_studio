@@ -1,7 +1,9 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { PublicationStyleOverrides } from '@markdown-publication/shared';
 import { AdvancedStylePanelSections } from './advanced-style-panel-sections.js';
 interface AdvancedStylePanelProps {
+  /** Content that scrolls with the style fields, such as the theme picker. */
+  header?: ReactNode;
   styleOverrides: PublicationStyleOverrides;
   dirty: boolean;
   saving: boolean;
@@ -21,6 +23,7 @@ export function AdvancedStylePanel(
       aria-label="Advanced publication styles"
     >
       <div className="style-panel-scroll">
+        {props.header}
         <p className="muted style-panel-note">
           Changes preview immediately. Apply &amp; Save stores these styles for
           future publications.

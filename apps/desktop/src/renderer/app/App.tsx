@@ -992,6 +992,54 @@ export function App(): React.JSX.Element {
     onTocChange: updateToc,
   };
 
+  const themePanel = (
+    <div className="theme-panel panel-block">
+      <p className="eyebrow">Publication theme</p>
+      <div
+        className="theme-options"
+        role="radiogroup"
+        aria-label="Publication theme"
+      >
+        {BUILT_IN_THEMES.map((theme) => (
+          <label
+            key={theme.id}
+            className={`theme-option${themeId === theme.id ? ' selected' : ''}`}
+          >
+            <input
+              type="radio"
+              name="publication-theme"
+              value={theme.id}
+              checked={themeId === theme.id}
+              disabled={busy || styleSaving}
+              onChange={() => {
+                const parsed = ThemeIdSchema.safeParse(theme.id);
+                if (!parsed.success) return;
+                setThemeId(parsed.data);
+                if (source)
+                  refreshCurrentPreview(
+                    source.path,
+                    parsed.data,
+                    pageSize,
+                    effectiveStyle,
+                  );
+              }}
+            />
+            <span
+              className={`theme-sample theme-${theme.id}`}
+              aria-hidden="true"
+            >
+              Aa
+            </span>
+            <span>{theme.name}</span>
+          </label>
+        ))}
+      </div>
+      <p className="muted theme-description">
+        {BUILT_IN_THEMES.find((theme) => theme.id === themeId)?.description}
+      </p>
+    </div>
+  );
+
   return (
     <main className="workspace" data-appearance={appearance}>
       <DocumentToolbar
@@ -1090,56 +1138,9 @@ export function App(): React.JSX.Element {
             aria-labelledby="tab-style"
             hidden={inspectorTab !== 'style'}
           >
-            <div className="theme-panel panel-block">
-              <p className="eyebrow">Publication theme</p>
-              <div
-                className="theme-options"
-                role="radiogroup"
-                aria-label="Publication theme"
-              >
-                {BUILT_IN_THEMES.map((theme) => (
-                  <label
-                    key={theme.id}
-                    className={`theme-option${themeId === theme.id ? ' selected' : ''}`}
-                  >
-                    <input
-                      type="radio"
-                      name="publication-theme"
-                      value={theme.id}
-                      checked={themeId === theme.id}
-                      disabled={busy || styleSaving}
-                      onChange={() => {
-                        const parsed = ThemeIdSchema.safeParse(theme.id);
-                        if (!parsed.success) return;
-                        setThemeId(parsed.data);
-                        if (source)
-                          refreshCurrentPreview(
-                            source.path,
-                            parsed.data,
-                            pageSize,
-                            effectiveStyle,
-                          );
-                      }}
-                    />
-                    <span
-                      className={`theme-sample theme-${theme.id}`}
-                      aria-hidden="true"
-                    >
-                      Aa
-                    </span>
-                    <span>{theme.name}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="muted theme-description">
-                {
-                  BUILT_IN_THEMES.find((theme) => theme.id === themeId)
-                    ?.description
-                }
-              </p>
-            </div>
             {stylePanelOpen ? (
               <AdvancedStylePanel
+                header={themePanel}
                 styleOverrides={styleDraft}
                 dirty={styleDirty}
                 saving={styleSaving}
@@ -1151,19 +1152,22 @@ export function App(): React.JSX.Element {
                 onReset={resetStyleDraft}
               />
             ) : (
-              <div className="style-entry">
-                <p className="muted">
-                  {customStyleActive
-                    ? 'Custom styles are applied.'
-                    : 'Using the theme’s typography and spacing.'}
-                </p>
-                <button
-                  onClick={openStylePanel}
-                  disabled={!settingsReady || styleSaving || exporting}
-                >
-                  Customize styles
-                </button>
-              </div>
+              <>
+                {themePanel}
+                <div className="style-entry">
+                  <p className="muted">
+                    {customStyleActive
+                      ? 'Custom styles are applied.'
+                      : 'Using the theme’s typography and spacing.'}
+                  </p>
+                  <button
+                    onClick={openStylePanel}
+                    disabled={!settingsReady || styleSaving || exporting}
+                  >
+                    Customize styles
+                  </button>
+                </div>
+              </>
             )}
           </section>
           <section

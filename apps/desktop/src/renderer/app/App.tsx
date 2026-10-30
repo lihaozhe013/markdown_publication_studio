@@ -1064,7 +1064,8 @@ export function App(): React.JSX.Element {
           pageSize={pageSize}
           pagination={pagination}
           zoomMode={zoomMode}
-          busy={busy}
+          busy={busy || styleSaving}
+          status={status}
           ready={settingsReady}
           onZoomResolved={setZoom}
           onProbe={(probeDiagnostics) =>

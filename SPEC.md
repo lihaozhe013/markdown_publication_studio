@@ -285,7 +285,10 @@ appearance, properties visibility, and PDF/HTML export. A paper-width preview
 occupies the center; a right inspector defaults to 320px, resizes from
 280–440px, and groups controls into Layout, Style, and Covers. A collapsible
 220px diagnostics pane and 26px status bar show actionable errors, warnings,
-operation status, and zoom.
+operation status, and zoom. Center canvas loading states (a document skeleton
+sheet during initial load and a frosted progress card overlay during re-renders
+and exports) provide immediate, visible feedback so the canvas never looks blank
+or frozen.
 
 Application appearance defaults to the system and supports explicit light/dark
 choices through renderer-only UI tokens. Do not set global

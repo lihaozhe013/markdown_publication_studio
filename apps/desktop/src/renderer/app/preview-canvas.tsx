@@ -15,6 +15,7 @@ import { paperWidth, resolveZoom, type ZoomMode } from './workspace-model.js';
 import { previewViewportStyles } from './preview-viewport.js';
 import { probePreviewRendering } from './preview-probe.js';
 import { StudioIcon } from './studio-icon.js';
+import { CanvasBusyOverlay, DocumentLoadingSheet } from './canvas-loading.js';
 const PREVIEW_PAGE_GAP = 24;
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
   pagination?: PaginationSummary | null;
   zoomMode: ZoomMode;
   busy: boolean;
+  status?: string | undefined;
   ready: boolean;
   onZoomResolved(zoom: number): void;
   onProbe(diagnostics: PublicationDiagnostic[]): void;
@@ -354,6 +356,13 @@ export function PreviewCanvas(props: Props): ReactElement {
               style={{ width, height, transform: `scale(${zoom})` }}
             />
           </div>
+        ) : (props.sourceLoaded || props.busy) && !dropActive ? (
+          <DocumentLoadingSheet
+            pageSize={props.pageSize}
+            status={props.status}
+            zoom={zoom}
+            availableWidth={availableWidth}
+          />
         ) : (
           <div className="empty-state">
             <StudioIcon name="document" size={48} />
@@ -381,6 +390,9 @@ export function PreviewCanvas(props: Props): ReactElement {
           </div>
         )}
       </div>
+      {props.busy && props.html ? (
+        <CanvasBusyOverlay status={props.status} />
+      ) : null}
     </section>
   );
 }

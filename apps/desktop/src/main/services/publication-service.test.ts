@@ -21,6 +21,7 @@ import type { MermaidRenderer } from './mermaid-renderer.js';
 import type { PageNumberPdfService } from './page-number-pdf-service.js';
 import { PublicationService } from './publication-service.js';
 import type { PdfAssembler } from './pdf-assembly-service.js';
+import type { PaginatedLayoutService } from './paginated-layout-service.js';
 
 vi.mock('electron', () => ({
   app: {
@@ -36,6 +37,8 @@ let bodyPdf: Uint8Array;
 let service: PublicationService;
 let renderedHtml: string[];
 let pageNumberApply: ReturnType<typeof vi.fn>;
+let layout: ReturnType<typeof vi.fn>;
+let pageFirstService: PublicationService;
 
 beforeAll(async () => {
   fixtureDirectory = await mkdtemp(
@@ -69,11 +72,51 @@ beforeAll(async () => {
   const pdfAssembler: PdfAssembler = {
     assemble: vi.fn(async ({ bodyPdf: assembledBody }) => assembledBody),
   };
+  layout = vi.fn(async () => ({
+    html: '<!doctype html><html><body><div class="pagedjs_page" id="page-1"></div><div class="pagedjs_page" id="page-2"></div></body></html>',
+    plan: {
+      pages: [
+        {
+          physicalPage: 1,
+          generatedPage: 1,
+          kind: 'toc',
+          template: 'toc',
+          logicalPage: 1,
+          logicalTotal: 1,
+          label: '1',
+          folio: '1 / 1',
+        },
+        {
+          physicalPage: 2,
+          generatedPage: 2,
+          kind: 'body',
+          template: 'default',
+          logicalPage: 1,
+          logicalTotal: 1,
+          label: '1',
+          folio: '1 / 1',
+        },
+      ],
+      tocPages: [1],
+      bodyStartPage: 2,
+      restartBodyAfterToc: true,
+      coverPages: 0,
+    },
+    revision: 'paginated-revision',
+    diagnostics: [],
+  }));
   service = new PublicationService(
     printBackend,
     mermaidRenderer,
     pageNumberPdfService,
     pdfAssembler,
+  );
+  pageFirstService = new PublicationService(
+    printBackend,
+    mermaidRenderer,
+    pageNumberPdfService,
+    pdfAssembler,
+    { layout } as unknown as PaginatedLayoutService,
   );
 });
 
@@ -91,6 +134,52 @@ const enabledPageNumbers = (overrides?: Partial<PageNumberSettings>) => ({
   enabled: true,
   firstPageMode: 'all-pages' as const,
   ...overrides,
+});
+
+describe('PublicationService page-first pipeline', () => {
+  it('returns the paginated artifact with its page plan for preview', async () => {
+    const preview = await pageFirstService.buildPreview(
+      sourcePath,
+      'rose',
+      'A4',
+      DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+      { enabled: true, preset: 'classic-book' },
+      {
+        pageNumber: enabledPageNumbers(),
+        pageLayout: { enabled: true, restartBodyAfterToc: true },
+      },
+    );
+
+    expect(layout).toHaveBeenCalledTimes(1);
+    const layoutRequest = layout.mock.calls[0]?.[0] as { html: string };
+    expect(layoutRequest.html).toContain('data-toc-page-for=');
+    expect(layoutRequest.html).toContain('data-toc="true"');
+    expect(preview.html).toContain('class="pagedjs_page"');
+    expect(preview.pagination).toMatchObject({
+      revision: 'paginated-revision',
+      bodyStartPage: 2,
+      restartBodyAfterToc: true,
+      tocPages: [1],
+    });
+  });
+
+  it('prints the shared artifact and skips PDF folio stamping', async () => {
+    const outputPath = join(fixtureDirectory, 'paginated.pdf');
+    await pageFirstService.exportPdf(
+      sourcePath,
+      outputPath,
+      'rose',
+      'A4',
+      enabledPageNumbers(),
+      {},
+      DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+      { enabled: true, preset: 'classic-book' },
+      { enabled: true, restartBodyAfterToc: true },
+    );
+
+    expect(renderedHtml.at(-1)).toContain('class="pagedjs_page"');
+    expect(pageNumberApply).not.toHaveBeenCalled();
+  });
 });
 
 describe('PublicationService table-of-contents export', () => {

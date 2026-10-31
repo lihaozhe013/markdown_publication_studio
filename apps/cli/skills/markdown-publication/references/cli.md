@@ -14,11 +14,14 @@ toc:
   preset: classic-book
 pageNumber:
   enabled: true
-  fontFamily: source-han-sans
+  fontFamily: source-sans-3
   fontSizePt: 10
   style: normal
   format: '{page} / {pages}'
   firstPageMode: all-pages
+pageLayout:
+  enabled: true
+  restartBodyAfterToc: false
 covers:
   front: ./cover.png
 styleOverrides:
@@ -27,9 +30,21 @@ styleOverrides:
 
 The configuration can omit optional fields. `mps describe --json` lists the
 supported theme IDs; page sizes are `A4` and `Letter`. It is also authoritative
-for the full style and page-number schemas. Relative source, output, and cover
-paths use the configuration file's directory. Paths passed directly on the
-command line use the current directory.
+for the full style and page-number schemas. Page-number fonts are limited to the
+bundled Latin faces, and page-number formats accept only basic Latin letters,
+digits, punctuation, `{page}`, and `{pages}`; CJK page-number text is rejected
+because embedding a CJK font would inflate every PDF by tens of megabytes.
+`pageLayout.enabled` selects the page-first pipeline, which is the default. Its
+folios, page templates, and contents page references are part of the same page
+artifact that the desktop preview shows. Set `restartBodyAfterToc: true` to
+start main-body page numbers at 1 after the contents section. `\clearpage` on
+its own line ends a page, and `\pagetemplate{section}` starts a new page with
+the section template; both are ignored inside code and math.
+
+`mps validate --json` reports the finalized page plan under `data.pagination`,
+including physical and logical page positions, templates, and folio labels.
+Relative source, output, and cover paths use the configuration file's directory.
+Paths passed directly on the command line use the current directory.
 
 Useful commands:
 

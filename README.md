@@ -42,18 +42,31 @@ URIs so that exported documents render identically on any machine.
 
 **Page Numbering**
 
-A configurable page number system with seven font choices (including CJK fonts),
-adjustable size and style, a customizable format template (e.g.
-`{page} / {pages}`), and policies for the first page (show all, hide and start
-numbering at 1, or hide and start at 2). Page numbers are embedded into the
-final PDF via pdf-lib with automatic font fallback for CJK characters.
+A configurable page number system with five Latin font choices, adjustable size
+and style, a customizable format template (e.g. `{page} / {pages}`), and
+policies for the first page (show all, hide and start numbering at 1, or hide
+and start at 2). In the default page-first path, folios are rendered once into
+the shared page artifact, so preview and PDF show identical footer text; the
+legacy pdf-lib stamping path applies only when page layout is disabled. CJK
+fonts and CJK format text are not available for page numbers because embedding a
+CJK font would add tens of megabytes to every export.
 
 **Table of Contents**
 
-PDF export can add a `Contents` page with automatically extracted H1-H3
-headings. Choose between the Classic Book and Modern Technical presets; both
-present a clickable hierarchy without page references for stable Markdown
-exports. HTML export remains body-only.
+PDF export can add a real, potentially multipage `Contents` section with
+automatically extracted H1-H3 headings. Choose between the Classic Book and
+Modern Technical presets; both present a clickable hierarchy whose page
+references resolve to the final layout. HTML export remains body-only and
+flow-based, so it omits page references.
+
+**Page Layout**
+
+The default publication path paginates real A4/Letter sheets. Standalone
+`\clearpage` lines end the current page, and `\pagetemplate{section}` starts a
+new page with the section template; literal occurrences inside code, math, and
+raw HTML stay untouched. The preview shows the finalized pages with whole-sheet
+backgrounds, folios, and page navigation. Disabling page layout in the inspector
+restores the legacy flowing preview and PDF folio stamping.
 
 **Advanced Styles**
 
@@ -84,12 +97,12 @@ Mermaid render failures, unsafe HTML removal, and font readiness.
 **Publication Workspace**
 
 A compact document toolbar, adjustable right-hand Layout/Style/Covers inspector,
-continuous paper-width preview, and collapsible diagnostics pane keep the
-publication in focus. Preview zoom supports fit width, 25–200%, and actual size
-without recompilation. Native View menu zoom commands target the preview.
-Application appearance supports system, light, and dark modes independently of
-publication styling. Unsaved style drafts survive panel navigation and can be
-exported without being saved.
+paginated paper-width preview with page navigation, and a collapsible
+diagnostics pane keep the publication in focus. Preview zoom supports fit width,
+25–200%, and actual size without recompilation. Native View menu zoom commands
+target the preview. Application appearance supports system, light, and dark
+modes independently of publication styling. Unsaved style drafts survive panel
+navigation and can be exported without being saved.
 
 **Application Settings**
 
@@ -145,7 +158,7 @@ and GUI task diagnostics.
 File validation and PDF/HTML exports run in isolated workers without opening the
 GUI. Session tools can open a document, inspect or change the current
 publication settings, export the current draft, adjust preview view, and capture
-the continuous preview. Agent style changes stay in the current session until
+the page-first preview. Agent style changes stay in the current session until
 explicitly saved as global defaults. MCP never exposes arbitrary shell or
 JavaScript execution. See [Desktop MCP and AI Connection](docs/mcp.md) for tool
 schemas, path rules, revision handling, and security boundaries.

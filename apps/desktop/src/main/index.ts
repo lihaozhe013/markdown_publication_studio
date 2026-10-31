@@ -28,6 +28,7 @@ import {
 import { ElectronPrintBackend } from './services/electron-print-backend.js';
 import { ElectronMermaidRenderer } from './services/mermaid-renderer.js';
 import { appLogger } from './services/app-logger.js';
+import { PaginatedLayoutService } from './services/paginated-layout-service.js';
 import {
   PublicationService,
   validateMarkdownPath,
@@ -95,11 +96,13 @@ const mermaidRendererPage = process.env.ELECTRON_RENDERER_URL
         : `${process.env.ELECTRON_RENDERER_URL}/`,
     ).toString()
   : join(currentDirectory, '../renderer/mermaid.html');
+const pagedEngineBundle = join(currentDirectory, 'paged.js');
 const publicationService = new PublicationService(
   new ElectronPrintBackend(),
   new ElectronMermaidRenderer(mermaidRendererPage),
   new PageNumberPdfService(),
   new PdfAssemblyService(),
+  new PaginatedLayoutService(pagedEngineBundle),
 );
 const appSettingsService = new AppSettingsService();
 const approvedSourcePaths = new Set<string>();
@@ -381,6 +384,10 @@ function registerIpcHandlers(): void {
       request.pageSize,
       request.styleOverrides,
       request.toc,
+      {
+        pageNumber: request.pageNumber,
+        pageLayout: request.pageLayout,
+      },
     );
   });
 
@@ -412,6 +419,7 @@ function registerIpcHandlers(): void {
       covers,
       request.styleOverrides,
       request.toc,
+      request.pageLayout,
     );
   });
 

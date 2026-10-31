@@ -12,10 +12,10 @@ import type { PageNumberFontAsset } from './page-number-font-service.js';
 
 const settings: PageNumberSettings = {
   enabled: true,
-  fontFamily: 'source-han-sans',
+  fontFamily: 'inter',
   fontSizePt: 10,
   style: 'bold',
-  format: '第 {page} 页 / 共 {pages} 页',
+  format: 'Page {page} of {pages}',
   firstPageMode: 'hide-first-start-at-1',
 };
 
@@ -40,12 +40,6 @@ const fontDefinitions: readonly FontDefinition[] = [
     allowSubsetting: true,
   },
   {
-    id: 'source-han-sans',
-    familyName: 'Source Han Sans SC VF',
-    relativePath: 'themes/fonts/SourceHanSansSC-VF.ttf',
-    allowSubsetting: false,
-  },
-  {
     id: 'jetbrains-mono',
     familyName: 'JetBrains Mono',
     relativePath:
@@ -62,12 +56,6 @@ const fontDefinitions: readonly FontDefinition[] = [
     id: 'source-serif-4',
     familyName: 'Source Serif 4',
     relativePath: 'themes/fonts/SourceSerif4-VariableFont_opsz,wght.ttf',
-    allowSubsetting: false,
-  },
-  {
-    id: 'source-han-serif',
-    familyName: 'Source Han Serif SC VF',
-    relativePath: 'themes/fonts/SourceHanSerifSC-VF.ttf',
     allowSubsetting: false,
   },
 ];
@@ -134,10 +122,6 @@ function getEmbeddedFonts(document: PDFDocument): EmbeddedFont[] {
   });
 }
 
-function getEmbeddedFontStreamSizes(document: PDFDocument): number[] {
-  return getEmbeddedFonts(document).map((font) => font.streamSize);
-}
-
 const latinFontIds = [
   'inter',
   'open-sans',
@@ -160,38 +144,8 @@ describe('PageNumberPdfService', () => {
     expect(result.byteLength).toBeGreaterThan(source.byteLength);
   }, 30_000);
 
-  it('embeds large CJK fonts without subsetting', async () => {
-    const source = await createFixturePdf();
-    const result = await new PageNumberPdfService(
-      await createFontLoader(),
-    ).apply(source, {
-      ...settings,
-      format: '{page} / {pages}',
-    });
-    const document = await PDFDocument.load(result);
-    const fontStreamSizes = getEmbeddedFontStreamSizes(document);
-
-    expect(fontStreamSizes.some((size) => size > 1_000_000)).toBe(true);
-  }, 30_000);
-
-  it('uses actual glyph coverage instead of PDF encoding success', async () => {
-    const loader = await createFontLoader();
-    const inter = await loader('inter');
-    const sourceHanSans = await loader('source-han-sans');
-    const sourceHanSerif = await loader('source-han-serif');
-
-    expect(inter.hasGlyph('第'.codePointAt(0) ?? 0)).toBe(false);
-    expect(sourceHanSans.hasGlyph('第'.codePointAt(0) ?? 0)).toBe(true);
-    expect(sourceHanSans.hasGlyph('2'.codePointAt(0) ?? 0)).toBe(true);
-    expect(sourceHanSans.hasGlyph('/'.codePointAt(0) ?? 0)).toBe(true);
-    expect(sourceHanSerif.hasGlyph('第'.codePointAt(0) ?? 0)).toBe(true);
-    expect(sourceHanSerif.hasGlyph('2'.codePointAt(0) ?? 0)).toBe(true);
-    expect(sourceHanSerif.hasGlyph('/'.codePointAt(0) ?? 0)).toBe(true);
-    expect(inter.hasGlyph('2'.codePointAt(0) ?? 0)).toBe(true);
-  });
-
   it.each(latinFontIds)(
-    'embeds a full primary font when %s requires CJK fallback',
+    'keeps embedded %s page-number fonts small and CJK-free',
     async (fontFamily) => {
       const source = await createFixturePdf(1);
       const loader = await createFontLoader();
@@ -199,38 +153,19 @@ describe('PageNumberPdfService', () => {
         ...settings,
         fontFamily,
         style: 'normal',
-        format: '第 {page} 页 / 共 {pages} 页',
+        format: 'Page {page} of {pages}',
         firstPageMode: 'all-pages',
       });
       const document = await PDFDocument.load(result);
       const embeddedFonts = getEmbeddedFonts(document);
 
-      expect(
-        embeddedFonts.some((font) => /SourceHanSansSC/u.test(font.name)),
-      ).toBe(true);
-      expect(embeddedFonts.some((font) => font.streamSize > 50_000)).toBe(true);
-    },
-    30_000,
-  );
-
-  it.each(latinFontIds)(
-    'does not embed the CJK fallback for numeric-only %s page numbers',
-    async (fontFamily) => {
-      const source = await createFixturePdf(1);
-      const loader = await createFontLoader();
-      const result = await new PageNumberPdfService(loader).apply(source, {
-        ...settings,
-        fontFamily,
-        style: 'normal',
-        format: '{page} / {pages}',
-        firstPageMode: 'all-pages',
-      });
-      const document = await PDFDocument.load(result);
-      const embeddedFonts = getEmbeddedFonts(document);
-
-      expect(
-        embeddedFonts.some((font) => /SourceHanSansSC/u.test(font.name)),
-      ).toBe(false);
+      expect(embeddedFonts.length).toBeGreaterThan(0);
+      expect(embeddedFonts.every((font) => font.streamSize < 1_000_000)).toBe(
+        true,
+      );
+      expect(embeddedFonts.some((font) => /SourceHan/u.test(font.name))).toBe(
+        false,
+      );
     },
     30_000,
   );
@@ -257,43 +192,19 @@ describe('PageNumberPdfService', () => {
     );
   });
 
-  it.each(['source-han-sans', 'source-han-serif'] as const)(
-    'renders numeric and CJK text with %s as the primary font',
-    async (fontFamily) => {
-      const source = await createFixturePdf(1);
-      const loader = await createFontLoader();
-      const result = await new PageNumberPdfService(loader).apply(source, {
-        ...settings,
-        fontFamily,
-        style: 'normal',
-        format: '第 {page} 页 / 共 {pages} 页',
-        firstPageMode: 'all-pages',
-      });
-      const document = await PDFDocument.load(result);
-      const embeddedFonts = getEmbeddedFonts(document);
+  it.each(styles)('preserves Latin page numbers in %s style', async (style) => {
+    const source = await createFixturePdf(1);
+    const loader = await createFontLoader();
+    const result = await new PageNumberPdfService(loader).apply(source, {
+      ...settings,
+      fontFamily: 'inter',
+      style,
+      format: 'Page {page} of {pages}',
+      firstPageMode: 'all-pages',
+    });
 
-      expect(embeddedFonts.some((font) => font.streamSize > 1_000_000)).toBe(
-        true,
-      );
-    },
-  );
-
-  it.each(styles)(
-    'preserves mixed-font page numbers in %s style',
-    async (style) => {
-      const source = await createFixturePdf(1);
-      const loader = await createFontLoader();
-      const result = await new PageNumberPdfService(loader).apply(source, {
-        ...settings,
-        fontFamily: 'inter',
-        style,
-        format: '第 {page} 页 / 共 {pages} 页',
-        firstPageMode: 'all-pages',
-      });
-
-      expect(result.byteLength).toBeGreaterThan(source.byteLength);
-    },
-  );
+    expect(result.byteLength).toBeGreaterThan(source.byteLength);
+  });
 
   it('fails instead of emitting an unrenderable page-number character', async () => {
     const bytes = await readFile(

@@ -4,6 +4,13 @@ Product and architecture contract for development agents. This describes the
 intended product, not a claim that every feature is implemented. Source code,
 package manifests, and tests describe the current implementation.
 
+Page-first publication is the default publication path: Markdown compiles once,
+an isolated layout pass produces a revision-bound page artifact with page
+templates, whole-sheet backgrounds, folios, and contents page references, and
+both preview and PDF consume that same artifact. See
+[RENDERING.md](docs/RENDERING.md) for the pipeline. The legacy flowing preview
+and PDF folio stamping remain available only when page layout is disabled.
+
 ## Product
 
 Cross-platform desktop application that turns existing Markdown files into
@@ -83,10 +90,13 @@ when they have consumers and a useful independent responsibility.
 ```text
 source discovery + metadata
   -> Markdown parsing + normalization
-  -> typed publication model + transforms
-  -> HTML + theme + resolved assets
-  -> preview / isolated Chromium printing
-  -> PDF assembly + metadata + page numbers
+  -> typed, source-linked publication model + transforms
+  -> semantic HTML + theme + resolved assets
+  -> page templates + isolated layout
+  -> complete page plan + logical numbering + TOC convergence
+  -> finalized shared page artifact
+  -> paginated preview / isolated Chromium printing
+  -> imported-page PDF assembly + metadata
   -> atomic output write
 ```
 
@@ -99,6 +109,59 @@ rendering, printing, PDF assembly, artwork generation, and job orchestration
 behind focused interfaces. GUI, batch, and future CLI entry points share the
 same core.
 
+### Page-first layout model
+
+Markdown and versioned publication configuration remain the editable source of
+truth. Pages are derived, revision-bound artifacts, not independently editable
+manuscript files. Preserve automatic content flow while allowing explicit page
+controls and dedicated publication pages; this is not a freeform page editor.
+
+Keep application-owned contracts independent of a particular pagination engine:
+
+- The publication document orders source-linked content, generated parts,
+  imported-page slots, and typed layout controls.
+- Page templates define physical dimensions, content bounds, background layers,
+  and reserved header/footer regions. Whole-page backgrounds include margins
+  without affecting content flow. Template switches start new pages by default;
+  local content backgrounds remain separate from page backgrounds.
+- A complete page plan orders generated and imported pages and distinguishes
+  physical positions, logical labels, folio visibility, and numbering totals.
+  Include known cover slots before numbering even when PDFs are assembled later.
+- A page map relates headings and source fragments to pages within one layout
+  revision. Blocks may span pages; physical indices are not stable source IDs.
+- A finalized artifact binds page HTML/CSS, the page plan, resource identity,
+  source mappings, and diagnostics to one build revision.
+
+Resolve TOC references from final logical page labels, not fixed cover offsets.
+Lay out the TOC itself, refill labels, and reflow until page assignments and
+references stabilize. Bound iterations and detect cycles; unresolved or
+nonconverging page references block export. Supported content must not
+disappear, change order, or be hidden by clipping during fragmentation.
+
+Run application-owned layout code in a main-controlled sandboxed window behind a
+replaceable layout backend. Keep source scripts prohibited and preview output
+static and script-disabled. Paged.js `0.5.0-beta.2` is the selected, pinned
+backend after fixture, CSP, serialization, licensing, and performance
+evaluation; the engine bundle and layout program are application-owned build
+assets, and the engine version participates in the artifact revision. Use
+bundled Chromium for PDF output and do not add a second browser runtime.
+
+Preview and PDF must consume the same finalized artifact revision and content
+geometry. Capture source/configuration/assets for that revision; reject or
+explicitly rebuild stale requests rather than silently printing a different
+publication. The page-layout switch selects one complete path: enabled uses the
+paginated artifact, disabled uses the legacy flowing preview and PDF stamping.
+Never mix the two paths within one preview or export.
+
+Keep the flowing HTML export as a separate body-only profile branching from
+semantic HTML. HTML export always uses that profile; fixed-page HTML requires an
+explicit versioned profile rather than silently changing existing output.
+
+Deferred page-first extensions: recto starts, deliberate blank pages, Roman or
+per-part labels, background images and watermarks, spreads and thumbnails, page
+virtualization, arbitrary page editing, template authoring beyond `default`,
+`toc`, and `section`, and source-anchor scroll restoration after reflow.
+
 ### Project configuration
 
 Use a versioned `publish.yaml` beside the content. Validate it with Zod. It
@@ -106,8 +169,9 @@ stores:
 
 - publication title, subtitle, author, and language;
 - source selection, root, include patterns, and explicit order;
-- cover, title page, TOC, and chapter-break options;
-- page size, margins, headers, footers, and page-number settings;
+- cover, title page, numbered TOC, and explicit page-control options;
+- page size, margins, page templates/scopes, headers, footers, and numbering
+  policies;
 - theme preset/tokens and optional custom CSS;
 - cover artwork path and layout;
 - output directory and named PDF/HTML profiles.
@@ -117,11 +181,16 @@ on the process working directory. Preserve portable, scriptable project files.
 
 CLI and desktop MCP file tools accept a strict single-source subset of
 `publish.yaml` with `version: 1`, `source`, `format`, `output`, `themeId`,
-`pageSize`, `toc`, `pageNumber`, `covers`, and `styleOverrides`. It uses the
-same Zod definitions and publishing services as the desktop app. CLI paths
-resolve from the configuration file or the command working directory; Markdown
-images remain relative to their source file. CLI configuration never reads
-desktop settings.
+`pageSize`, `toc`, `pageNumber`, `pageLayout`, `covers`, and `styleOverrides`.
+It uses the same Zod definitions and publishing services as the desktop app. CLI
+paths resolve from the configuration file or the command working directory;
+Markdown images remain relative to their source file. CLI configuration never
+reads desktop settings. Preserve that strict v1 contract and its defaults until
+new layout/template/numbering options have explicit versioned schemas and
+capability support; do not treat planned fields as already accepted input.
+Existing cover and first-page numbering behavior remains the compatibility
+default. Restarting main-body numbering after the TOC is an explicit opt-in
+policy.
 
 ### Desktop MCP and AI connection
 
@@ -153,8 +222,9 @@ MCP input paths are absolute; YAML and Markdown asset paths retain their
 configuration/source-relative behavior. Outputs cannot replace sources,
 configuration, or cover assets even when overwrite is enabled. The server does
 not expose arbitrary shell, JavaScript, DOM, or generic input-control tools.
-Preview screenshots are continuous-preview captures, not final PDF pages. See
-`docs/mcp.md` for tool details and operating constraints.
+Preview captures and page navigation identify the finalized layout revision and
+reject stale results while preserving heading and scroll operations. See
+`docs/mcp.md` for current tool details and operating constraints.
 
 ### Markdown and HTML
 
@@ -164,25 +234,48 @@ is data only. Keep transforms extensible without requiring a public plugin
 system.
 
 Generate complete HTML with semantic structure, theme CSS, screen/print CSS,
-structure CSS, and optional controlled custom CSS. Preview and PDF share the
-base document; final PDF behavior is authoritative. HTML export includes or
-packages the assets needed for distribution.
+structure CSS, and optional controlled custom CSS. Page-first preview and PDF
+share the finalized page artifact; print-only rules may remove viewer decoration
+but must not change content geometry or introduce new body breakpoints. HTML
+export includes or packages the assets needed for distribution.
 
-Constrain images to printable space, avoid splitting short figures/code where
-practical, and diagnose wide tables/code and unresolved links/assets.
+Parse standalone `\clearpage` outside code, math, raw HTML blocks, and other
+literal contexts into a source-linked page-ending control. It ends the current
+page and starts subsequent content on a new one without accidental leading,
+trailing, or consecutive blank pages. Do not use global string replacement or
+claim LaTeX float-flushing compatibility without a float queue. Reserve distinct
+semantic controls for future recto starts and deliberate blank pages. Flowing
+HTML must treat supported controls safely without displaying raw directives or
+acquiring fixed-page semantics.
+
+Constrain images to printable space and preserve aspect ratios. Keep short
+figures/code together where practical; split long prose, lists, code, and tables
+without losing content, numbering, syntax colors, or semantic order. Repeat
+table headers and diagnose overheight rows, oversized atomic items, wide
+content, and unresolved links/assets rather than concealing failures with
+clipping.
 
 ### Preview and themes
 
-Preview supports page-size-aware rendering, zoom, diagnostics, and debounced
-rebuilds after source, asset, theme, or configuration changes. Measure
-pagination differences with fixtures before promising exact preview/PDF parity.
+Page-first preview displays real A4/Letter sheets with whole-page backgrounds,
+publication folios, current/total physical page position, and page navigation.
+Support zoom, source-linked diagnostics, and debounced rebuilds after source,
+asset, theme, or configuration changes. Numbered TOC entries target final
+logical page labels and remain clickable after PDF assembly. Verify shared
+pagination, labels, backgrounds, and content with fixtures; do not imply
+unmeasured pixel-identical rasterization.
 
 Ship the Rose, GitHub, Modern Serif, Claude, Academic Paper, Classic Book,
 Minimal Print, Notebook, Solarized Light, and Nordic Light themes. Theme
 definitions contain identity/version, supported page profiles,
 typography/spacing tokens, code style, cover layouts, CSS, and assets. Common
 layout controls are available in the GUI. Interactive controls are keyboard
-accessible and use semantic HTML/ARIA.
+accessible and use semantic HTML/ARIA. Keep page-template geometry and furniture
+separate from theme typography and local content styles. Normalize legacy
+screen/print selectors so preview and printing use one margin model and the same
+measured content bounds. Preserve approved theme-background assets. New template
+image controls, watermarks, odd/even decoration, and advanced running headers
+are extension points, not first-milestone requirements.
 
 ### Desktop publication workspace
 
@@ -192,7 +285,10 @@ appearance, properties visibility, and PDF/HTML export. A paper-width preview
 occupies the center; a right inspector defaults to 320px, resizes from
 280–440px, and groups controls into Layout, Style, and Covers. A collapsible
 220px diagnostics pane and 26px status bar show actionable errors, warnings,
-operation status, and zoom.
+operation status, and zoom. Center canvas loading states (a document skeleton
+sheet during initial load and a frosted progress card overlay during re-renders
+and exports) provide immediate, visible feedback so the canvas never looks blank
+or frozen.
 
 Application appearance defaults to the system and supports explicit light/dark
 choices through renderer-only UI tokens. Do not set global
@@ -202,13 +298,26 @@ main-process settings service, retaining existing page-number and custom-style
 settings. Inspector visibility, category, diagnostics visibility, and zoom are
 session state.
 
-The interactive preview displays continuous content at the selected A4/Letter
-width (points converted at 96/72 CSS pixels). Fit width is the default; manual
-zoom supports 25–200% and actual size. Zoom changes presentation without
-compilation or text reflow. Preview-only screen rules are installed inside the
-sandboxed iframe; they never enter PDF/HTML output or the shared publishing
-pipeline. Do not imply exact pagination, page counts, cover preview, or PDF
-page-number parity. PDF output remains authoritative.
+The target interactive preview presents fixed-size A4/Letter pages (points
+converted at 96/72 CSS pixels) from the finalized shared artifact. Fit width is
+the default; manual zoom supports 25–200% and actual size. Zoom changes
+presentation without compilation or text reflow. Viewer-only spacing, shadows,
+and controls never enter PDF/HTML output. Reflow restores reading position by
+source anchor where possible and distinguishes pending, ready, stale, and failed
+results. Reflow currently resets the preview scroll position; restoring it by
+source anchor remains deferred. Imported PDF covers may use controlled preview
+images while retaining original vectors in export. Page virtualization is
+deferred until justified by measured workloads and must not break anchors,
+selection, or accessibility.
+
+The current implementation delivers this page-first preview for the default
+path. Markdown compiles once, an isolated Paged.js layout pass produces a
+revision-bound static page artifact, and the desktop preview and Chromium
+printing consume that same artifact. The preview shows fixed A4/Letter sheets
+with page navigation, whole-sheet template backgrounds, shared folios, and
+contents page references. HTML export intentionally remains the flowing,
+body-only profile. The legacy continuously flowing preview and PDF folio
+stamping remain available only when page-first layout is disabled.
 
 Advanced styles are edited within the inspector, with Body and Headings expanded
 initially and other sections collapsed. Drafts preview immediately, survive
@@ -225,20 +334,41 @@ Use a dedicated hidden Electron WebContents behind a replaceable `PrintBackend`.
 Use the bundled Chromium; a second bundled browser is unnecessary for the normal
 export path.
 
-Wait for DOM, fonts, images, math/diagrams, and an explicit publication-ready
-signal, with actionable timeout/failure diagnostics. Fixed sleeps are not the
-readiness mechanism. Print backgrounds and honor CSS page sizes.
+Wait for DOM, used fonts, images, math/diagrams, completed layout, converged
+page references, and an explicit publication-ready signal, with actionable
+timeout/failure diagnostics. Fixed sleeps are not the readiness mechanism. Print
+backgrounds and honor CSS page sizes without independently repaginating content.
 
-Assembly preserves page dimensions and vector body content, merges cover/front/
-back matter as needed, writes metadata, and fails on malformed intermediate
-PDFs. Draw page numbers after the final page count is known:
+Assembly preserves page dimensions and vector body content, inserts planned
+cover/front/back matter exactly once, writes metadata, and fails on malformed
+intermediate PDFs. Check generated-page counts against the generated portion of
+the page plan and final counts/order against the complete plan. Preserve and
+verify clickable destinations through assembly.
 
-- centered footer, bundled font, 6–24pt, regular/bold/italic;
-- validated format containing `{page}` and/or `{pages}`;
-- number all pages, hide first and start at 1 on second, or hide first and
-  retain physical numbering (2 on second).
+The page-first path prints the finalized artifact with zero page margins and no
+independent repagination. Planned cover pages shift physical positions but not
+logical labels; `restartBodyAfterToc` is an explicit opt-in numbering policy.
+Page templates target publication sections rather than physical page numbers, so
+reflow cannot silently apply a template to the wrong content.
 
-Page numbers appear only in PDF, not interactive preview or HTML export.
+After final numbering is known, render folios through the shared page HTML for
+both preview and PDF, with header/footer space reserved before body layout.
+Preserve existing numbering defaults and validation:
+
+- centered footer, bundled Latin font, 6–24pt, regular/bold/italic;
+- validated format containing `{page}` and/or `{pages}`, printable ASCII only;
+- number all body-stream pages, hide first and start at 1 on second, or hide
+  first and retain body-stream numbering (2 on second).
+
+Page-first folios appear in preview and PDF, not in the existing flowing HTML
+profile. The legacy PDF-stamping service applies only when page layout is
+disabled and must never duplicate shared HTML folios. Retain font-coverage
+checks and regressions for glyph rendering, embedding, and output size when
+changing that path. Physical order, logical labels, display visibility, and
+total scopes remain separate. By default, covers are unnumbered and excluded
+from `{pages}`; the TOC belongs to the body total. Preserve all existing
+first-page-mode semantics and provide an explicit policy for restarting the main
+body after the TOC.
 
 ### Cover artwork
 
@@ -265,8 +395,11 @@ Code, or another compatible skill directory.
 CLI v1 builds or validates one Markdown source. It does not merge chapters,
 process directories, or require a running GUI. Build writes an output only after
 rendering succeeds; validation checks configuration, assets, Markdown, and
-Mermaid rendering without writing a publication. HTML remains body-only; TOC,
-page numbering, and cover settings affect PDF only.
+Mermaid rendering without writing a publication. Flowing HTML remains body-only;
+page templates, TOC page references, folios, and cover sequencing belong to the
+shared page-first preview/PDF path. CLI, desktop, and MCP must use the same
+layout service and versioned contracts rather than entry-point-specific
+pagination.
 
 Every export is a job:
 
@@ -329,6 +462,17 @@ MVP acceptance:
 - AI integration works when configured; local export works without it.
 - Packaging targets Windows, macOS, and Linux. Signing/notarization are release
   concerns; automatic updates follow signed release artifacts.
+
+Page-first acceptance is covered by a reproducible fixture that combines an
+unnumbered cover, multipage TOC with a distinct whole-sheet background and
+correct page labels, an explicit main-body numbering restart, previewed folios,
+a section template switch, and `\clearpage`. Typography changes update
+pagination, references, and totals together. Final PDF pages, backgrounds,
+labels, and TOC destinations agree with the finalized preview artifact after
+assembly. `pnpm test:page-first` runs content-preservation, fragmentation,
+security, cancellation, and theme/size checks, and `pnpm verify:packaged` runs
+the packaged-runtime check; see [RENDERING.md](docs/RENDERING.md) for the
+pipeline and diagnostics.
 
 Chromium is adequate for ordinary technical/digital publications, not full
 commercial prepress. Evaluate another print backend only against a concrete

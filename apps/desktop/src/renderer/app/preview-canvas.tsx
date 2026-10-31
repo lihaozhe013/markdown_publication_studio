@@ -8,18 +8,24 @@ import {
 import {
   PAGE_SIZE_DEFINITIONS,
   type PageSizeId,
+  type PaginationSummary,
   type PublicationDiagnostic,
 } from '@markdown-publication/shared';
 import { paperWidth, resolveZoom, type ZoomMode } from './workspace-model.js';
 import { previewViewportStyles } from './preview-viewport.js';
 import { probePreviewRendering } from './preview-probe.js';
 import { StudioIcon } from './studio-icon.js';
+import { CanvasBusyOverlay, DocumentLoadingSheet } from './canvas-loading.js';
+const PREVIEW_PAGE_GAP = 24;
+
 interface Props {
   html: string;
   sourceLoaded: boolean;
   pageSize: PageSizeId;
+  pagination?: PaginationSummary | null;
   zoomMode: ZoomMode;
   busy: boolean;
+  status?: string | undefined;
   ready: boolean;
   onZoomResolved(zoom: number): void;
   onProbe(diagnostics: PublicationDiagnostic[]): void;
@@ -54,11 +60,36 @@ export function PreviewCanvas(props: Props): ReactElement {
     (PAGE_SIZE_DEFINITIONS[props.pageSize].heightPt * 96) / 72,
   );
   const [dropActive, setDropActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const dragDepth = useRef(0);
   const width = paperWidth(props.pageSize);
   const zoom = resolveZoom(props.zoomMode, availableWidth, width);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const pageCount = props.pagination?.pages.length ?? 0;
+
+  function syncCurrentPage(scrollTop: number): void {
+    if (pageCount === 0) return;
+    const sheet = (PAGE_SIZE_DEFINITIONS[props.pageSize].heightPt * 96) / 72;
+    const pitch = (sheet + PREVIEW_PAGE_GAP) * zoomRef.current;
+    const viewport = canvas.current?.clientHeight ?? 0;
+    const page = Math.min(
+      pageCount,
+      Math.max(1, Math.floor((scrollTop + viewport / 2) / pitch) + 1),
+    );
+    setCurrentPage(page);
+  }
+
+  function scrollToPage(page: number): void {
+    if (pageCount === 0) return;
+    const sheet = (PAGE_SIZE_DEFINITIONS[props.pageSize].heightPt * 96) / 72;
+    const target = Math.min(pageCount, Math.max(1, page));
+    setCurrentPage(target);
+    canvas.current?.scrollTo({
+      top: (target - 1) * (sheet + PREVIEW_PAGE_GAP) * zoomRef.current,
+      behavior: 'auto',
+    });
+  }
 
   useEffect(() => {
     const element = canvas.current;
@@ -239,15 +270,44 @@ export function PreviewCanvas(props: Props): ReactElement {
       <div className="canvas-caption">
         <span>
           {props.sourceLoaded
-            ? `${props.pageSize} · Continuous preview`
+            ? pageCount > 0
+              ? `${props.pageSize} · ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}`
+              : `${props.pageSize} · Continuous preview`
             : 'Preview'}
         </span>
-        <span>PDF determines final pagination</span>
+        {pageCount > 0 ? (
+          <span className="preview-page-navigation">
+            <button
+              type="button"
+              onClick={() => scrollToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            <span aria-live="polite">
+              Page {currentPage} / {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => scrollToPage(currentPage + 1)}
+              disabled={currentPage >= pageCount}
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </span>
+        ) : (
+          <span>PDF determines final pagination</span>
+        )}
       </div>
       <div
         ref={canvas}
         className={`preview-canvas${dropActive ? ' is-dragging' : ''}`}
-        onScroll={reportViewMetrics}
+        onScroll={() => {
+          reportViewMetrics();
+          syncCurrentPage(canvas.current?.scrollTop ?? 0);
+        }}
         onDragEnter={(event) => {
           event.preventDefault();
           if (
@@ -296,6 +356,13 @@ export function PreviewCanvas(props: Props): ReactElement {
               style={{ width, height, transform: `scale(${zoom})` }}
             />
           </div>
+        ) : (props.sourceLoaded || props.busy) && !dropActive ? (
+          <DocumentLoadingSheet
+            pageSize={props.pageSize}
+            status={props.status}
+            zoom={zoom}
+            availableWidth={availableWidth}
+          />
         ) : (
           <div className="empty-state">
             <StudioIcon name="document" size={48} />
@@ -323,6 +390,9 @@ export function PreviewCanvas(props: Props): ReactElement {
           </div>
         )}
       </div>
+      {props.busy && props.html ? (
+        <CanvasBusyOverlay status={props.status} />
+      ) : null}
     </section>
   );
 }

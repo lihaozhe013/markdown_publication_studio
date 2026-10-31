@@ -68,6 +68,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Advisory packaged-runtime verification. It is non-blocking until the
+      # check has run successfully on both release platforms.
+      - name: Verify packaged page-first runtime
+        continue-on-error: true
+        run: pnpm exec electron scripts/check-packaged-runtime.mjs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7.0.1
         with:

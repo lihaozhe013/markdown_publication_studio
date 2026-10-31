@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
@@ -26,6 +27,33 @@ export default defineConfig({
       katexAssetsPlugin(
         resolve(desktopRoot, '../../packages/publication-core'),
       ),
+      {
+        name: 'mps-paged-engine',
+        generateBundle() {
+          // The pinned pagination engine runs as trusted application code inside
+          // the sandboxed layout window; it is emitted next to the main bundle.
+          const enginePackage = resolve(
+            dirname(createRequire(import.meta.url).resolve('pagedjs')),
+            '..',
+          );
+          const metadata = JSON.parse(
+            readFileSync(resolve(enginePackage, 'package.json'), 'utf8'),
+          ) as { version: string };
+          this.emitFile({
+            type: 'asset',
+            fileName: 'paged.js',
+            source: readFileSync(resolve(enginePackage, 'dist/paged.js')),
+          });
+          this.emitFile({
+            type: 'asset',
+            fileName: 'paged-engine.json',
+            source: JSON.stringify({
+              engine: 'pagedjs',
+              version: metadata.version,
+            }),
+          });
+        },
+      },
       {
         name: 'mps-cli-runtime-metadata',
         generateBundle() {

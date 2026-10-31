@@ -16,9 +16,25 @@ building a preview, and starting an export.
   the validated values and only approved bundled fonts can be selected.
 - Page-number fonts are selected from an application-owned allow-list of bundled
   font assets. The page-number format accepts only `{page}` and `{pages}`
-  placeholders and is validated before entering the main-process PDF
-  post-processing stage. Page-number fonts never enter the interactive preview
-  or HTML export.
+  placeholders, printable ASCII characters only, and is validated before layout.
+  CJK page-number fonts and characters are rejected so untrusted input cannot
+  trigger embedding a multi-megabyte font. HTML export never receives folios.
+- Pagination runs in a separate hidden `BrowserWindow` with
+  `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`. The
+  pinned Paged.js engine bundle and the isolated layout program are
+  application-owned build artifacts injected by the main process into that
+  window; publication source never receives scripting permission and cannot
+  provide layout code.
+- The desktop preview remains a script-disabled, `allow-same-origin` iframe
+  loaded from the finalized static artifact. It does not combine `allow-scripts`
+  with `allow-same-origin`, and it does not execute the layout engine.
+- Layout directives are parsed during Markdown compilation as typed nodes. A
+  standalone `\\clearpage` or `\\pagetemplate{name}` is never interpreted inside
+  code, math, inline code, or raw HTML, and template names are restricted to a
+  lowercase identifier before they reach the layout program.
+- Layout diagnostics never include source paths beyond the publication source
+  already known to the caller. Opt-in `MPS_LAYOUT_DUMP_DIR` artifacts contain
+  publication content and are a local debugging aid, not an export format.
 - Markdown HTML uses a safe-static allow-list. Scripts, event handlers,
   `javascript:` URLs, iframes, embeds, `foreignObject`, and unsafe CSS are
   removed before publication HTML is returned.
@@ -46,9 +62,11 @@ building a preview, and starting an export.
   app version, and worker protocol. The CLI rejects missing or incompatible
   runtime metadata before launching a process.
 - PDF output is rendered in a separate hidden `BrowserWindow` with
-  `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.
-- Page-number PDF post-processing runs in the main process after Chromium
-  printing and never exposes PDF or font filesystem access to the renderer.
+  `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`, or
+  printed directly from the already finalized pagination artifact.
+- Legacy page-number PDF post-processing runs in the main process after Chromium
+  printing and never exposes PDF or font filesystem access to the renderer. The
+  page-first path uses the artifact's own folios instead.
 - The table of contents is generated from validated heading metadata in the
   publication core. It contains only fixed internal heading anchors and does not
   parse PDF output or expose page-location operations through preload or

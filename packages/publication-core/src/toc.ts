@@ -22,13 +22,18 @@ function presetClass(preset: TocPresetId): string {
   return `publication-toc--${preset}`;
 }
 
-function renderTocEntry(entry: TocEntry): string {
-  return `<li class="publication-toc-entry publication-toc-entry--level-${entry.level}"><a class="publication-toc-link" href="#${escapeHtml(entry.id)}"><span class="publication-toc-title-text">${escapeHtml(entry.title)}</span></a></li>`;
+function renderTocEntry(entry: TocEntry, pageReferences: boolean): string {
+  const label = pageReferences
+    ? `<span class="publication-toc-page" data-toc-page-for="${escapeHtml(entry.id)}"></span>`
+    : '';
+  return `<li class="publication-toc-entry publication-toc-entry--level-${entry.level}"><a class="publication-toc-link" href="#${escapeHtml(entry.id)}"><span class="publication-toc-title-text">${escapeHtml(entry.title)}</span>${label}</a></li>`;
 }
 
 export function renderTableOfContents(options: PublicationTocOptions): string {
   if (options.entries.length === 0) return '';
-  const entries = options.entries.map(renderTocEntry);
+  const entries = options.entries.map((entry) =>
+    renderTocEntry(entry, options.pageReferences === true),
+  );
   return `<nav class="publication-toc ${presetClass(options.preset)}" data-toc="true" aria-labelledby="publication-toc-heading"><h1 id="publication-toc-heading" class="publication-toc-heading">Contents</h1><ol class="publication-toc-list">${entries.join('')}</ol></nav>`;
 }
 
@@ -87,8 +92,15 @@ export function getTableOfContentsStylesheet(): string {
         outline: none;
       }
       .publication-toc .publication-toc-title-text {
+        flex: 1 1 auto;
         min-width: 0;
         overflow-wrap: anywhere;
+      }
+      .publication-toc .publication-toc-page {
+        flex: 0 0 4em;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        white-space: nowrap;
       }
       .publication-toc .publication-toc-entry--level-1 {
         font-family: var(--publication-toc-heading-font, var(--fontStack-sansSerif, Georgia, serif));

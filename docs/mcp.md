@@ -98,10 +98,11 @@ both `sessionId` and `jobId` for a GUI export.
 
 `session_view` adjusts preview zoom, vertical scroll, or a matching heading.
 `session_capture` returns a PNG for the preview viewport or application content
-window after the requested revision's preview, fonts, images, and layout are
-ready. This is a continuous-preview image; PDF output remains authoritative for
-final pagination. Preview capture times out after 15 seconds if resources do not
-become ready.
+window after the requested revision's preview, fonts, images, and paginated
+layout are ready. Captures present the finalized page artifact, so they show the
+same pages, folios, and backgrounds that PDF export prints; a stale revision is
+rejected instead of capturing different pagination. Preview capture times out
+after 60 seconds if resources do not become ready.
 
 ## Paths and output safety
 

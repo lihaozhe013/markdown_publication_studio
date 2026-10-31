@@ -63,7 +63,9 @@ export function renderPublicationHtml(
         body { max-width: 900px; margin: 0 auto; padding: 48px 64px; background: var(--publication-screen-background, #eef1f5); }
         .chapter { margin: 0 0 32px; padding: 52px 64px; background: var(--publication-surface-background, white); box-shadow: 0 12px 40px rgb(16 35 58 / 12%); }
       }
+      .publication-page-break { display: none; }
       @media print {
+        .publication-page-break { display: block; break-after: page; }
         html, body { margin: 0; background: var(--publication-page-background, white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chapter { break-before: page; background: var(--publication-surface-background, white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chapter:first-child { break-before: auto; }

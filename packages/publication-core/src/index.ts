@@ -27,3 +27,15 @@ export {
   type SvgMarkupSummary,
 } from './render-debug.js';
 export { sanitizePublicationHtml } from './sanitizer.js';
+export {
+  assertPaginationPlanMatches,
+  planPagination,
+  type GeneratedPageDescriptor,
+  type PaginationPlanOptions,
+} from './page-plan.js';
+export {
+  planPageNumbers,
+  type PageNumberingOptions,
+  type PlannedPageNumber,
+  type PublicationPageKind,
+} from './page-numbering.js';

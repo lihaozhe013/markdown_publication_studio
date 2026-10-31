@@ -116,6 +116,58 @@ describe('AppSettingsService custom styles', () => {
   });
 });
 
+describe('AppSettingsService page number migration', () => {
+  it('replaces a legacy CJK page-number font but keeps the rest of the settings', async () => {
+    await writeFile(
+      join(userDataDirectory, 'settings.json'),
+      JSON.stringify({
+        pageNumber: {
+          ...pageNumber,
+          fontFamily: 'source-han-sans',
+          format: 'Page {page} of {pages}',
+        },
+      }),
+      'utf8',
+    );
+
+    await expect(new AppSettingsService().loadPageNumber()).resolves.toEqual({
+      ...pageNumber,
+      fontFamily: DEFAULT_PAGE_NUMBER_SETTINGS.fontFamily,
+      format: 'Page {page} of {pages}',
+    });
+  });
+
+  it('replaces a legacy CJK format when the original font is also unsupported', async () => {
+    await writeFile(
+      join(userDataDirectory, 'settings.json'),
+      JSON.stringify({
+        pageNumber: {
+          ...pageNumber,
+          fontFamily: 'source-han-serif',
+          format: '第 {page} 页 / 共 {pages} 页',
+        },
+      }),
+      'utf8',
+    );
+
+    await expect(new AppSettingsService().loadPageNumber()).resolves.toEqual(
+      pageNumber,
+    );
+  });
+
+  it('uses defaults when persisted page-number settings are not an object', async () => {
+    await writeFile(
+      join(userDataDirectory, 'settings.json'),
+      JSON.stringify({ pageNumber: 'invalid' }),
+      'utf8',
+    );
+
+    await expect(new AppSettingsService().loadPageNumber()).resolves.toEqual(
+      DEFAULT_PAGE_NUMBER_SETTINGS,
+    );
+  });
+});
+
 describe('AppSettingsService UI preferences', () => {
   it('loads defaults from older files and preserves publication settings on UI saves', async () => {
     await writeFile(

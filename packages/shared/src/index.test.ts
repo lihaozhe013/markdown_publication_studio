@@ -5,6 +5,7 @@ import {
   CoverAssetReferenceSchema,
   CoverSelectionSchema,
   DEFAULT_PAGE_SIZE,
+  DEFAULT_PAGE_LAYOUT_SETTINGS,
   compareMermaidGeometry,
   compareMermaidMetrics,
   DEFAULT_PAGE_NUMBER_SETTINGS,
@@ -19,6 +20,8 @@ import {
   isValidPageNumberFormat,
   OpenDroppedMarkdownRequestSchema,
   PageNumberSettingsSchema,
+  PageNumberFontIdSchema,
+  PublicationFontIdSchema,
   PreviewRequestSchema,
   PublicationStyleOverridesSchema,
   resolveNumberedPage,
@@ -79,8 +82,13 @@ describe('Page number settings', () => {
         .pageNumber,
     ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
     expect(
-      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' }),
-    ).not.toHaveProperty('pageNumber');
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageNumber,
+    ).toEqual(DEFAULT_PAGE_NUMBER_SETTINGS);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .pageLayout,
+    ).toEqual(DEFAULT_PAGE_LAYOUT_SETTINGS);
     expect(
       PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
         .pageSize,
@@ -105,12 +113,38 @@ describe('Page number settings', () => {
     );
   });
 
-  it('accepts supported placeholders and rejects unknown tokens', () => {
-    expect(isValidPageNumberFormat('第 {page} 页 / 共 {pages} 页')).toBe(true);
+  it('accepts supported placeholders and rejects unknown or unsupported characters', () => {
+    expect(isValidPageNumberFormat('Page {page} of {pages}')).toBe(true);
     expect(isValidPageNumberFormat('{page}')).toBe(true);
     expect(isValidPageNumberFormat('{chapter}')).toBe(false);
     expect(isValidPageNumberFormat('Page {page')).toBe(false);
     expect(isValidPageNumberFormat('Page number')).toBe(false);
+    expect(isValidPageNumberFormat('第 {page} 页 / 共 {pages} 页')).toBe(false);
+    expect(isValidPageNumberFormat('Page\n{page}')).toBe(false);
+    const unsupportedFormat = PageNumberSettingsSchema.safeParse({
+      ...DEFAULT_PAGE_NUMBER_SETTINGS,
+      format: '第 {page} 页',
+    });
+    expect(unsupportedFormat.success).toBe(false);
+    if (!unsupportedFormat.success) {
+      expect(unsupportedFormat.error.issues[0]?.message).toContain(
+        'does not support "第"',
+      );
+    }
+  });
+
+  it('limits page-number fonts to Latin faces while body styles keep CJK fonts', () => {
+    expect(() => PageNumberFontIdSchema.parse('source-han-sans')).toThrow();
+    expect(PageNumberFontIdSchema.parse('source-sans-3')).toBe('source-sans-3');
+    expect(PublicationFontIdSchema.parse('source-han-sans')).toBe(
+      'source-han-sans',
+    );
+    expect(() =>
+      PageNumberSettingsSchema.parse({
+        ...DEFAULT_PAGE_NUMBER_SETTINGS,
+        fontFamily: 'source-han-serif',
+      }),
+    ).toThrow();
   });
 
   it('formats page labels for each first-page rule', () => {
@@ -127,8 +161,8 @@ describe('Page number settings', () => {
       page: 2,
       pages: 4,
     });
-    expect(formatPageNumber('第 {page} 页 / 共 {pages} 页', 2, 8)).toBe(
-      '第 2 页 / 共 8 页',
+    expect(formatPageNumber('Page {page} of {pages}', 2, 8)).toBe(
+      'Page 2 of 8',
     );
   });
 });

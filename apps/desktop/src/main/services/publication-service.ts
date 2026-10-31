@@ -1,4 +1,5 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
+import { PDFDocument } from 'pdf-lib';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
@@ -9,8 +10,10 @@ import {
 } from '@markdown-publication/publication-core';
 import type {
   ExportResult,
+  PageLayoutSettings,
   PageNumberSettings,
   PageSizeId,
+  PaginationSummary,
   PreviewResult,
   PublicationStyleOverrides,
   TocSettings,
@@ -18,6 +21,7 @@ import type {
 } from '@markdown-publication/shared';
 import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import {
+  DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PAGE_SIZE,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
@@ -29,9 +33,23 @@ import type {
   PdfAssemblyCovers,
   PdfAssembler,
 } from './pdf-assembly-service.js';
+import type { CoverAssetFile } from './cover-asset-service.js';
 import { loadThemeStylesheet } from './theme-service.js';
 import { appLogger, isRenderingDebugEnabled } from './app-logger.js';
 import { PageNumberPdfService } from './page-number-pdf-service.js';
+import type { PaginatedLayoutService } from './paginated-layout-service.js';
+
+interface PublicationBuildOptions {
+  pageNumber?: PageNumberSettings;
+  pageLayout?: PageLayoutSettings;
+  frontCoverPages?: number;
+  backCoverPages?: number;
+  signal?: AbortSignal;
+}
+
+interface BuiltPublication extends PreviewResult {
+  paginated: boolean;
+}
 
 function logAssetDiagnostics(
   sourcePath: string,
@@ -67,6 +85,28 @@ function logAssetDiagnostics(
   }
 }
 
+async function countCoverPages(covers: PdfAssemblyCovers): Promise<{
+  frontCoverPages: number;
+  backCoverPages: number;
+}> {
+  const count = async (asset: CoverAssetFile | undefined): Promise<number> => {
+    if (!asset) return 0;
+    if (asset.kind !== 'pdf') return 1;
+    try {
+      const document = await PDFDocument.load(await readFile(asset.path), {
+        updateMetadata: false,
+      });
+      return document.getPageCount();
+    } catch {
+      return 1;
+    }
+  };
+  return {
+    frontCoverPages: await count(covers.front),
+    backCoverPages: await count(covers.back),
+  };
+}
+
 export class PublicationService {
   private readonly compilerPromise = createMarkdownCompiler();
 
@@ -75,7 +115,20 @@ export class PublicationService {
     private readonly mermaidRenderer: MermaidRenderer,
     private readonly pageNumberPdfService: PageNumberPdfService,
     private readonly pdfAssembler: PdfAssembler,
+    private readonly layoutService?: PaginatedLayoutService,
   ) {}
+
+  /** Page-first layout is the production default once a layout backend exists. */
+  private resolvePageLayout(
+    pageLayout: PageLayoutSettings | undefined,
+  ): PageLayoutSettings {
+    return (
+      pageLayout ?? {
+        enabled: this.layoutService !== undefined,
+        restartBodyAfterToc: false,
+      }
+    );
+  }
 
   async buildPreview(
     sourcePath: string,
@@ -83,14 +136,18 @@ export class PublicationService {
     pageSize: PageSizeId = DEFAULT_PAGE_SIZE,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
+    options: PublicationBuildOptions = {},
   ): Promise<PreviewResult> {
-    return this.buildPublication(
+    const built = await this.buildPublication(
       sourcePath,
       themeId,
       pageSize,
       styleOverrides,
       tocSettings,
+      options,
     );
+    const { paginated: _paginated, ...preview } = built;
+    return preview;
   }
 
   private async buildPublication(
@@ -99,7 +156,8 @@ export class PublicationService {
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides,
     tocSettings: TocSettings,
-  ): Promise<PreviewResult> {
+    options: PublicationBuildOptions = {},
+  ): Promise<BuiltPublication> {
     if (isRenderingDebugEnabled) {
       appLogger.debug('[math-render] KaTeX stylesheet asset summary', {
         report: JSON.stringify(getKatexFontAssetSummary()),
@@ -115,11 +173,14 @@ export class PublicationService {
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
     const tocEntries = tocSettings.enabled ? chapter.tocEntries : [];
+    const pageLayout = this.resolvePageLayout(options.pageLayout);
+    const paginate = pageLayout.enabled && this.layoutService !== undefined;
     const tocOptions =
       tocEntries.length > 0
         ? {
             preset: tocSettings.preset,
             entries: tocEntries,
+            ...(paginate ? { pageReferences: true } : {}),
           }
         : undefined;
     const rendered = renderPublicationHtml([chapter], {
@@ -153,10 +214,38 @@ export class PublicationService {
         feature: 'toc',
       });
     }
+    if (paginate && this.layoutService) {
+      this.throwOnFatalDiagnostics(diagnostics);
+      const paginated = await this.layoutService.layout({
+        html: mermaid.html,
+        themeId,
+        pageSize,
+        pageNumber: options.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS,
+        restartBodyAfterToc: pageLayout.restartBodyAfterToc,
+        tocEnabled: tocSettings.enabled,
+        frontCoverPages: options.frontCoverPages ?? 0,
+        backCoverPages: options.backCoverPages ?? 0,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+      diagnostics.push(...paginated.diagnostics);
+      this.throwOnFatalDiagnostics(diagnostics);
+      const pagination: PaginationSummary = {
+        ...paginated.plan,
+        revision: paginated.revision,
+      };
+      return {
+        title: chapter.title,
+        html: paginated.html,
+        diagnostics,
+        pagination,
+        paginated: true,
+      };
+    }
     return {
       title: chapter.title,
       html: mermaid.html,
       diagnostics,
+      paginated: false,
     };
   }
 
@@ -169,8 +258,10 @@ export class PublicationService {
     covers: PdfAssemblyCovers,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
+    pageLayout?: PageLayoutSettings,
+    options: { signal?: AbortSignal } = {},
   ): Promise<ExportResult> {
-    const { pdf, diagnostics } = await this.renderPdf(
+    const { pdf, diagnostics, pagination } = await this.renderPdf(
       sourcePath,
       themeId,
       pageSize,
@@ -178,6 +269,8 @@ export class PublicationService {
       covers,
       styleOverrides,
       tocSettings,
+      pageLayout,
+      options,
     );
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -185,7 +278,11 @@ export class PublicationService {
     );
     await writeFile(temporaryPath, pdf);
     await rename(temporaryPath, outputPath);
-    return { outputPath, diagnostics };
+    return {
+      outputPath,
+      diagnostics,
+      ...(pagination ? { pagination } : {}),
+    };
   }
 
   async renderPdf(
@@ -196,28 +293,47 @@ export class PublicationService {
     covers: PdfAssemblyCovers,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
-  ): Promise<{ pdf: Uint8Array; diagnostics: PreviewResult['diagnostics'] }> {
+    pageLayout?: PageLayoutSettings,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<{
+    pdf: Uint8Array;
+    diagnostics: PreviewResult['diagnostics'];
+    pagination?: PaginationSummary;
+  }> {
+    const coverPages = await countCoverPages(covers);
     const publication = await this.buildPublication(
       sourcePath,
       themeId,
       pageSize,
       styleOverrides,
       tocSettings,
+      {
+        pageNumber,
+        ...(pageLayout ? { pageLayout } : {}),
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...coverPages,
+      },
     );
     this.throwOnFatalDiagnostics(publication.diagnostics);
     const printedPdf = await this.printBackend.render(publication.html);
-    if (pageNumber.enabled) {
-      appLogger.info('[page-number] Applying PDF page-number settings', {
-        fontFamily: pageNumber.fontFamily,
-        fontSizePt: pageNumber.fontSizePt,
-        style: pageNumber.style,
-        firstPageMode: pageNumber.firstPageMode,
-      });
+    let numberedBodyPdf: Uint8Array;
+    if (publication.paginated) {
+      // Shared page HTML already carries the finalized folios for this revision.
+      numberedBodyPdf = printedPdf;
+    } else {
+      if (pageNumber.enabled) {
+        appLogger.info('[page-number] Applying PDF page-number settings', {
+          fontFamily: pageNumber.fontFamily,
+          fontSizePt: pageNumber.fontSizePt,
+          style: pageNumber.style,
+          firstPageMode: pageNumber.firstPageMode,
+        });
+      }
+      numberedBodyPdf = await this.pageNumberPdfService.apply(
+        printedPdf,
+        pageNumber,
+      );
     }
-    const numberedBodyPdf = await this.pageNumberPdfService.apply(
-      printedPdf,
-      pageNumber,
-    );
     if (covers.front || covers.back) {
       appLogger.info('[cover] Assembling selected cover assets', {
         front: covers.front?.name,
@@ -230,7 +346,11 @@ export class PublicationService {
       pageSize,
       covers,
     });
-    return { pdf, diagnostics: publication.diagnostics };
+    return {
+      pdf,
+      diagnostics: publication.diagnostics,
+      ...(publication.pagination ? { pagination: publication.pagination } : {}),
+    };
   }
 
   async exportHtml(
@@ -267,6 +387,8 @@ export class PublicationService {
       pageSize,
       styleOverrides,
       DEFAULT_TOC_SETTINGS,
+      // The flowing HTML profile stays flow-based and never fixes pages.
+      { pageLayout: { enabled: false, restartBodyAfterToc: false } },
     );
     this.throwOnFatalDiagnostics(publication.diagnostics);
     return { html: publication.html, diagnostics: publication.diagnostics };

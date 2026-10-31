@@ -1,7 +1,14 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { degrees, PDFDocument } from 'pdf-lib';
+import {
+  degrees,
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFString,
+} from 'pdf-lib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   getPageSizeDefinition,
@@ -104,6 +111,55 @@ describe('PdfAssemblyService', () => {
 
     expect(document.getPageCount()).toBe(3);
     document.getPages().forEach((page) => expectPageSize(page, 'A4'));
+  });
+
+  it('preserves named destinations, annotations, and metadata when inserting covers', async () => {
+    const body = await PDFDocument.create();
+    const size = getPageSizeDefinition('A4');
+    const first = body.addPage([size.widthPt, size.heightPt]);
+    const target = body.addPage([size.widthPt, size.heightPt]);
+    body.setTitle('Document with a linked contents page');
+    const destination = body.context.obj([target.ref, PDFName.of('Fit')]);
+    const destinationNames = body.context.obj([
+      PDFString.of('chapter-two'),
+      destination,
+    ]);
+    body.catalog.set(
+      PDFName.of('Names'),
+      body.context.obj({ Dests: { Names: destinationNames } }),
+    );
+    const annotation = body.context.register(
+      body.context.obj({
+        Type: 'Annot',
+        Subtype: 'Link',
+        Rect: [0, 0, 100, 20],
+        Dest: PDFName.of('chapter-two'),
+      }),
+    );
+    first.node.set(PDFName.of('Annots'), body.context.obj([annotation]));
+    const front = await createImage('png');
+    const back = await createCoverPdf('A4');
+    const bytes = await new PdfAssemblyService().assemble({
+      bodyPdf: await body.save(),
+      pageSize: 'A4',
+      covers: {
+        front: asset(front, 'image', 'front'),
+        back: asset(back, 'pdf', 'back'),
+      },
+    });
+    const assembled = await PDFDocument.load(bytes);
+    expect(assembled.getPageCount()).toBe(4);
+    expect(assembled.getTitle()).toBe('Document with a linked contents page');
+    const names = assembled.catalog.lookup(PDFName.of('Names'), PDFDict);
+    const destinations = names.lookup(PDFName.of('Dests'), PDFDict);
+    const entries = destinations.lookup(PDFName.of('Names'), PDFArray);
+    const preservedDestination = entries.lookup(1, PDFArray);
+    expect(preservedDestination.get(0)).toEqual(assembled.getPage(2).ref);
+    const annotations = assembled
+      .getPage(1)
+      .node.lookup(PDFName.of('Annots'), PDFArray);
+    const link = annotations.lookup(0, PDFDict);
+    expect(link.get(PDFName.of('Dest'))).toEqual(PDFName.of('chapter-two'));
   });
 
   it('rejects multi-page PDF covers', async () => {

@@ -132,7 +132,7 @@ export const CoverSelectionSchema = z
   })
   .strict();
 
-export const PageNumberFontIdSchema = z.enum([
+export const PublicationFontIdSchema = z.enum([
   'inter',
   'open-sans',
   'source-han-sans',
@@ -140,6 +140,16 @@ export const PageNumberFontIdSchema = z.enum([
   'source-sans-3',
   'source-serif-4',
   'source-han-serif',
+]);
+
+// CJK fonts are intentionally excluded: embedding a full CJK font for a few
+// footer glyphs adds tens of megabytes to every exported PDF.
+export const PageNumberFontIdSchema = z.enum([
+  'inter',
+  'open-sans',
+  'jetbrains-mono',
+  'source-sans-3',
+  'source-serif-4',
 ]);
 
 export const PageNumberStyleSchema = z.enum(['normal', 'bold', 'italic']);
@@ -153,8 +163,24 @@ export const PageNumberFirstPageModeSchema = z.enum([
 const pageNumberFormatTokenPattern = /\{([^{}]*)\}/gu;
 const pageNumberFormatTokens = new Set(['page', 'pages']);
 
+export function isSupportedPageNumberFormatCharacter(
+  character: string,
+): boolean {
+  const codePoint = character.codePointAt(0);
+  return codePoint !== undefined && codePoint >= 0x20 && codePoint <= 0x7e;
+}
+
+export function findUnsupportedPageNumberFormatCharacter(
+  value: string,
+): string | undefined {
+  return Array.from(value).find(
+    (character) => !isSupportedPageNumberFormatCharacter(character),
+  );
+}
+
 export function isValidPageNumberFormat(value: string): boolean {
-  if (value.length === 0 || value.length > 160 || /[\r\n]/u.test(value)) {
+  if (value.length === 0 || value.length > 160) return false;
+  if (findUnsupportedPageNumberFormatCharacter(value) !== undefined) {
     return false;
   }
 
@@ -171,9 +197,17 @@ export function isValidPageNumberFormat(value: string): boolean {
 export const PageNumberFormatSchema = z
   .string()
   .trim()
-  .refine(isValidPageNumberFormat, {
-    message:
-      'Use at least one supported placeholder: {page} or {pages}. Unknown placeholders are not allowed.',
+  .superRefine((value, context) => {
+    if (isValidPageNumberFormat(value)) return;
+
+    const unsupported = findUnsupportedPageNumberFormatCharacter(value);
+    context.addIssue({
+      code: 'custom',
+      message:
+        unsupported === undefined
+          ? 'Use at least one supported placeholder: {page} or {pages}. Unknown placeholders are not allowed.'
+          : `Page-number format does not support ${JSON.stringify(unsupported)}. Use basic Latin letters, digits, and punctuation with {page} or {pages}; CJK characters would embed a large CJK font into the PDF.`,
+    });
   });
 
 export const PageNumberSettingsSchema = z.object({
@@ -184,8 +218,6 @@ export const PageNumberSettingsSchema = z.object({
   format: PageNumberFormatSchema,
   firstPageMode: PageNumberFirstPageModeSchema,
 });
-
-export const PublicationFontIdSchema = PageNumberFontIdSchema;
 
 export const PublicationFontWeightSchema = z.union([
   z.literal(300),
@@ -345,7 +377,7 @@ export const DEFAULT_PUBLICATION_STYLE_OVERRIDES = {
 
 export const DEFAULT_PAGE_NUMBER_SETTINGS = {
   enabled: false,
-  fontFamily: 'source-han-sans',
+  fontFamily: 'source-sans-3',
   fontSizePt: 10,
   style: 'normal',
   format: '{page} / {pages}',
@@ -382,6 +414,58 @@ export function resolveNumberedPage(
   return { page: pageIndex + 1, pages: pageCount };
 }
 
+export const PageLayoutSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    restartBodyAfterToc: z.boolean(),
+  })
+  .strict();
+
+export type PageLayoutSettings = z.infer<typeof PageLayoutSettingsSchema>;
+
+export const DEFAULT_PAGE_LAYOUT_SETTINGS = {
+  enabled: true,
+  restartBodyAfterToc: false,
+} as const satisfies PageLayoutSettings;
+
+export const PageTemplateIdSchema = z.enum(['default', 'toc', 'section']);
+export const PaginatedPageKindSchema = z.enum(['toc', 'body']);
+
+export const PaginatedPageSchema = z
+  .object({
+    /** Position in the finalized PDF, including planned cover pages. */
+    physicalPage: z.number().int().positive(),
+    /** Position among generated pages, matching the paginated artifact. */
+    generatedPage: z.number().int().positive(),
+    kind: PaginatedPageKindSchema,
+    template: PageTemplateIdSchema,
+    logicalPage: z.number().int().nonnegative().nullable(),
+    logicalTotal: z.number().int().nonnegative().nullable(),
+    label: z.string().nullable(),
+    folio: z.string().nullable(),
+  })
+  .strict();
+
+export const PaginationPlanSchema = z
+  .object({
+    pages: z.array(PaginatedPageSchema),
+    tocPages: z.array(z.number().int().positive()),
+    bodyStartPage: z.number().int().positive().nullable(),
+    restartBodyAfterToc: z.boolean(),
+    coverPages: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const PaginationSummarySchema = PaginationPlanSchema.extend({
+  revision: z.string().min(1),
+});
+
+export type PaginatedPage = z.infer<typeof PaginatedPageSchema>;
+export type PaginatedPageKind = z.infer<typeof PaginatedPageKindSchema>;
+export type PaginationPlan = z.infer<typeof PaginationPlanSchema>;
+export type PaginationSummary = z.infer<typeof PaginationSummarySchema>;
+export type PageTemplateId = z.infer<typeof PageTemplateIdSchema>;
+
 export const PreviewRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
@@ -390,6 +474,8 @@ export const PreviewRequestSchema = z.object({
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
+  pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+  pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
 });
 
 export const PdfExportRequestSchema = z.object({
@@ -401,6 +487,7 @@ export const PdfExportRequestSchema = z.object({
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
   pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+  pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
   covers: CoverSelectionSchema.default({}),
 });
 
@@ -423,6 +510,7 @@ export const PublishConfigurationSchema = z
     pageSize: PageSizeIdSchema.optional(),
     toc: TocSettingsSchema.optional(),
     pageNumber: PageNumberSettingsSchema.optional(),
+    pageLayout: PageLayoutSettingsSchema.optional(),
     covers: z
       .object({
         front: z.string().min(1).optional(),
@@ -445,6 +533,7 @@ export const CliWorkerRequestSchema = z
     pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
     toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
     pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
+    pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
     covers: z
       .object({
         front: z
@@ -471,7 +560,13 @@ export const CliWorkerResponseSchema = z
     schemaVersion: z.literal(1),
     command: z.enum(['build', 'validate']),
     ok: z.boolean(),
-    data: z.object({ outputPath: z.string().optional() }).strict().optional(),
+    data: z
+      .object({
+        outputPath: z.string().optional(),
+        pagination: PaginationSummarySchema.optional(),
+      })
+      .strict()
+      .optional(),
     diagnostics: z.array(
       z.object({
         severity: z.enum(['info', 'warning', 'error']),
@@ -688,11 +783,13 @@ export interface PreviewResult {
   title: string;
   html: string;
   diagnostics: PublicationDiagnostic[];
+  pagination?: PaginationSummary;
 }
 
 export interface ExportResult {
   outputPath: string;
   diagnostics: PublicationDiagnostic[];
+  pagination?: PaginationSummary;
 }
 
 export interface DesktopApi {
@@ -856,3 +953,13 @@ export function compareMermaidGeometry(
     ...(firstDifference === undefined ? {} : { firstDifference }),
   };
 }
+
+export type {
+  LayoutDiagnostic,
+  LayoutOverflowReport,
+  LayoutPageReport,
+  PaginationApplyOptions,
+  PaginationApplyReport,
+  PaginationPassReport,
+  PaginationProgramOptions,
+} from './pagination-program.js';

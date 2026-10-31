@@ -56,6 +56,8 @@ export interface TocEntry {
 export interface PublicationTocOptions {
   preset: TocPresetId;
   entries: readonly TocEntry[];
+  /** Reserve a page-label column that the paginated layout fills in. */
+  pageReferences?: boolean;
 }
 
 export interface PublicationHtmlOptions {

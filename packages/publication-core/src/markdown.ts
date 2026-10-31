@@ -26,6 +26,7 @@ import type {
 import { normalizeTocText } from './toc.js';
 import { renderMathPlaceholders, prepareMath } from './math.js';
 import { sanitizePublicationHtml } from './sanitizer.js';
+import { registerLayoutControls } from './layout-controls.js';
 
 const imageMimeTypes: Record<string, string> = {
   '.gif': 'image/gif',
@@ -408,6 +409,7 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
           }
         },
       });
+      registerLayoutControls(markdown);
       const defaultHeadingOpen = markdown.renderer.rules.heading_open;
       markdown.renderer.rules.heading_open = (
         tokens,

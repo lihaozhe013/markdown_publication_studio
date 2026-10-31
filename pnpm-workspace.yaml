@@ -1,11 +1,9 @@
 packages:
   - apps/*
   - packages/*
-onlyBuiltDependencies:
-  - electron
-  - electron-winstaller
-  - esbuild
 allowBuilds:
+  core-js: false
   electron: true
   electron-winstaller: true
+  es5-ext: false
   esbuild: true

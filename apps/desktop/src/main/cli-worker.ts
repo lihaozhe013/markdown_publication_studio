@@ -7,6 +7,7 @@ import {
   CliWorkerRequestSchema,
   CliWorkerResponseSchema,
   type CliWorkerResponse,
+  type PaginationSummary,
   type PublicationDiagnostic,
 } from '@markdown-publication/shared';
 import {
@@ -18,6 +19,7 @@ import { inspectCoverAsset } from './services/cover-asset-service.js';
 import { CLI_WORKER_PROTOCOL } from './services/cli-runtime-registry.js';
 import { ElectronPrintBackend } from './services/electron-print-backend.js';
 import { ElectronMermaidRenderer } from './services/mermaid-renderer.js';
+import { PaginatedLayoutService } from './services/paginated-layout-service.js';
 import { PageNumberPdfService } from './services/page-number-pdf-service.js';
 import { PdfAssemblyService } from './services/pdf-assembly-service.js';
 import type { PdfAssemblyCovers } from './services/pdf-assembly-service.js';
@@ -25,6 +27,7 @@ import type { CliWorkerRequest } from '@markdown-publication/shared';
 import { writePublicationAtomically } from '@markdown-publication/publishing-runtime';
 
 let cancellationRequested = false;
+let jobController: AbortController | undefined;
 
 function throwIfCancellationRequested(): void {
   if (cancellationRequested)
@@ -71,6 +74,7 @@ function response(
   ok: boolean,
   options: {
     outputPath?: string;
+    pagination?: PaginationSummary;
     diagnostics?: PublicationDiagnostic[];
     error?: string;
     errorCode?: 'usage' | 'io' | 'publish';
@@ -80,7 +84,14 @@ function response(
     schemaVersion: 1,
     command,
     ok,
-    ...(options.outputPath ? { data: { outputPath: options.outputPath } } : {}),
+    ...(options.outputPath || options.pagination
+      ? {
+          data: {
+            ...(options.outputPath ? { outputPath: options.outputPath } : {}),
+            ...(options.pagination ? { pagination: options.pagination } : {}),
+          },
+        }
+      : {}),
     diagnostics: options.diagnostics ?? [],
     ...(options.error ? { error: options.error } : {}),
     ...(options.errorCode ? { errorCode: options.errorCode } : {}),
@@ -94,6 +105,7 @@ function response(
 async function runCliWorkerInternal(requestPath: string): Promise<void> {
   const resultPath = join(dirname(requestPath), 'result.json');
   let command: 'build' | 'validate' = 'build';
+  let lastPagination: PaginationSummary | undefined;
   let result: CliWorkerResponse;
 
   try {
@@ -148,6 +160,9 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
       ),
       new PageNumberPdfService(),
       new PdfAssemblyService(),
+      new PaginatedLayoutService(
+        fileURLToPath(new URL('./paged.js', import.meta.url)),
+      ),
     );
 
     if (request.command === 'validate') {
@@ -157,8 +172,10 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
         request.pageSize,
         request.styleOverrides,
         request.toc,
+        { pageNumber: request.pageNumber, pageLayout: request.pageLayout },
       );
       diagnostics.push(...preview.diagnostics);
+      lastPagination = preview.pagination;
     } else if (request.format === 'html') {
       const { html, diagnostics: buildDiagnostics } =
         await publicationService.renderHtml(
@@ -188,24 +205,31 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
       );
       result = response(command, true, {
         outputPath: request.outputPath,
+        ...(lastPagination ? { pagination: lastPagination } : {}),
         diagnostics,
       });
       await writeFile(resultPath, JSON.stringify(result), 'utf8');
       app.exit(0);
       return;
     } else {
-      const { pdf, diagnostics: buildDiagnostics } =
-        await publicationService.renderPdf(
-          request.sourcePath,
-          request.themeId,
-          request.pageSize,
-          request.pageNumber,
-          covers,
-          request.styleOverrides,
-          request.toc,
-        );
+      const {
+        pdf,
+        diagnostics: buildDiagnostics,
+        pagination,
+      } = await publicationService.renderPdf(
+        request.sourcePath,
+        request.themeId,
+        request.pageSize,
+        request.pageNumber,
+        covers,
+        request.styleOverrides,
+        request.toc,
+        request.pageLayout,
+        { ...(jobController ? { signal: jobController.signal } : {}) },
+      );
       throwIfCancellationRequested();
       diagnostics.push(...buildDiagnostics);
+      lastPagination = pagination;
       if (
         request.strict &&
         diagnostics.some(({ severity }) => severity === 'warning')
@@ -225,6 +249,7 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
       );
       result = response(command, true, {
         outputPath: request.outputPath,
+        ...(lastPagination ? { pagination: lastPagination } : {}),
         diagnostics,
       });
       await writeFile(resultPath, JSON.stringify(result), 'utf8');
@@ -237,6 +262,7 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
       request.strict &&
       diagnostics.some(({ severity }) => severity === 'warning');
     result = response(command, !hasErrors && !hasStrictWarnings, {
+      ...(lastPagination ? { pagination: lastPagination } : {}),
       diagnostics,
       ...(hasErrors || hasStrictWarnings
         ? {
@@ -261,8 +287,10 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
 
 export async function runCliWorker(requestPath: string): Promise<void> {
   cancellationRequested = false;
+  jobController = new AbortController();
   const onCancel = (): void => {
     cancellationRequested = true;
+    jobController?.abort();
   };
   process.once('SIGTERM', onCancel);
   try {

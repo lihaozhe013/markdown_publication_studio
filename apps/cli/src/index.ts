@@ -839,7 +839,7 @@ function describeData(): Record<string, unknown> {
       }),
       pageNumberFormat: {
         description:
-          'Must include {page} or {pages}. Only these placeholders are accepted; the value cannot contain newlines and is limited to 160 characters.',
+          'Must include {page} or {pages}. Only these placeholders are accepted; the value must use printable ASCII characters, cannot contain newlines, and is limited to 160 characters. CJK text is rejected because it would embed a large CJK font into the PDF.',
         supportedPlaceholders: ['{page}', '{pages}'],
       },
     },

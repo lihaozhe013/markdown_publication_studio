@@ -319,6 +319,17 @@ contents page references. HTML export intentionally remains the flowing,
 body-only profile. The legacy continuously flowing preview and PDF folio
 stamping remain available only when page-first layout is disabled.
 
+Preview artifacts and exported files use different asset profiles over the same
+content. Exports embed theme fonts and images so the output stays
+self-contained. The preview and its isolated layout window load the bundled
+theme files through an application-owned `mps-asset:` scheme with containment
+checks and immutable caching, so a rebuild does not transfer or re-parse tens of
+megabytes of base64 font data. Prepared publications and revision-bound
+paginated artifacts are cached by content, and a newer preview request aborts
+the build in flight. Offscreen pages use screen-only `content-visibility` in the
+preview; printing still lays out every page. Page virtualization remains
+deferred.
+
 Advanced styles are edited within the inspector, with Body and Headings expanded
 initially and other sections collapsed. Drafts preview immediately, survive
 category changes and inspector hiding, and are used for exports without implicit

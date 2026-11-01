@@ -59,6 +59,41 @@ describe('publication HTML layout', () => {
     );
   });
 
+  it('allows the preview asset scheme for fonts and images', () => {
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      assetOrigin: 'mps-asset:',
+    });
+
+    expect(publication.html).toContain(
+      "img-src data: mps-asset:; style-src 'unsafe-inline'; font-src data: mps-asset:;",
+    );
+  });
+
+  it('omits the KaTeX stylesheet when the chapters contain no math', () => {
+    const publication = renderPublicationHtml([chapter], {
+      title: 'Book',
+      themeId: 'rose',
+      features: { math: { enabled: true } },
+    });
+
+    expect(publication.html).not.toContain('KaTeX_Main');
+  });
+
+  it('includes the KaTeX stylesheet when a chapter renders math', () => {
+    const publication = renderPublicationHtml(
+      [{ ...chapter, html: '<span class="katex">x</span>' }],
+      {
+        title: 'Book',
+        themeId: 'rose',
+        features: { math: { enabled: true } },
+      },
+    );
+
+    expect(publication.html).toContain('KaTeX_Main');
+  });
+
   it('places structured style overrides after theme and renderer helper CSS', () => {
     const publication = renderPublicationHtml([chapter], {
       title: 'Book',

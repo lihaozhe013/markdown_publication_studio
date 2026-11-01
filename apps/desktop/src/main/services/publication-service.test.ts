@@ -10,6 +10,7 @@ import {
   expect,
   it,
   vi,
+  type Mock,
 } from 'vitest';
 import {
   DEFAULT_PAGE_NUMBER_SETTINGS,
@@ -38,6 +39,7 @@ let service: PublicationService;
 let renderedHtml: string[];
 let pageNumberApply: ReturnType<typeof vi.fn>;
 let layout: ReturnType<typeof vi.fn>;
+let mermaidRender: Mock;
 let pageFirstService: PublicationService;
 
 beforeAll(async () => {
@@ -62,9 +64,8 @@ beforeAll(async () => {
       return bodyPdf;
     }),
   };
-  const mermaidRenderer: MermaidRenderer = {
-    render: vi.fn(async (html: string) => ({ html, diagnostics: [] })),
-  };
+  mermaidRender = vi.fn(async (html: string) => ({ html, diagnostics: [] }));
+  const mermaidRenderer: MermaidRenderer = { render: mermaidRender };
   pageNumberApply = vi.fn(async (bytes: Uint8Array) => bytes);
   const pageNumberPdfService = {
     apply: pageNumberApply,
@@ -257,5 +258,80 @@ describe('PublicationService table-of-contents export', () => {
         feature: 'toc',
       }),
     ]);
+  });
+});
+
+describe('PublicationService preview assets and caching', () => {
+  const flowingLayout = { enabled: false, restartBodyAfterToc: false };
+
+  it('serves theme assets by URL instead of embedding font binaries', async () => {
+    const preview = await service.buildPreview(
+      sourcePath,
+      'rose',
+      'A4',
+      DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+      { enabled: false, preset: 'classic-book' },
+      { assets: 'asset-url', pageLayout: flowingLayout },
+    );
+
+    expect(preview.html).toContain(
+      'mps-asset://theme/fonts/SourceHanSansSC-VF.ttf',
+    );
+    expect(preview.html).not.toContain('data:font/ttf');
+    expect(preview.html).toContain('font-src data: mps-asset:;');
+  });
+
+  it('keeps HTML export self-contained', async () => {
+    const preview = await service.buildPreview(
+      sourcePath,
+      'rose',
+      'A4',
+      DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+      { enabled: false, preset: 'classic-book' },
+      { pageLayout: flowingLayout },
+    );
+
+    expect(preview.html).toContain('data:font/ttf;base64,');
+    expect(preview.html).not.toContain('mps-asset://');
+  });
+
+  it('reuses the compiled publication for an identical request', async () => {
+    const build = () =>
+      service.buildPreview(
+        sourcePath,
+        'rose',
+        'Letter',
+        DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+        { enabled: false, preset: 'classic-book' },
+        { pageLayout: flowingLayout },
+      );
+
+    mermaidRender.mockClear();
+    await build();
+    await build();
+
+    expect(mermaidRender).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops before layout when the build is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    layout.mockClear();
+
+    await expect(
+      pageFirstService.buildPreview(
+        sourcePath,
+        'rose',
+        'A4',
+        DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+        { enabled: false, preset: 'classic-book' },
+        {
+          pageNumber: enabledPageNumbers(),
+          pageLayout: { enabled: true, restartBodyAfterToc: true },
+          signal: controller.signal,
+        },
+      ),
+    ).rejects.toThrow(/cancelled/u);
+    expect(layout).not.toHaveBeenCalled();
   });
 });

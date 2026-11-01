@@ -17,14 +17,14 @@ Markdown
   -> Mermaid placeholder extraction
   -> isolated Chromium Mermaid SVG rendering
   -> static publication HTML
-       -> HTML export (flowing profile)
+       -> HTML export (flowing profile, embedded assets)
        -> optional contents section with reserved page labels
        -> isolated Paged.js layout in a sandboxed window
        -> PagePlan: kinds, templates, physical/logical pages, folios
        -> bounded contents-reference convergence
        -> paginated artifact (static HTML, no scripts)
-            -> desktop preview (same artifact revision)
-            -> isolated printToPDF with zero page margins
+            -> desktop preview (same artifact revision, theme assets by URL)
+            -> isolated printToPDF with zero page margins (embedded assets)
             -> optional cover/back-cover PDF assembly
 ```
 
@@ -63,13 +63,13 @@ A layout pass:
 6. Resolves each contents entry to its generated page, then applies folios,
    whole-sheet template backgrounds, and page kinds.
 7. Serializes the finalized document and removes the engine's inert copy of the
-   source content so the artifact keeps one copy of every anchor.
-
-Contents labels occupy a reserved fixed-width column. If refilling them changes
-the measured contents geometry, the service reloads the artifact with the
-previous labels pre-filled and repeats, up to three passes, with cycle
-detection. A non-converging document fails with an actionable error instead of
-shipping stale references.
+   source content so the artifact keeps one copy of every anchor. Contents
+   labels occupy a reserved fixed-width column. If refilling them changes the
+   measured contents geometry, the service reloads the same artifact file with
+   the previous labels pre-filled and repeats, up to three passes, with cycle
+   detection. One hidden window is reused for every pass of a layout call. A
+   non-converging document fails with an actionable error instead of shipping
+   stale references.
 
 The service reports `layout-overflow` warnings when content visibly escapes the
 printable content box, `page-template-unknown` warnings for invalid template
@@ -85,10 +85,45 @@ deadline of 180 seconds per step. `pnpm test:page-first` exercises the complete
 acceptance scenario, the ten-theme and two-paper-size matrix, hostile source
 content, and cancellation. `pnpm verify:packaged` runs the same pipeline from an
 unpacked application build and requires the engine assets to be present in the
-application archive. On the reference Linux machine, a two-page sample
-publication paginates in about 4-5 seconds and an 80 MiB request fixture with 44
-headings, 85 table rows, and 110 code lines paginates in about 23 seconds. These
-numbers are measurements, not guarantees.
+application archive. A two-page sample publication paginates in about 4-5
+seconds and an 80 MiB request fixture with 44 headings, 85 table rows, and 110
+code lines paginates in about 23 seconds on the reference Linux machine. Those
+figures predate the preview asset profile below and should be re-measured there.
+On the reference macOS workstation the two-page sample now paginates in about
+0.25 seconds and the preview shows the artifact about 0.55 seconds after the
+file is selected. These numbers are measurements, not guarantees.
+
+## Preview asset delivery and caching
+
+The desktop preview intentionally has a different asset profile from exports:
+
+- Export HTML and PDF embed theme fonts and images as data URLs so the output is
+  self-contained and offline-safe.
+- The preview and the isolated layout window reference the same bundled theme
+  files through the application-owned `mps-asset://theme/...` scheme. The scheme
+  is standard, secure, CORS-enabled, served by the main process from `themes/`
+  with containment checks, and cached immutably by Chromium.
+- Duplicate `@font-face` declarations are removed while composing theme CSS, and
+  the KaTeX stylesheet is only included when the compiled chapters contain
+  rendered math, so a two-page sample artifact is roughly 0.4 MiB instead of 96
+  MiB.
+- The artifact CSP allows the asset scheme for fonts and images in the preview
+  profile and keeps the self-contained policy for exports.
+
+Incremental work is cached by content, not by wall-clock time:
+
+- Prepared publications (compiled chapters, Mermaid SVG, theme and structure
+  CSS) are cached by source path, modification time, size, theme, page size,
+  style overrides, contents settings, and asset profile.
+- Paginated artifacts are cached by `paginationRevision`, which covers the
+  prepared HTML, engine and Electron versions, page size, folio settings, and
+  cover page counts.
+- A newer preview request aborts the build in flight, so superseded theme or
+  style changes stop holding layout windows.
+
+Theme fonts for a paginated artifact are never embedded, so the preview never
+parses tens of megabytes of base64 data per rebuild. Printer output still embeds
+every font it uses; Chromium resolves the embedded data URLs during printing.
 
 ## Fragmentation and content integrity
 

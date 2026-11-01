@@ -7,6 +7,20 @@ import type {
   PaginationProgramOptions,
 } from '@markdown-publication/shared';
 
+/**
+ * Screen sheet size in CSS pixels. This mirrors the A4/Letter definitions in
+ * `@markdown-publication/shared`, but the program must not import values from
+ * that package: its module graph reaches schemas that call `eval`, and the
+ * artifact CSP (`default-src 'none'`) forbids evaluating page scripts.
+ */
+const PAGE_SHEET_PX: Record<string, { width: number; height: number }> = {
+  A4: {
+    width: Math.round((210 / 25.4) * 96),
+    height: Math.round((297 / 25.4) * 96),
+  },
+  Letter: { width: 816, height: 1056 },
+};
+
 declare global {
   interface Window {
     /** Lay out the loaded publication into fixed page boxes. */
@@ -316,6 +330,20 @@ function applyProgram(options: PaginationApplyOptions): PaginationApplyReport {
   document.documentElement.dataset.publicationPageCount = String(pages.length);
 
   const overflow = collectOverflow(pages);
+
+  // Let the viewer skip layout and paint for pages outside the viewport. This
+  // is screen-only: printing must lay out every page, and the measurements
+  // above already ran before the rule exists.
+  const sheet = PAGE_SHEET_PX[options.pageSize];
+  if (sheet) {
+    const visibility = document.createElement('style');
+    visibility.dataset.publicationVisibility = 'true';
+    visibility.textContent = `@media screen {
+      .pagedjs_page { content-visibility: auto; contain-intrinsic-size: ${sheet.width}px ${sheet.height}px; }
+    }`;
+    document.head.append(visibility);
+  }
+
   const html = `<!doctype html>\n${document.documentElement.outerHTML}`;
   return {
     html,

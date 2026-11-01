@@ -18,6 +18,18 @@ function escapeAttribute(value: string): string {
     .replaceAll('<', '&lt;');
 }
 
+/**
+ * KaTeX ships about 1.5 MB of embedded font data. Only pay for it when the
+ * compiled chapters actually contain rendered math.
+ */
+function containsRenderedMath(chapters: readonly CompiledChapter[]): boolean {
+  return chapters.some(
+    (chapter) =>
+      chapter.html.includes('<span class="katex') ||
+      chapter.html.includes('<span class="katex-display'),
+  );
+}
+
 export function renderPublicationHtml(
   chapters: CompiledChapter[],
   options: PublicationHtmlOptions,
@@ -25,7 +37,12 @@ export function renderPublicationHtml(
   const margins = { ...defaultMargins, ...options.margins };
   const diagnostics = chapters.flatMap((chapter) => chapter.diagnostics);
   const mathStylesheet =
-    options.features?.math?.enabled === false ? '' : getKatexStylesheet();
+    options.features?.math?.enabled === false || !containsRenderedMath(chapters)
+      ? ''
+      : getKatexStylesheet();
+  const assetOrigin = options.assetOrigin
+    ? ` ${escapeAttribute(options.assetOrigin)}`
+    : '';
   const styleOverrides = renderStyleOverrides(options.styleOverrides);
   const pageBackground =
     options.pageCanvasMode === 'full-bleed'
@@ -47,7 +64,7 @@ export function renderPublicationHtml(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="publication-render-ready" content="false">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:${assetOrigin}; style-src 'unsafe-inline'; font-src data:${assetOrigin};">
     <title>${escapeAttribute(options.title)}</title>
     <style>
       :root {

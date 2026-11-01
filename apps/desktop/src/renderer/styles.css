@@ -667,6 +667,31 @@ button svg {
 .workspace[data-appearance='dark'] .canvas-busy-overlay {
   background: rgb(0 0 0 / 38%);
 }
+/* Opaque cover shown between a finished build and the first painted frame. */
+.canvas-pending-overlay {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 14;
+  display: flex;
+  overflow: hidden;
+  background: var(--canvas);
+  animation: canvas-pending-in 140ms ease-out;
+}
+.canvas-pending-overlay > * {
+  width: 100%;
+  min-height: 100%;
+}
+@keyframes canvas-pending-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .canvas-busy-card {
   display: flex;
   flex-direction: column;
@@ -1487,7 +1512,8 @@ button svg {
     animation: none;
   }
   .canvas-busy-overlay,
-  .canvas-busy-card {
+  .canvas-busy-card,
+  .canvas-pending-overlay {
     animation: none !important;
   }
   .canvas-spinner-ring .spinner-arc,

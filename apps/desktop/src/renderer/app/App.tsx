@@ -61,12 +61,35 @@ function hasStyleOverrides(style: PublicationStyleOverrides): boolean {
   );
 }
 
+/** Everything that can change the requested artifact, in a stable order. */
+function previewRequestKey(
+  path: string,
+  theme: ThemeId,
+  pageSize: PageSizeId,
+  style: PublicationStyleOverrides,
+  toc: TocSettings,
+  pageNumber: PageNumberSettings,
+  pageLayout: PageLayoutSettings,
+): string {
+  return JSON.stringify([
+    path,
+    theme,
+    pageSize,
+    style,
+    toc,
+    pageNumber,
+    pageLayout,
+  ]);
+}
+
 export function App(): React.JSX.Element {
   const [source, setSource] = useState<{ path: string; name: string } | null>(
     null,
   );
   const [title, setTitle] = useState('No publication loaded');
   const [html, setHtml] = useState('');
+  const htmlRef = useRef(html);
+  htmlRef.current = html;
   const [diagnostics, setDiagnostics] = useState<PublicationDiagnostic[]>([]);
   const [themeId, setThemeId] = useState<ThemeId>('rose');
   const [pageSize, setPageSize] = useState<PageSizeId>(DEFAULT_PAGE_SIZE);
@@ -236,7 +259,7 @@ export function App(): React.JSX.Element {
   ): Promise<void> {
     const selectedPageNumber = overrides.pageNumber ?? pageNumberRef.current;
     const selectedPageLayout = overrides.pageLayout ?? pageLayoutRef.current;
-    previewRequestRef.current = JSON.stringify([
+    const requestKey = previewRequestKey(
       path,
       selectedTheme,
       selectedPageSize,
@@ -244,7 +267,11 @@ export function App(): React.JSX.Element {
       selectedToc,
       selectedPageNumber,
       selectedPageLayout,
-    ]);
+    );
+    // Several effects can ask for the same artifact. Skip requests that match
+    // the build already in flight or the one that just completed.
+    if (requestKey === previewRequestRef.current) return;
+    previewRequestRef.current = requestKey;
     const sequence = ++previewSequenceRef.current;
     setBusy(true);
     setPreviewReady(false);
@@ -262,13 +289,21 @@ export function App(): React.JSX.Element {
       });
       if (sequence !== previewSequenceRef.current) return;
       setTitle(result.title);
+      // Identical artifacts do not reload the sandboxed document, so the frame
+      // will not report another paint. The displayed preview is already final.
+      const unchanged = result.html === htmlRef.current;
       setHtml(result.html);
       setDiagnostics(result.diagnostics);
       setPagination(result.pagination ?? null);
       setPreviewFailed(false);
-      setStatus('Preview ready.');
+      if (unchanged) {
+        setPreviewReady(true);
+        setStatus('Preview ready.');
+      }
     } catch (error) {
       if (sequence !== previewSequenceRef.current) return;
+      // Allow the same request to retry after a failure.
+      previewRequestRef.current = '';
       const message =
         error instanceof Error ? error.message : 'Preview failed.';
       setStatus(message);
@@ -290,6 +325,9 @@ export function App(): React.JSX.Element {
   const onMcpPreviewReady = useCallback(() => {
     setPreviewReady(true);
     setPreviewFailed(false);
+    // The build can finish before the sandboxed document has painted. Report
+    // readiness from the frame so status, MCP snapshots, and the skeleton agree.
+    setStatus('Preview ready.');
   }, []);
   const onPreviewViewMetrics = useCallback(
     (metrics: {
@@ -391,6 +429,7 @@ export function App(): React.JSX.Element {
               );
             }
           } else if (command.operation === 'document') {
+            previewRequestRef.current = '';
             if (command.sourcePath) {
               if (command.discardChanges) dispatchStyle({ type: 'discard' });
               const documentStyle = command.discardChanges
@@ -524,7 +563,15 @@ export function App(): React.JSX.Element {
       return undefined;
     if (
       previewRequestRef.current ===
-      JSON.stringify([source.path, themeId, pageSize, styleDraft, toc])
+      previewRequestKey(
+        source.path,
+        themeId,
+        pageSize,
+        styleDraft,
+        toc,
+        pageNumberRef.current,
+        pageLayoutRef.current,
+      )
     )
       return undefined;
     const timer = window.setTimeout(() => {
@@ -715,6 +762,9 @@ export function App(): React.JSX.Element {
 
   async function openMarkdown(): Promise<void> {
     if (busy || styleSaving || !settingsReady) return;
+    // Reopening the same file must rebuild even when the previous request key
+    // matches, because the preview content was cleared in between.
+    previewRequestRef.current = '';
     setBusy(true);
     setStatus('Opening Markdown file…');
     console.info('[open-file] Open Markdown requested.');
@@ -763,6 +813,7 @@ export function App(): React.JSX.Element {
 
   async function openDroppedMarkdown(file: File): Promise<void> {
     if (busy || styleSaving || !settingsReady) return;
+    previewRequestRef.current = '';
     setBusy(true);
     setStatus('Opening dropped Markdown file…');
     console.info('[open-file] Dropped Markdown requested.', {
@@ -815,6 +866,7 @@ export function App(): React.JSX.Element {
     }
     const closed = source;
     previewSequenceRef.current += 1;
+    previewRequestRef.current = '';
     setBusy(false);
     setSource(null);
     setTitle('No publication loaded');
@@ -1090,6 +1142,7 @@ export function App(): React.JSX.Element {
           onDrop={(file) => void openDroppedMarkdown(file)}
           onDropError={setStatus}
           onPreviewReady={onMcpPreviewReady}
+          failed={previewFailed}
           onViewMetrics={onPreviewViewMetrics}
           onViewRequestResult={onPreviewViewRequestResult}
           scrollRequest={previewScrollRequest}

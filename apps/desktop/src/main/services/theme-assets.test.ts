@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { inlineLocalAssets } from './theme-assets.js';
+import {
+  dedupeFontFaces,
+  inlineLocalAssets,
+  rewriteLocalAssets,
+} from './theme-assets.js';
 
 let fixtureRoot: string | undefined;
 
@@ -64,5 +68,34 @@ describe('Theme asset inlining', () => {
         root,
       ),
     ).rejects.toThrow('escapes the built-in theme directory');
+  });
+
+  it('keeps theme assets as URLs for the preview profile', async () => {
+    const { cssPath, root } = await createThemeFixture();
+    const stylesheet = await rewriteLocalAssets(
+      ':root { font: url("../fonts/test.ttf"); background: url(../images/paper.svg); }',
+      cssPath,
+      root,
+      'asset-url',
+    );
+
+    expect(stylesheet).toContain('url("mps-asset://theme/fonts/test.ttf")');
+    expect(stylesheet).toContain('url("mps-asset://theme/images/paper.svg")');
+    expect(stylesheet).not.toContain('base64');
+  });
+
+  it('drops repeated font declarations from composed stylesheets', () => {
+    const css = [
+      "@font-face { font-family: 'Inter'; src: url('../fonts/inter.ttf'); font-weight: normal; }",
+      "@font-face { font-family: 'Inter'; src: url('../fonts/inter.ttf'); font-weight: 400; }",
+      "@font-face { font-family: 'Inter'; src: url('../fonts/inter-bold.ttf'); font-weight: bold; }",
+      '.body { color: red; }',
+    ].join('\n');
+
+    const deduped = dedupeFontFaces(css);
+
+    expect(deduped.match(/@font-face/gu)).toHaveLength(2);
+    expect(deduped).toContain('inter-bold.ttf');
+    expect(deduped).toContain('.body { color: red; }');
   });
 });

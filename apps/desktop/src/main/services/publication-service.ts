@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -45,10 +45,29 @@ interface PublicationBuildOptions {
   frontCoverPages?: number;
   backCoverPages?: number;
   signal?: AbortSignal;
+  /**
+   * `inline` keeps exports self-contained. `asset-url` leaves theme assets on
+   * the application scheme so the desktop preview never transfers font
+   * binaries through IPC or re-parses them for every build.
+   */
+  assets?: 'inline' | 'asset-url';
 }
 
 interface BuiltPublication extends PreviewResult {
   paginated: boolean;
+}
+
+/** The compiled and Mermaid-rendered publication before pagination. */
+interface PreparedPublication {
+  title: string;
+  html: string;
+  diagnostics: PreviewResult['diagnostics'];
+}
+
+const PREPARED_CACHE_LIMIT = 4;
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new Error('Publication build was cancelled.');
 }
 
 function logAssetDiagnostics(
@@ -110,6 +129,18 @@ async function countCoverPages(covers: PdfAssemblyCovers): Promise<{
 export class PublicationService {
   private readonly compilerPromise = createMarkdownCompiler();
 
+  /**
+   * Theme, style, and contents changes re-run compilation from scratch today,
+   * which is the slowest part of a rebuild after assets are served by URL.
+   * Keep a small cache of prepared publications keyed by the source revision
+   * and the options that affect compilation. Pagination caches separately by
+   * artifact revision, so folio and page-size changes still rebuild pages.
+   */
+  private readonly preparedCache = new Map<
+    string,
+    Promise<PreparedPublication>
+  >();
+
   constructor(
     private readonly printBackend: PrintBackend,
     private readonly mermaidRenderer: MermaidRenderer,
@@ -158,6 +189,105 @@ export class PublicationService {
     tocSettings: TocSettings,
     options: PublicationBuildOptions = {},
   ): Promise<BuiltPublication> {
+    const pageLayout = this.resolvePageLayout(options.pageLayout);
+    const paginate = pageLayout.enabled && this.layoutService !== undefined;
+    const prepared = await this.preparePublication(
+      sourcePath,
+      themeId,
+      pageSize,
+      styleOverrides,
+      tocSettings,
+      { paginate, assets: options.assets ?? 'inline' },
+    );
+    throwIfAborted(options.signal);
+    const diagnostics = [...prepared.diagnostics];
+    if (paginate && this.layoutService) {
+      this.throwOnFatalDiagnostics(diagnostics);
+      const paginated = await this.layoutService.layout({
+        html: prepared.html,
+        themeId,
+        pageSize,
+        pageNumber: options.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS,
+        restartBodyAfterToc: pageLayout.restartBodyAfterToc,
+        tocEnabled: tocSettings.enabled,
+        frontCoverPages: options.frontCoverPages ?? 0,
+        backCoverPages: options.backCoverPages ?? 0,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+      diagnostics.push(...paginated.diagnostics);
+      this.throwOnFatalDiagnostics(diagnostics);
+      const pagination: PaginationSummary = {
+        ...paginated.plan,
+        revision: paginated.revision,
+      };
+      return {
+        title: prepared.title,
+        html: paginated.html,
+        diagnostics,
+        pagination,
+        paginated: true,
+      };
+    }
+    return {
+      title: prepared.title,
+      html: prepared.html,
+      diagnostics,
+      paginated: false,
+    };
+  }
+
+  private async preparePublication(
+    sourcePath: string,
+    themeId: ThemeId,
+    pageSize: PageSizeId,
+    styleOverrides: PublicationStyleOverrides,
+    tocSettings: TocSettings,
+    options: { paginate: boolean; assets: 'inline' | 'asset-url' },
+  ): Promise<PreparedPublication> {
+    const sourceStat = await stat(sourcePath).catch(() => undefined);
+    const cacheKey = JSON.stringify([
+      sourcePath,
+      sourceStat?.mtimeMs ?? 0,
+      sourceStat?.size ?? 0,
+      themeId,
+      pageSize,
+      styleOverrides,
+      tocSettings,
+      options.paginate,
+      options.assets,
+    ]);
+    const cached = this.preparedCache.get(cacheKey);
+    if (cached) return cached;
+
+    const loading = this.preparePublicationUncached(
+      sourcePath,
+      themeId,
+      pageSize,
+      styleOverrides,
+      tocSettings,
+      options,
+    );
+    this.preparedCache.set(cacheKey, loading);
+    loading.catch(() => {
+      if (this.preparedCache.get(cacheKey) === loading) {
+        this.preparedCache.delete(cacheKey);
+      }
+    });
+    if (this.preparedCache.size > PREPARED_CACHE_LIMIT) {
+      const oldest = this.preparedCache.keys().next().value;
+      if (oldest !== undefined) this.preparedCache.delete(oldest);
+    }
+    return loading;
+  }
+
+  private async preparePublicationUncached(
+    sourcePath: string,
+    themeId: ThemeId,
+    pageSize: PageSizeId,
+    styleOverrides: PublicationStyleOverrides,
+    tocSettings: TocSettings,
+    options: { paginate: boolean; assets: 'inline' | 'asset-url' },
+  ): Promise<PreparedPublication> {
     if (isRenderingDebugEnabled) {
       appLogger.debug('[math-render] KaTeX stylesheet asset summary', {
         report: JSON.stringify(getKatexFontAssetSummary()),
@@ -173,14 +303,12 @@ export class PublicationService {
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
     const tocEntries = tocSettings.enabled ? chapter.tocEntries : [];
-    const pageLayout = this.resolvePageLayout(options.pageLayout);
-    const paginate = pageLayout.enabled && this.layoutService !== undefined;
     const tocOptions =
       tocEntries.length > 0
         ? {
             preset: tocSettings.preset,
             entries: tocEntries,
-            ...(paginate ? { pageReferences: true } : {}),
+            ...(options.paginate ? { pageReferences: true } : {}),
           }
         : undefined;
     const rendered = renderPublicationHtml([chapter], {
@@ -194,7 +322,10 @@ export class PublicationService {
         mermaid: { enabled: true },
         html: { policy: 'safe-static' },
       },
-      stylesheet: await loadThemeStylesheet(themeId, styleOverrides),
+      stylesheet: await loadThemeStylesheet(themeId, styleOverrides, {
+        assets: options.assets,
+      }),
+      ...(options.assets === 'asset-url' ? { assetOrigin: 'mps-asset:' } : {}),
       styleOverrides,
       ...(tocOptions ? { toc: tocOptions } : {}),
     });
@@ -214,39 +345,7 @@ export class PublicationService {
         feature: 'toc',
       });
     }
-    if (paginate && this.layoutService) {
-      this.throwOnFatalDiagnostics(diagnostics);
-      const paginated = await this.layoutService.layout({
-        html: mermaid.html,
-        themeId,
-        pageSize,
-        pageNumber: options.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS,
-        restartBodyAfterToc: pageLayout.restartBodyAfterToc,
-        tocEnabled: tocSettings.enabled,
-        frontCoverPages: options.frontCoverPages ?? 0,
-        backCoverPages: options.backCoverPages ?? 0,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-      diagnostics.push(...paginated.diagnostics);
-      this.throwOnFatalDiagnostics(diagnostics);
-      const pagination: PaginationSummary = {
-        ...paginated.plan,
-        revision: paginated.revision,
-      };
-      return {
-        title: chapter.title,
-        html: paginated.html,
-        diagnostics,
-        pagination,
-        paginated: true,
-      };
-    }
-    return {
-      title: chapter.title,
-      html: mermaid.html,
-      diagnostics,
-      paginated: false,
-    };
+    return { title: chapter.title, html: mermaid.html, diagnostics };
   }
 
   async exportPdf(

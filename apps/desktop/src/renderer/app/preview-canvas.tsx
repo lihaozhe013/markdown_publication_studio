@@ -27,6 +27,7 @@ interface Props {
   busy: boolean;
   status?: string | undefined;
   ready: boolean;
+  failed?: boolean;
   onZoomResolved(zoom: number): void;
   onProbe(diagnostics: PublicationDiagnostic[]): void;
   onOpen(): void;
@@ -61,7 +62,12 @@ export function PreviewCanvas(props: Props): ReactElement {
   );
   const [dropActive, setDropActive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  // The iframe paints a blank document between `srcDoc` changes and its first
+  // frame. Track which artifact has painted so the skeleton can stay up until
+  // real content is visible instead of leaving an empty sheet on screen.
+  const [paintedHtml, setPaintedHtml] = useState<string | null>(null);
   const dragDepth = useRef(0);
+  const scrollFrame = useRef(0);
   const width = paperWidth(props.pageSize);
   const zoom = resolveZoom(props.zoomMode, availableWidth, width);
   const zoomRef = useRef(zoom);
@@ -112,6 +118,18 @@ export function PreviewCanvas(props: Props): ReactElement {
     };
   }, []);
   useEffect(() => props.onZoomResolved(zoom), [zoom, props.onZoomResolved]);
+  useEffect(() => {
+    setPaintedHtml(null);
+  }, [props.html]);
+  useEffect(
+    () => () => {
+      if (scrollFrame.current) {
+        window.cancelAnimationFrame(scrollFrame.current);
+        scrollFrame.current = 0;
+      }
+    },
+    [],
+  );
   useEffect(() => {
     const element = canvas.current;
     if (!element || !props.scrollRequest) return;
@@ -199,8 +217,10 @@ export function PreviewCanvas(props: Props): ReactElement {
         !disposed &&
         loadedHtml === latestHtml.current &&
         iframe.contentDocument === document
-      )
+      ) {
+        setPaintedHtml(loadedHtml);
         readyCallback.current();
+      }
     };
     const observer = new previewWindow.ResizeObserver(measure);
     observer.observe(document.body);
@@ -228,18 +248,27 @@ export function PreviewCanvas(props: Props): ReactElement {
     measure();
     void document.fonts.ready.then(measure);
     void reportReady();
-    void probePreviewRendering(iframe)
-      .then((diagnostics) => {
-        if (
-          !disposed &&
-          loadedHtml === latestHtml.current &&
-          iframe.contentDocument === document
-        )
-          probeCallback.current(diagnostics);
-      })
-      .catch(() => {
-        /* Preview compilation diagnostics remain available if probing fails. */
-      });
+    // Probing reads the full stylesheet and computed styles. Run it after the
+    // first paint so it never competes with showing the document.
+    const runProbe = (): void => {
+      void probePreviewRendering(iframe)
+        .then((diagnostics) => {
+          if (
+            !disposed &&
+            loadedHtml === latestHtml.current &&
+            iframe.contentDocument === document
+          )
+            probeCallback.current(diagnostics);
+        })
+        .catch(() => {
+          /* Preview compilation diagnostics remain available if probing fails. */
+        });
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(runProbe, { timeout: 2_000 });
+    } else {
+      window.setTimeout(runProbe, 200);
+    }
     cleanup.current = () => {
       disposed = true;
       window.cancelAnimationFrame(scheduled);
@@ -265,6 +294,23 @@ export function PreviewCanvas(props: Props): ReactElement {
     lastViewMetrics.current = key;
     viewCallback.current(metrics);
   }
+
+  // Scroll events fire per frame at most, but React state updates and metrics
+  // serialization should still be coalesced to one animation frame.
+  function scheduleScrollUpdate(): void {
+    if (scrollFrame.current) return;
+    scrollFrame.current = window.requestAnimationFrame(() => {
+      scrollFrame.current = 0;
+      reportViewMetrics();
+      syncCurrentPage(canvas.current?.scrollTop ?? 0);
+    });
+  }
+  const showPendingSheet =
+    !props.busy &&
+    Boolean(props.html) &&
+    props.sourceLoaded &&
+    !props.failed &&
+    paintedHtml !== props.html;
   return (
     <section className="preview-shell" aria-label="Publication preview canvas">
       <div className="canvas-caption">
@@ -305,8 +351,7 @@ export function PreviewCanvas(props: Props): ReactElement {
         ref={canvas}
         className={`preview-canvas${dropActive ? ' is-dragging' : ''}`}
         onScroll={() => {
-          reportViewMetrics();
-          syncCurrentPage(canvas.current?.scrollTop ?? 0);
+          scheduleScrollUpdate();
         }}
         onDragEnter={(event) => {
           event.preventDefault();
@@ -392,6 +437,21 @@ export function PreviewCanvas(props: Props): ReactElement {
       </div>
       {props.busy && props.html ? (
         <CanvasBusyOverlay status={props.status} />
+      ) : null}
+      {showPendingSheet ? (
+        <div
+          className="canvas-pending-overlay"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <DocumentLoadingSheet
+            pageSize={props.pageSize}
+            status={props.status}
+            zoom={zoom}
+            availableWidth={availableWidth}
+          />
+        </div>
       ) : null}
     </section>
   );

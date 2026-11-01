@@ -7,7 +7,12 @@ import type {
   ThemeId,
 } from '@markdown-publication/shared';
 import { collectStyleOverrideFontIds } from '@markdown-publication/publication-core';
-import { inlineLocalAssets } from './theme-assets.js';
+import {
+  dedupeFontFaces,
+  rewriteLocalAssets,
+  type ThemeAssetCache,
+  type ThemeAssetMode,
+} from './theme-assets.js';
 
 const themeStylesheets: Record<ThemeId, readonly string[]> = {
   rose: ['github.css', 'rose.css'],
@@ -42,8 +47,18 @@ const themeStylesheets: Record<ThemeId, readonly string[]> = {
   ],
 };
 
-const stylesheetCache = new Map<ThemeId, Promise<string>>();
-const customFontStylesheetCache = new Map<string, Promise<string>>();
+const rawStylesheetCache = new Map<ThemeId, Promise<string>>();
+const rawCustomFontStylesheetCache = new Map<string, Promise<string>>();
+const stylesheetCache = new Map<string, Promise<string>>();
+
+export interface LoadThemeStylesheetOptions {
+  /**
+   * `inline` produces self-contained CSS for export and printing. `asset-url`
+   * keeps theme assets on the application scheme so the desktop preview never
+   * ships font binaries through IPC or re-parses them on every build.
+   */
+  assets?: ThemeAssetMode;
+}
 
 interface FontFaceDefinition {
   familyName: string;
@@ -162,70 +177,82 @@ const customFontFaces: Record<
   ],
 };
 
-function themeRoot(): string {
+export function themeRoot(): string {
   return resolve(app.getAppPath(), 'themes');
 }
 
-export async function loadThemeStylesheet(
+export function loadThemeStylesheet(
   themeId: ThemeId,
   styleOverrides?: PublicationStyleOverrides,
+  options: LoadThemeStylesheetOptions = {},
 ): Promise<string> {
-  const cached = stylesheetCache.get(themeId);
-  const baseStylesheet = cached ?? loadAndCacheThemeStylesheet(themeId);
+  const mode = options.assets ?? 'inline';
   const fontIds = collectStyleOverrideFontIds(styleOverrides);
-  if (fontIds.length === 0) return baseStylesheet;
+  const cacheKey = `${mode}:${themeId}:${[...fontIds].sort().join(',')}`;
+  const cached = stylesheetCache.get(cacheKey);
+  if (cached) return cached;
 
-  const customFonts = await loadCustomFontStylesheet(fontIds);
-  return `${await baseStylesheet}\n${customFonts}`;
-}
-
-function loadAndCacheThemeStylesheet(themeId: ThemeId): Promise<string> {
-  const loading = loadThemeStylesheetUncached(themeId);
-  stylesheetCache.set(themeId, loading);
+  const loading = loadThemeStylesheetUncached(themeId, fontIds, mode);
+  stylesheetCache.set(cacheKey, loading);
   loading.catch(() => {
-    stylesheetCache.delete(themeId);
+    stylesheetCache.delete(cacheKey);
   });
   return loading;
 }
 
-async function loadThemeStylesheetUncached(themeId: ThemeId): Promise<string> {
-  const root = themeRoot();
-  const cssDirectory = resolve(root, 'css');
-  const files = themeStylesheets[themeId];
-  const stylesheets = await Promise.all(
-    files.map(async (fileName) => {
-      const cssPath = resolve(cssDirectory, fileName);
-      const css = await readFile(cssPath, 'utf8');
-      return inlineLocalAssets(css, cssPath, root);
-    }),
+async function loadThemeStylesheetUncached(
+  themeId: ThemeId,
+  fontIds: readonly PublicationFontId[],
+  mode: ThemeAssetMode,
+): Promise<string> {
+  const [baseStylesheet, customFonts] = await Promise.all([
+    loadRawThemeStylesheet(themeId),
+    fontIds.length > 0 ? loadRawCustomFontStylesheet(fontIds) : '',
+  ]);
+  const combined = dedupeFontFaces(
+    customFonts ? `${baseStylesheet}\n${customFonts}` : baseStylesheet,
   );
-  return stylesheets.join('\n');
+  const cssDirectory = resolve(themeRoot(), 'css');
+  return rewriteLocalAssets(
+    combined,
+    resolve(cssDirectory, 'theme.css'),
+    themeRoot(),
+    mode,
+    new Map<string, Promise<string>>() satisfies ThemeAssetCache,
+  );
 }
 
-async function loadCustomFontStylesheet(
+/** Read the theme stylesheets without resolving their asset references. */
+function loadRawThemeStylesheet(themeId: ThemeId): Promise<string> {
+  const cached = rawStylesheetCache.get(themeId);
+  if (cached) return cached;
+  const loading = (async () => {
+    const cssDirectory = resolve(themeRoot(), 'css');
+    const stylesheets = await Promise.all(
+      themeStylesheets[themeId].map((fileName) =>
+        readFile(resolve(cssDirectory, fileName), 'utf8'),
+      ),
+    );
+    return stylesheets.join('\n');
+  })();
+  rawStylesheetCache.set(themeId, loading);
+  loading.catch(() => {
+    rawStylesheetCache.delete(themeId);
+  });
+  return loading;
+}
+
+function loadRawCustomFontStylesheet(
   fontIds: readonly PublicationFontId[],
 ): Promise<string> {
   const key = [...fontIds].sort().join(',');
-  const cached = customFontStylesheetCache.get(key);
+  const cached = rawCustomFontStylesheetCache.get(key);
   if (cached) return cached;
-
-  const loading = loadCustomFontStylesheetUncached(fontIds);
-  customFontStylesheetCache.set(key, loading);
-  loading.catch(() => {
-    customFontStylesheetCache.delete(key);
-  });
-  return loading;
-}
-
-async function loadCustomFontStylesheetUncached(
-  fontIds: readonly PublicationFontId[],
-): Promise<string> {
-  const root = themeRoot();
-  const cssPath = resolve(root, 'css/custom-fonts.css');
-  const css = fontIds
-    .flatMap((fontId) => customFontFaces[fontId])
-    .map(
-      ({ familyName, relativePath, weight, style }) => `
+  const loading = Promise.resolve(
+    fontIds
+      .flatMap((fontId) => customFontFaces[fontId])
+      .map(
+        ({ familyName, relativePath, weight, style }) => `
 @font-face {
   font-family: '${familyName}';
   src: url('${relativePath}') format('truetype');
@@ -233,7 +260,9 @@ async function loadCustomFontStylesheetUncached(
   font-style: ${style};
   font-display: swap;
 }`,
-    )
-    .join('\n');
-  return inlineLocalAssets(css, cssPath, root);
+      )
+      .join('\n'),
+  );
+  rawCustomFontStylesheetCache.set(key, loading);
+  return loading;
 }

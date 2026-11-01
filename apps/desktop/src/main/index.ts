@@ -52,10 +52,21 @@ import { runMcpServer } from './mcp-server.js';
 import { McpSessionClient } from './services/mcp-session-client.js';
 import { McpSessionHost } from './services/mcp-session-host.js';
 import {
+  isThemeAssetSchemeAvailable,
+  registerThemeAssetProtocol,
+  registerThemeAssetScheme,
+} from './services/theme-asset-protocol.js';
+import {
   copyMcpPrompt,
   getMcpConnectionSetup,
 } from './services/mcp-connection-service.js';
 import { McpPromptModeSchema } from '@markdown-publication/shared/mcp';
+
+// A standard, secure application scheme lets the preview and the isolated
+// layout window load bundled theme fonts by URL instead of embedding tens of
+// megabytes of base64 font data in every artifact. Privileges must be declared
+// before the application is ready.
+registerThemeAssetScheme();
 
 const mcpArgumentIndex = process.argv.indexOf('--mps-mcp');
 const mcpRequested = mcpArgumentIndex >= 0;
@@ -111,6 +122,7 @@ const approvedCoverAssets = new Map<string, CoverAssetFile>();
 let mainWindow: BrowserWindow | undefined;
 let mcpSessionHost: McpSessionHost | undefined;
 let applicationIsQuitting = false;
+let activePreviewBuild: AbortController | undefined;
 
 function resolveCoverAsset(reference: CoverAssetReference): CoverAssetFile {
   const asset = approvedCoverAssets.get(reference.id);
@@ -395,17 +407,28 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    return publicationService.buildPreview(
-      request.sourcePath,
-      request.themeId,
-      request.pageSize,
-      request.styleOverrides,
-      request.toc,
-      {
-        pageNumber: request.pageNumber,
-        pageLayout: request.pageLayout,
-      },
-    );
+    // Only the newest preview matters; stop superseded builds so they no longer
+    // hold layout windows or compete for the CPU.
+    activePreviewBuild?.abort();
+    const controller = new AbortController();
+    activePreviewBuild = controller;
+    try {
+      return await publicationService.buildPreview(
+        request.sourcePath,
+        request.themeId,
+        request.pageSize,
+        request.styleOverrides,
+        request.toc,
+        {
+          pageNumber: request.pageNumber,
+          pageLayout: request.pageLayout,
+          assets: isThemeAssetSchemeAvailable() ? 'asset-url' : 'inline',
+          signal: controller.signal,
+        },
+      );
+    } finally {
+      if (activePreviewBuild === controller) activePreviewBuild = undefined;
+    }
   });
 
   ipcMain.handle('export:start', async (_event, rawRequest: unknown) => {
@@ -485,6 +508,8 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(async () => {
+  registerThemeAssetProtocol();
+
   if (cliWorkerRequested) {
     if (!cliWorkerRequestPath) {
       app.exit(2);

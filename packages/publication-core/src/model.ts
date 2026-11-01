@@ -64,6 +64,12 @@ export interface PublicationHtmlOptions {
   title: string;
   themeId?: ThemeId;
   pageCanvasMode?: ThemePageCanvasMode;
+  /**
+   * Scheme that serves theme assets when the stylesheet references files by
+   * URL instead of embedding them. Preview documents allow it for fonts and
+   * images; self-contained exports leave it unset.
+   */
+  assetOrigin?: string;
   stylesheet?: string;
   styleOverrides?: PublicationStyleOverrides;
   features?: PublicationFeatureOptions;

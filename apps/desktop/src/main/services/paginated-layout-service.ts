@@ -56,6 +56,12 @@ interface LayoutPassResult {
 }
 
 const MAX_CONVERGENCE_PASSES = 3;
+const LAYOUT_CACHE_LIMIT = 6;
+
+interface LayoutSession {
+  window?: BrowserWindow;
+  url: string;
+}
 
 /**
  * Wait for fonts and images without hanging on hidden-window decode work.
@@ -152,6 +158,13 @@ export class PaginatedLayoutService {
 
   private readonly programBundlePath: string;
 
+  /**
+   * Paginated artifacts are revision-bound, deterministic, and small once theme
+   * assets are served by URL. Reusing one makes switching back to a previous
+   * theme or re-exporting an unchanged publication immediate.
+   */
+  private readonly artifactCache = new Map<string, PaginatedLayoutResult>();
+
   private engineVersionPromise?: Promise<string>;
 
   private async readBundle(
@@ -187,55 +200,96 @@ export class PaginatedLayoutService {
   async layout(
     request: PaginatedLayoutRequest,
   ): Promise<PaginatedLayoutResult> {
-    const diagnostics: PublicationDiagnostic[] = [];
+    const engineVersion = await this.engineVersion();
+    const revision = paginationRevision(request.html, {
+      themeId: request.themeId,
+      pageSize: request.pageSize,
+      pageNumber: request.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS,
+      restartBodyAfterToc: request.restartBodyAfterToc ?? false,
+      frontCoverPages: request.frontCoverPages ?? 0,
+      backCoverPages: request.backCoverPages ?? 0,
+      engineVersion,
+      electronVersion: process.versions.electron ?? 'unknown',
+    });
+    const cached = this.artifactCache.get(revision);
+    if (cached) {
+      appLogger.info('[layout] Reusing paginated artifact', {
+        revision: revision.slice(0, 12),
+        pages: cached.plan.pages.length,
+      });
+      return { ...cached, diagnostics: [...cached.diagnostics] };
+    }
+
     const engine = await this.readBundle(this.engineBundlePath, 'engine');
     const program = await this.readBundle(this.programBundlePath, 'program');
-    const engineVersion = await this.engineVersion();
+
+    const diagnostics: PublicationDiagnostic[] = [];
     let prefillLabels: Record<string, string> = {};
     const seenLabels = new Set<string>();
+    const directory = await mkdtemp(join(tmpdir(), 'mps-layout-'));
+    const htmlPath = join(directory, 'publication.html');
+    const session: LayoutSession = {
+      url: pathToFileURL(htmlPath).toString(),
+    };
 
-    for (let pass = 1; pass <= MAX_CONVERGENCE_PASSES; pass += 1) {
-      throwIfAborted(request.signal);
-      const result = await this.runPass(
-        request,
-        engine,
-        program,
-        prefillLabels,
-        diagnostics,
-      );
-      assertPaginationPlanMatches(result.plan, result.report.pageCount);
-      if (result.applied.geometryStable) {
-        return {
-          html: result.applied.html,
-          plan: result.plan,
-          revision: paginationRevision(request.html, {
-            themeId: request.themeId,
-            pageSize: request.pageSize,
-            pageNumber: request.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS,
-            restartBodyAfterToc: request.restartBodyAfterToc ?? false,
-            frontCoverPages: request.frontCoverPages ?? 0,
-            backCoverPages: request.backCoverPages ?? 0,
-            engineVersion,
-            electronVersion: process.versions.electron ?? 'unknown',
-          }),
+    try {
+      await writeFile(htmlPath, request.html, 'utf8');
+      for (let pass = 1; pass <= MAX_CONVERGENCE_PASSES; pass += 1) {
+        throwIfAborted(request.signal);
+        const result = await this.runPass(
+          request,
+          engine,
+          program,
+          prefillLabels,
           diagnostics,
-        };
-      }
-      const signature = JSON.stringify(result.labels);
-      if (seenLabels.has(signature)) {
-        throw new Error(
-          'Page references did not converge; the contents page kept changing size.',
+          session,
         );
+        assertPaginationPlanMatches(result.plan, result.report.pageCount);
+        if (result.applied.geometryStable) {
+          const output: PaginatedLayoutResult = {
+            html: result.applied.html,
+            plan: result.plan,
+            revision,
+            diagnostics,
+          };
+          this.rememberArtifact(revision, output);
+          return output;
+        }
+        const signature = JSON.stringify(result.labels);
+        if (seenLabels.has(signature)) {
+          throw new Error(
+            'Page references did not converge; the contents page kept changing size.',
+          );
+        }
+        seenLabels.add(signature);
+        prefillLabels = result.labels;
+        appLogger.info('[layout] Reflowing to converge contents references', {
+          pass,
+        });
       }
-      seenLabels.add(signature);
-      prefillLabels = result.labels;
-      appLogger.info('[layout] Reflowing to converge contents references', {
-        pass,
-      });
+      throw new Error(
+        `Page references did not stabilize after ${MAX_CONVERGENCE_PASSES} layout passes.`,
+      );
+    } finally {
+      if (session.window && !session.window.isDestroyed()) {
+        session.window.destroy();
+      }
+      await rm(directory, { recursive: true, force: true }).catch(
+        () => undefined,
+      );
     }
-    throw new Error(
-      `Page references did not stabilize after ${MAX_CONVERGENCE_PASSES} layout passes.`,
-    );
+  }
+
+  private rememberArtifact(
+    revision: string,
+    artifact: PaginatedLayoutResult,
+  ): void {
+    this.artifactCache.set(revision, artifact);
+    while (this.artifactCache.size > LAYOUT_CACHE_LIMIT) {
+      const oldest = this.artifactCache.keys().next().value;
+      if (oldest === undefined) break;
+      this.artifactCache.delete(oldest);
+    }
   }
 
   private async runPass(
@@ -244,110 +298,110 @@ export class PaginatedLayoutService {
     program: string,
     prefillLabels: Record<string, string>,
     diagnostics: PublicationDiagnostic[],
+    session: LayoutSession,
   ): Promise<LayoutPassResult> {
-    const directory = await mkdtemp(join(tmpdir(), 'mps-layout-'));
-    const htmlPath = join(directory, 'publication.html');
-    let window: BrowserWindow | undefined;
+    const window = this.ensureWindow(session);
+    const abort = (): void => {
+      if (!window.isDestroyed()) window.destroy();
+    };
+    request.signal?.addEventListener('abort', abort, { once: true });
+    const evaluate = async (script: string, label: string): Promise<string> =>
+      withDeadline(
+        window.webContents.executeJavaScript(script, true),
+        label,
+        request.signal,
+      ).then((value) => String(value));
     try {
-      await writeFile(htmlPath, request.html, 'utf8');
-      window = this.createWindow();
-      const currentWindow = window;
-      const abort = (): void => {
-        if (!currentWindow.isDestroyed()) currentWindow.destroy();
-      };
-      request.signal?.addEventListener('abort', abort, { once: true });
-      const evaluate = async (script: string, label: string): Promise<string> =>
-        withDeadline(
-          currentWindow.webContents.executeJavaScript(script, true),
-          label,
-          request.signal,
-        ).then((value) => String(value));
-      try {
-        appLogger.info('[layout] Loading publication window');
-        await withDeadline(
-          currentWindow.loadURL(pathToFileURL(htmlPath).toString()),
-          'Publication layout load',
-          request.signal,
-        );
-        appLogger.info('[layout] Publication window loaded');
-        await evaluate(
-          PUBLICATION_READINESS_SCRIPT,
-          'Publication resource readiness',
-        );
-        appLogger.info('[layout] Resources ready');
-        // Layout windows may be hidden by the host application, which pauses
-        // animation frames. Fall back to timers so measurement keeps running.
-        await evaluate(
-          `new Promise((resolve) => {
-            let settled = false;
-            const timer = setTimeout(() => {
-              if (settled) return;
-              settled = true;
-              window.requestAnimationFrame = (callback) =>
-                setTimeout(() => callback(performance.now()), 16);
-              resolve('timer-fallback');
-            }, 250);
-            window.requestAnimationFrame(() => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timer);
-              resolve('animation-frame');
-            });
-          })`,
-          'Layout animation frames',
-        );
-        await evaluate(engine, 'Pagination engine startup');
-        appLogger.info('[layout] Engine ready');
-        await evaluate(program, 'Pagination program startup');
-        appLogger.info('[layout] Program ready');
-        const report = JSON.parse(
-          await evaluate(
-            `(async () => JSON.stringify(await window.__publicationPaginate(${JSON.stringify(this.programOptions(request, prefillLabels))})))()`,
-            'Publication pagination',
-          ),
-        ) as PaginationPassReport;
-        for (const item of report.diagnostics) {
-          diagnostics.push({
-            severity: item.severity,
-            code: item.code,
-            message: item.message,
-            feature: 'render',
-            ...(item.details ? { details: item.details } : {}),
-          });
-        }
-        appLogger.info('[layout] Layout pass finished', {
-          pages: report.pageCount,
-        });
-        const plan = this.createPlan(report, request, diagnostics);
-        const labels = this.resolveLabels(report, plan);
-        const applied = JSON.parse(
-          await evaluate(
-            `(async () => JSON.stringify(await window.__publicationApply(${JSON.stringify(this.applyOptions(request, plan, labels, report.geometry))})))()`,
-            'Publication artifact finalization',
-          ),
-        ) as PaginationApplyReport;
-        if (process.env.MPS_LAYOUT_DUMP_DIR) {
-          mkdirSync(process.env.MPS_LAYOUT_DUMP_DIR, { recursive: true });
-          const stamp = String(Date.now());
-          writeFileSync(
-            join(process.env.MPS_LAYOUT_DUMP_DIR, `report-${stamp}.json`),
-            JSON.stringify({ report, plan, labels }, null, 2),
-          );
-          writeFileSync(
-            join(process.env.MPS_LAYOUT_DUMP_DIR, `artifact-${stamp}.html`),
-            applied.html,
-          );
-        }
-        return { report, plan, labels, applied };
-      } finally {
-        request.signal?.removeEventListener('abort', abort);
-      }
-    } finally {
-      if (window && !window.isDestroyed()) window.destroy();
-      await rm(directory, { recursive: true, force: true }).catch(
-        () => undefined,
+      appLogger.info('[layout] Loading publication window');
+      await withDeadline(
+        window.loadURL(session.url),
+        'Publication layout load',
+        request.signal,
       );
+      appLogger.info('[layout] Publication window loaded');
+      await evaluate(
+        PUBLICATION_READINESS_SCRIPT,
+        'Publication resource readiness',
+      );
+      appLogger.info('[layout] Resources ready');
+      // Layout windows may be hidden by the host application, which pauses
+      // animation frames. Fall back to timers so measurement keeps running.
+      await evaluate(
+        `new Promise((resolve) => {
+          let settled = false;
+          const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            window.requestAnimationFrame = (callback) =>
+              setTimeout(() => callback(performance.now()), 16);
+            resolve('timer-fallback');
+          }, 250);
+          window.requestAnimationFrame(() => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve('animation-frame');
+          });
+        })`,
+        'Layout animation frames',
+      );
+      await evaluate(engine, 'Pagination engine startup');
+      appLogger.info('[layout] Engine ready');
+      await evaluate(program, 'Pagination program startup');
+      appLogger.info('[layout] Program ready');
+      const report = JSON.parse(
+        await evaluate(
+          `(async () => JSON.stringify(await window.__publicationPaginate(${JSON.stringify(this.programOptions(request, prefillLabels))})))()`,
+          'Publication pagination',
+        ),
+      ) as PaginationPassReport;
+      for (const item of report.diagnostics) {
+        diagnostics.push({
+          severity: item.severity,
+          code: item.code,
+          message: item.message,
+          feature: 'render',
+          ...(item.details ? { details: item.details } : {}),
+        });
+      }
+      appLogger.info('[layout] Layout pass finished', {
+        pages: report.pageCount,
+      });
+      const plan = this.createPlan(report, request, diagnostics);
+      const labels = this.resolveLabels(report, plan);
+      const applied = JSON.parse(
+        await evaluate(
+          `(async () => JSON.stringify(await window.__publicationApply(${JSON.stringify(this.applyOptions(request, plan, labels, report.geometry))})))()`,
+          'Publication artifact finalization',
+        ),
+      ) as PaginationApplyReport;
+      if (process.env.MPS_LAYOUT_DUMP_DIR) {
+        mkdirSync(process.env.MPS_LAYOUT_DUMP_DIR, { recursive: true });
+        const stamp = String(Date.now());
+        writeFileSync(
+          join(process.env.MPS_LAYOUT_DUMP_DIR, `report-${stamp}.json`),
+          JSON.stringify({ report, plan, labels }, null, 2),
+        );
+        writeFileSync(
+          join(process.env.MPS_LAYOUT_DUMP_DIR, `artifact-${stamp}.html`),
+          applied.html,
+        );
+      }
+      return { report, plan, labels, applied };
+    } finally {
+      request.signal?.removeEventListener('abort', abort);
     }
+  }
+
+  /**
+   * Convergence passes reload the same artifact file. Keep one hidden window
+   * for the whole layout call instead of paying window creation per pass.
+   */
+  private ensureWindow(session: LayoutSession): BrowserWindow {
+    if (session.window && !session.window.isDestroyed()) return session.window;
+    const window = this.createWindow();
+    session.window = window;
+    return window;
   }
 
   private createPlan(

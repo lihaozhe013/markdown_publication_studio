@@ -9,7 +9,8 @@ import {
   shell,
 } from 'electron';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -19,10 +20,13 @@ async function run() {
   // Exercise the built application and real preload/IPC/publishing services.
   // Native dialogs are substituted so the check remains unattended and isolated.
   const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const artifacts = await mkdtemp(join(tmpdir(), 'mps-workspace-'));
+  // The main bundle declares its privileged asset scheme at module load, which
+  // Electron only accepts before the application is ready. Keep everything
+  // above the import synchronous so the check exercises the real launch order.
+  const artifacts = mkdtempSync(join(tmpdir(), 'mps-workspace-'));
   for (const name of ['appData', 'userData', 'sessionData', 'logs']) {
     const directory = join(artifacts, name);
-    await mkdir(directory);
+    mkdirSync(directory);
     app.setPath(name, directory);
   }
   app.getAppPath = () => repository;
@@ -46,6 +50,7 @@ async function run() {
         rendererErrors.push(event.message);
     });
   });
+  await import(pathToFileURL(join(repository, 'out/main/index.js')).href);
   let nextSource = join(repository, 'examples/sample-book/sample.md');
   let nextCover;
   let cancelDialog = false;
@@ -244,7 +249,6 @@ async function run() {
     app.exit(1);
   }, 180000);
   try {
-    await import(pathToFileURL(join(repository, 'out/main/index.js')).href);
     window = BrowserWindow.getAllWindows()[0];
     if (!window) {
       window = await new Promise((resolve) =>
@@ -280,6 +284,25 @@ async function run() {
     await capture('empty-light');
     await click('.document-toolbar button');
     await rendered();
+    // The preview must resolve bundled theme fonts through the application
+    // asset scheme; a data-URL or fallback-font regression would show here.
+    const previewFonts = await evaluate(`(() => {
+      const frame = document.querySelector('iframe.preview');
+      const doc = frame?.contentDocument;
+      if (!doc) return null;
+      return {
+        body: frame.contentWindow.getComputedStyle(doc.body).fontFamily,
+        sourceHanSans: doc.fonts.check('16px "Source Han Sans SC"', '中文'),
+      };
+    })()`);
+    assert.ok(
+      previewFonts?.body.includes('Source Han Sans SC'),
+      'preview body must stack the bundled CJK font',
+    );
+    assert.ok(
+      previewFonts?.sourceHanSans,
+      'preview must load the bundled Source Han Sans font through the asset scheme',
+    );
     await click('#tab-style');
     await evaluate(
       `Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'Customize styles').click()`,

@@ -17,10 +17,8 @@ export async function probePreviewRendering(
   if (!document || !previewWindow) return [];
 
   await document.fonts.ready;
-  logTocLayout(document);
-  const stylesheet = [...document.querySelectorAll('style')]
-    .map((style) => style.textContent ?? '')
-    .join('\n');
+  const debugLogging = window.location.hostname === 'localhost';
+  if (debugLogging) logTocLayout(document);
   const mathElement = document.querySelector<HTMLElement>('.katex .mord');
   const delimiterElement = document.querySelector<HTMLElement>(
     '.katex .delimsizing',
@@ -31,7 +29,12 @@ export async function probePreviewRendering(
       document.fonts.check(`16px "${family}"`, '∫[]'),
     ]),
   );
-  if (window.location.hostname === 'localhost') {
+  if (debugLogging) {
+    // Reading every stylesheet is expensive once theme fonts are served by
+    // URL, so it only happens in development builds.
+    const stylesheet = [...document.querySelectorAll('style')]
+      .map((style) => style.textContent ?? '')
+      .join('\n');
     console.info(
       `[math-render] Preview font probe ${JSON.stringify({
         mathElementCount: document.querySelectorAll('.katex').length,
@@ -83,7 +86,7 @@ export async function probePreviewRendering(
         : undefined,
     };
   });
-  if (window.location.hostname === 'localhost') {
+  if (debugLogging) {
     console.info(
       `[mermaid-render] Preview layout probe ${JSON.stringify({ diagrams })}`,
     );
@@ -91,34 +94,38 @@ export async function probePreviewRendering(
 
   // FontFaceSet.ready loads fonts actually used by the document. Unused KaTeX
   // size families may remain unloaded and must not produce missing-font warnings.
-  const missingMathFonts = [
-    ...new Set(
-      [
-        ...document.querySelectorAll<HTMLElement>('.katex-html, .katex-html *'),
-      ].flatMap((element) => {
-        const text = [...element.childNodes]
-          .filter((node) => node.nodeType === Node.TEXT_NODE)
-          .map((node) => node.textContent ?? '')
-          .join('')
-          .trim();
-        if (!text) return [];
-        const computed = previewWindow.getComputedStyle(element);
-        const families = computed.fontFamily
-          .split(',')
-          .map((family) =>
-            family.trim().replaceAll('"', '').replaceAll("'", ''),
-          );
-        return katexFontFamilies.filter(
-          (family) =>
-            families.includes(family) &&
-            !document.fonts.check(
-              `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} "${family}"`,
-              text,
-            ),
-        );
-      }),
-    ),
-  ];
+  const mathNodes = document.querySelectorAll<HTMLElement>(
+    '.katex-html, .katex-html *',
+  );
+  const missingMathFonts =
+    mathNodes.length === 0
+      ? []
+      : [
+          ...new Set(
+            [...mathNodes].flatMap((element) => {
+              const text = [...element.childNodes]
+                .filter((node) => node.nodeType === Node.TEXT_NODE)
+                .map((node) => node.textContent ?? '')
+                .join('')
+                .trim();
+              if (!text) return [];
+              const computed = previewWindow.getComputedStyle(element);
+              const families = computed.fontFamily
+                .split(',')
+                .map((family) =>
+                  family.trim().replaceAll('"', '').replaceAll("'", ''),
+                );
+              return katexFontFamilies.filter(
+                (family) =>
+                  families.includes(family) &&
+                  !document.fonts.check(
+                    `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} "${family}"`,
+                    text,
+                  ),
+              );
+            }),
+          ),
+        ];
   return missingMathFonts.length === 0
     ? []
     : [
@@ -134,7 +141,7 @@ export async function probePreviewRendering(
 
 function logTocLayout(document: Document): void {
   const toc = document.querySelector<HTMLElement>('[data-toc="true"]');
-  if (toc && window.location.hostname === 'localhost') {
+  if (toc) {
     console.info(
       `[toc] Preview layout ${JSON.stringify({
         entryCount: toc.querySelectorAll('.publication-toc-entry').length,

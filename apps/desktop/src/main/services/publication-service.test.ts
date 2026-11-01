@@ -200,7 +200,7 @@ describe('PublicationService table-of-contents export', () => {
     expect(renderedHtml[0]).toContain('data-toc="true"');
     expect(renderedHtml[0]).toContain('href="#heading-book-introduction"');
     expect(renderedHtml[0]).not.toContain('data-toc-page-for=');
-    expect(renderedHtml[0]).not.toContain('0000');
+    expect(renderedHtml[0]).not.toContain('<span class="publication-toc-page"');
     expect(pageNumberApply).toHaveBeenCalledTimes(1);
     await expect(readFile(outputPath)).resolves.toEqual(Buffer.from(bodyPdf));
   });
@@ -221,7 +221,7 @@ describe('PublicationService table-of-contents export', () => {
     expect(renderedHtml).toHaveLength(1);
     expect(renderedHtml[0]).toContain('publication-toc--modern-technical');
     expect(renderedHtml[0]).not.toContain('data-toc-page-for=');
-    expect(renderedHtml[0]).not.toContain('publication-toc-leader');
+    expect(renderedHtml[0]).not.toContain('<span class="publication-toc-page"');
     expect(pageNumberApply).toHaveBeenCalledTimes(1);
   });
 

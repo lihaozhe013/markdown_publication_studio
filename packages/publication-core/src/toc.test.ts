@@ -45,8 +45,8 @@ describe('table of contents rendering', () => {
     expect(html).toContain('href="#heading-guide-intro"');
     expect(html).toContain('Introduction &amp; scope');
     expect(html).not.toContain('data-toc-page-for=');
-    expect(html).not.toContain('publication-toc-leader');
-    expect(html).not.toContain('0000');
+    expect(html).not.toContain('<span class="publication-toc-page"');
+    expect(html).not.toContain('<span class="publication-toc-dots"');
   });
 
   it('reserves a leader and page column only when page references are on', () => {

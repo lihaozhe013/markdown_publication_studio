@@ -23,8 +23,10 @@ function presetClass(preset: TocPresetId): string {
 }
 
 function renderTocEntry(entry: TocEntry, pageReferences: boolean): string {
+  // Leaders only make sense when a page label closes the row; without one the
+  // title simply ends the line.
   const label = pageReferences
-    ? `<span class="publication-toc-page" data-toc-page-for="${escapeHtml(entry.id)}"></span>`
+    ? `<span class="publication-toc-dots" aria-hidden="true"></span><span class="publication-toc-page" data-toc-page-for="${escapeHtml(entry.id)}"></span>`
     : '';
   return `<li class="publication-toc-entry publication-toc-entry--level-${entry.level}"><a class="publication-toc-link" href="#${escapeHtml(entry.id)}"><span class="publication-toc-title-text">${escapeHtml(entry.title)}</span>${label}</a></li>`;
 }
@@ -38,32 +40,29 @@ export function renderTableOfContents(options: PublicationTocOptions): string {
 }
 
 export function getTableOfContentsStylesheet(): string {
+  // Plain, print-first typography: a left-aligned heading, indented levels, and
+  // dotted leaders that run to a right-aligned page column. No accent rails,
+  // cards, or hover fills, so the page reads like a book or Word contents page.
   return `
       .publication-toc {
-        --publication-toc-accent: var(--fgColor-accent, #2f80ed);
         break-after: page;
         color: var(--fgColor-default, #182230);
         margin: 0;
         padding: 0;
       }
       .publication-toc .publication-toc-heading {
-        align-items: flex-start;
+        background: transparent;
+        border: 0;
         color: var(--fgColor-default, #102a43);
-        display: flex;
-        flex-direction: column;
-        font-family: var(--publication-toc-heading-font, var(--fontStack-sansSerif, Georgia, serif));
-        font-size: 26pt;
-        font-weight: 700;
-        line-height: 1.15;
-        margin: 0 0 28pt;
+        font-family: inherit;
+        font-size: 18pt;
+        font-weight: 600;
+        letter-spacing: normal;
+        line-height: 1.3;
+        margin: 0 0 18pt;
         padding: 0;
-      }
-      .publication-toc .publication-toc-heading::after {
-        border-bottom: 3pt solid var(--publication-toc-accent);
-        content: '';
-        display: block;
-        margin-top: 12pt;
-        width: 48pt;
+        text-align: left;
+        text-transform: none;
       }
       .publication-toc .publication-toc-list {
         list-style: none;
@@ -77,99 +76,71 @@ export function getTableOfContentsStylesheet(): string {
       }
       .publication-toc .publication-toc-link {
         align-items: baseline;
-        border-radius: 3pt;
         color: inherit;
         display: flex;
-        gap: 10pt;
         min-width: 0;
-        padding: 6pt 10pt;
+        padding: 2.5pt 0;
         text-decoration: none;
       }
-      .publication-toc .publication-toc-link:hover,
+      .publication-toc .publication-toc-link:hover {
+        text-decoration: underline;
+      }
       .publication-toc .publication-toc-link:focus-visible {
-        background: rgb(47 128 237 / 9%);
-        color: var(--publication-toc-accent);
-        outline: none;
+        outline: 1pt solid currentColor;
+        outline-offset: 2pt;
       }
       .publication-toc .publication-toc-title-text {
-        flex: 1 1 auto;
+        flex: 0 1 auto;
         min-width: 0;
         overflow-wrap: anywhere;
       }
+      .publication-toc .publication-toc-dots {
+        border-bottom: 1pt dotted currentColor;
+        flex: 1 1 auto;
+        margin: 0 0.5em;
+        min-width: 1.5em;
+        opacity: 0.45;
+      }
       .publication-toc .publication-toc-page {
-        flex: 0 0 4em;
+        flex: 0 0 auto;
         font-variant-numeric: tabular-nums;
         text-align: right;
         white-space: nowrap;
       }
       .publication-toc .publication-toc-entry--level-1 {
-        font-family: var(--publication-toc-heading-font, var(--fontStack-sansSerif, Georgia, serif));
-        font-size: 13pt;
-        font-weight: 700;
-        margin-top: 16pt;
+        font-family: inherit;
+        font-size: 12pt;
+        font-weight: 600;
+        margin-top: 10pt;
       }
       .publication-toc .publication-toc-entry--level-1:first-child {
         margin-top: 0;
       }
-      .publication-toc .publication-toc-entry--level-1 > .publication-toc-link {
-        border-left: 3pt solid var(--publication-toc-accent);
-        padding-left: 12pt;
-      }
       .publication-toc .publication-toc-entry--level-2 {
-        font-size: 11pt;
-        margin-left: 24pt;
-        margin-top: 7pt;
-      }
-      .publication-toc .publication-toc-entry--level-2 > .publication-toc-link {
-        border-left: 1pt solid rgb(82 96 109 / 35%);
-        padding-left: 12pt;
+        font-size: 10.5pt;
+        margin-left: 1.5em;
       }
       .publication-toc .publication-toc-entry--level-3 {
         color: var(--fgColor-muted, #52606d);
         font-size: 10pt;
-        margin-left: 48pt;
-        margin-top: 5pt;
-      }
-      .publication-toc .publication-toc-entry--level-3 > .publication-toc-link {
-        padding-left: 12pt;
+        margin-left: 3em;
       }
       .publication-toc--modern-technical {
-        border-top: 5pt solid var(--publication-toc-accent);
-        padding-top: 18pt;
-      }
-      .publication-toc--modern-technical .publication-toc-heading {
         font-family: var(--fontStack-sansSerif, Arial, sans-serif);
-        font-size: 23pt;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .publication-toc--modern-technical .publication-toc-heading::after {
-        border-bottom-width: 1pt;
-        margin-top: 10pt;
-        width: 100%;
-      }
-      .publication-toc--modern-technical .publication-toc-entry {
-        border-bottom: 1pt solid rgb(16 35 58 / 15%);
-      }
-      .publication-toc--modern-technical .publication-toc-link {
-        border-radius: 0;
-        padding-bottom: 8pt;
-        padding-top: 8pt;
       }
       .publication-toc--modern-technical .publication-toc-entry--level-1 {
-        color: var(--publication-toc-accent);
+        font-family: inherit;
         font-size: 11pt;
-        margin-top: 0;
+        margin-top: 8pt;
       }
-      .publication-toc--modern-technical .publication-toc-entry--level-1 > .publication-toc-link {
-        border-left: 2pt solid var(--publication-toc-accent);
-        padding-left: 10pt;
+      .publication-toc--modern-technical .publication-toc-dots {
+        display: none;
       }
-      .publication-toc--modern-technical .publication-toc-entry--level-2 {
-        margin-left: 16pt;
+      .publication-toc--modern-technical .publication-toc-title-text {
+        flex: 1 1 auto;
       }
-      .publication-toc--modern-technical .publication-toc-entry--level-3 {
-        margin-left: 32pt;
+      .publication-toc--modern-technical .publication-toc-page {
+        margin-left: 0.75em;
       }
       @media screen {
         .publication-toc {
@@ -177,9 +148,6 @@ export function getTableOfContentsStylesheet(): string {
           box-shadow: 0 12px 40px rgb(16 35 58 / 12%);
           margin: 0 0 32px;
           padding: 52px 64px;
-        }
-        .publication-toc--modern-technical {
-          padding-top: 52px;
         }
       }
       @media print {

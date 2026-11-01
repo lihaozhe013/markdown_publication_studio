@@ -49,6 +49,17 @@ describe('table of contents rendering', () => {
     expect(html).not.toContain('0000');
   });
 
+  it('reserves a leader and page column only when page references are on', () => {
+    const withPages = renderTableOfContents({
+      preset: 'classic-book',
+      entries,
+      pageReferences: true,
+    });
+
+    expect(withPages).toContain('publication-toc-dots');
+    expect(withPages).toContain('data-toc-page-for="heading-guide-intro"');
+  });
+
   it('provides hierarchy-focused preset hooks and print pagination rules', () => {
     const stylesheet = getTableOfContentsStylesheet();
 
@@ -57,6 +68,15 @@ describe('table of contents rendering', () => {
     expect(stylesheet).toContain('display: flex');
     expect(stylesheet).not.toContain('publication-toc-leader');
     expect(stylesheet).toContain('break-after: page');
+  });
+
+  it('keeps the contents page free of decorative accents', () => {
+    const stylesheet = getTableOfContentsStylesheet();
+
+    expect(stylesheet).not.toContain('--publication-toc-accent');
+    expect(stylesheet).not.toContain('border-left');
+    expect(stylesheet).not.toContain('background: rgb(');
+    expect(stylesheet).toContain('border-bottom: 1pt dotted');
   });
 
   it('does not create an empty contents section', () => {

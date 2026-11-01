@@ -52,12 +52,13 @@ export const TOC_PRESET_DEFINITIONS: readonly TocPresetDefinition[] = [
     id: 'classic-book',
     label: 'Classic Book',
     description:
-      'Editorial hierarchy with serif-led section titles and open spacing.',
+      'Book-style hierarchy with indented levels and dotted page leaders.',
   },
   {
     id: 'modern-technical',
     label: 'Modern Technical',
-    description: 'Compact sans-serif entries with a theme-colored accent rail.',
+    description:
+      'Compact sans-serif entries with right-aligned page numbers and no leaders.',
   },
 ];
 

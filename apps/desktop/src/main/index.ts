@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  shell,
   type OpenDialogOptions,
 } from 'electron';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -184,7 +185,23 @@ function createMainWindow(): BrowserWindow {
   return window;
 }
 
+function requireExportedOutput(
+  exportedOutputPaths: ReadonlySet<string>,
+  rawPath: unknown,
+): string {
+  if (typeof rawPath !== 'string' || !exportedOutputPaths.has(rawPath)) {
+    throw new Error(
+      'Only files exported in this session can be opened from the application.',
+    );
+  }
+  return rawPath;
+}
+
 function registerIpcHandlers(): void {
+  // Only files produced by this session can be opened or revealed, so a
+  // renderer cannot ask the shell to launch arbitrary paths.
+  const exportedOutputPaths = new Set<string>();
+
   ipcMain.handle('mcp:get-setup', () => {
     if (!mcpSessionHost) throw new Error('The GUI MCP bridge is not ready.');
     return getMcpConnectionSetup(mcpSessionHost);
@@ -400,19 +417,19 @@ function registerIpcHandlers(): void {
     }
     await validateMarkdownPath(request.sourcePath);
     const covers = resolveRequestedCovers(request.covers);
-    const result = await dialog.showSaveDialog({
+    const destination = await dialog.showSaveDialog({
       defaultPath: join(
         process.cwd(),
         `${basename(request.sourcePath, extname(request.sourcePath))}.pdf`,
       ),
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
-    if (result.canceled || !result.filePath) {
+    if (destination.canceled || !destination.filePath) {
       return null;
     }
-    return publicationService.exportPdf(
+    const exported = await publicationService.exportPdf(
       request.sourcePath,
-      result.filePath,
+      destination.filePath,
       request.themeId,
       request.pageSize,
       request.pageNumber,
@@ -421,6 +438,8 @@ function registerIpcHandlers(): void {
       request.toc,
       request.pageLayout,
     );
+    exportedOutputPaths.add(exported.outputPath);
+    return exported;
   });
 
   ipcMain.handle('export:html', async (_event, rawRequest: unknown) => {
@@ -431,23 +450,37 @@ function registerIpcHandlers(): void {
       );
     }
     await validateMarkdownPath(request.sourcePath);
-    const result = await dialog.showSaveDialog({
+    const destination = await dialog.showSaveDialog({
       defaultPath: join(
         process.cwd(),
         `${basename(request.sourcePath, extname(request.sourcePath))}.html`,
       ),
       filters: [{ name: 'HTML', extensions: ['html'] }],
     });
-    if (result.canceled || !result.filePath) {
+    if (destination.canceled || !destination.filePath) {
       return null;
     }
-    return publicationService.exportHtml(
+    const exported = await publicationService.exportHtml(
       request.sourcePath,
-      result.filePath,
+      destination.filePath,
       request.themeId,
       request.pageSize,
       request.styleOverrides,
     );
+    exportedOutputPaths.add(exported.outputPath);
+    return exported;
+  });
+
+  ipcMain.handle('export:open-output', async (_event, rawPath: unknown) => {
+    const outputPath = requireExportedOutput(exportedOutputPaths, rawPath);
+    const error = await shell.openPath(outputPath);
+    if (error) {
+      throw new Error(`Could not open ${outputPath}: ${error}`);
+    }
+  });
+
+  ipcMain.handle('export:reveal-output', (_event, rawPath: unknown) => {
+    shell.showItemInFolder(requireExportedOutput(exportedOutputPaths, rawPath));
   });
 }
 

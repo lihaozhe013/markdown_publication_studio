@@ -72,6 +72,10 @@ const api: DesktopApi = {
   export: {
     start: (request) => ipcRenderer.invoke('export:start', request),
     html: (request) => ipcRenderer.invoke('export:html', request),
+    openOutput: (outputPath) =>
+      ipcRenderer.invoke('export:open-output', outputPath),
+    revealOutput: (outputPath) =>
+      ipcRenderer.invoke('export:reveal-output', outputPath),
   },
   mcp: {
     getSetup: () => ipcRenderer.invoke('mcp:get-setup'),

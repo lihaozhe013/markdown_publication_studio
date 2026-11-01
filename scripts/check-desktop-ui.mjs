@@ -6,6 +6,7 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  shell,
 } from 'electron';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -70,6 +71,15 @@ async function run() {
       ? []
       : [options.title.startsWith('Choose cover') ? nextCover : nextSource],
   });
+  const openedPaths = [];
+  const revealedPaths = [];
+  shell.openPath = async (path) => {
+    openedPaths.push(path);
+    return '';
+  };
+  shell.showItemInFolder = (path) => {
+    revealedPaths.push(path);
+  };
   dialog.showSaveDialog = async (options) => ({
     canceled: cancelDialog,
     filePath: cancelDialog
@@ -125,6 +135,45 @@ async function run() {
     evaluate(
       `(() => { const element = document.querySelector(${JSON.stringify(selector)}); element.value = ${JSON.stringify(value)}; element.dispatchEvent(new Event('change', { bubbles: true })); })()`,
     );
+  const closeExportDialog = async (label, expectedPath) => {
+    await waitFor(
+      async () => evaluate(`Boolean(document.querySelector('.export-dialog'))`),
+      `${label} export dialog`,
+    );
+    assert.equal(
+      await evaluate(
+        `document.querySelector('.export-dialog-open').textContent.trim()`,
+      ),
+      `Open ${label.toUpperCase()}`,
+      `${label} dialog offers the default-program action`,
+    );
+    await click('.export-dialog-reveal');
+    await waitFor(
+      async () => revealedPaths.includes(expectedPath),
+      `${label} reveal request`,
+    );
+    await waitFor(
+      async () =>
+        evaluate(`!document.querySelector('.export-dialog-open').disabled`),
+      `${label} reveal completion`,
+    );
+    await click('.export-dialog-open');
+    await waitFor(
+      async () => openedPaths.includes(expectedPath),
+      `${label} open request`,
+    );
+    await waitFor(
+      async () =>
+        evaluate(`!document.querySelector('.export-dialog-done').disabled`),
+      `${label} open completion`,
+    );
+    await click('.export-dialog-done');
+    await waitFor(
+      async () => evaluate(`!document.querySelector('.export-dialog')`),
+      `${label} dialog dismissal`,
+    );
+  };
+
   const idle = () =>
     waitFor(
       async () =>
@@ -305,6 +354,7 @@ async function run() {
         ),
       'HTML draft export',
     );
+    await closeExportDialog('html', join(artifacts, 'publication.html'));
     const exported = await readFile(
       join(artifacts, 'publication.html'),
       'utf8',
@@ -384,6 +434,7 @@ async function run() {
         ),
       'HTML with mismatched PDF cover',
     );
+    await closeExportDialog('html', join(artifacts, 'publication.html'));
     nextCover = join(artifacts, 'art.png');
     await click('.cover-choose-button');
     await idle();
@@ -395,6 +446,7 @@ async function run() {
         ),
       'real PDF export',
     );
+    await closeExportDialog('pdf', join(artifacts, 'publication.pdf'));
     const pdf = await PDFDocument.load(
       await readFile(join(artifacts, 'publication.pdf')),
     );

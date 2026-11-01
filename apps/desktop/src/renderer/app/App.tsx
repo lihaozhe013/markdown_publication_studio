@@ -42,6 +42,8 @@ import {
 } from './workspace-model.js';
 import { PageNumberControls } from './page-number-controls.js';
 import { McpConnectionDialog } from './mcp-connection-dialog.js';
+import { ExportCompleteDialog } from './export-complete-dialog.js';
+import type { ExportKind } from './export-output.js';
 import type {
   McpRendererCommand,
   McpRendererSnapshot,
@@ -119,6 +121,10 @@ export function App(): React.JSX.Element {
   const [previewRect, setPreviewRect] =
     useState<McpRendererSnapshot['view']['previewRect']>(null);
   const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+  const [exportedOutput, setExportedOutput] = useState<{
+    kind: ExportKind;
+    outputPath: string;
+  } | null>(null);
   const [previewScrollRequest, setPreviewScrollRequest] = useState<{
     scrollY?: number;
     heading?: string;
@@ -901,6 +907,7 @@ export function App(): React.JSX.Element {
     }
     setBusy(true);
     setExporting(true);
+    setExportedOutput(null);
     setStatus('Printing PDF with Chromium…');
     try {
       const result = await window.desktopApi.export.start({
@@ -919,6 +926,7 @@ export function App(): React.JSX.Element {
       }
       setDiagnostics(result.diagnostics);
       setStatus(`PDF written to ${result.outputPath}`);
+      setExportedOutput({ kind: 'pdf', outputPath: result.outputPath });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Export failed.';
       setStatus(message);
@@ -941,6 +949,7 @@ export function App(): React.JSX.Element {
     if (!source || busy || styleSaving || !settingsReady) return;
     setBusy(true);
     setExporting(true);
+    setExportedOutput(null);
     setStatus('Writing self-contained HTML…');
     try {
       const result = await window.desktopApi.export.html({
@@ -955,6 +964,7 @@ export function App(): React.JSX.Element {
       }
       setDiagnostics(result.diagnostics);
       setStatus(`HTML written to ${result.outputPath}`);
+      setExportedOutput({ kind: 'html', outputPath: result.outputPath });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Export failed.';
       setStatus(message);
@@ -1198,6 +1208,13 @@ export function App(): React.JSX.Element {
         onZoom={setZoomMode}
       />
       {mcpDialogOpen && <McpConnectionDialog onClose={closeMcpDialog} />}
+      {exportedOutput && (
+        <ExportCompleteDialog
+          kind={exportedOutput.kind}
+          outputPath={exportedOutput.outputPath}
+          onClose={() => setExportedOutput(null)}
+        />
+      )}
     </main>
   );
 }

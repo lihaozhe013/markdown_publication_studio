@@ -328,6 +328,11 @@ draft to the saved style. Escape closes transient export options without
 discarding a draft. Native View zoom commands control the publication preview,
 not the application UI. PDF export also supports CmdOrCtrl+Shift+E.
 
+Completed PDF and HTML exports open a confirmation dialog that names the written
+file and offers opening it with the system default application or revealing it
+in the file manager. The dialog traps focus, closes on Escape or Done, and only
+files exported in the current session can be opened or revealed.
+
 ### PDF printing and assembly
 
 Use a dedicated hidden Electron WebContents behind a replaceable `PrintBackend`.

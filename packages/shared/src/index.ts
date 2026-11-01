@@ -825,6 +825,8 @@ export interface DesktopApi {
   export: {
     start(request: PdfExportRequest): Promise<ExportResult | null>;
     html(request: HtmlExportRequest): Promise<ExportResult | null>;
+    openOutput(outputPath: string): Promise<void>;
+    revealOutput(outputPath: string): Promise<void>;
   };
   mcp: {
     getSetup(): Promise<import('./mcp.js').McpConnectionSetup>;

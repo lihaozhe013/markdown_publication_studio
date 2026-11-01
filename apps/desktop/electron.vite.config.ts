@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
+import { build as viteBuild, type Plugin } from 'vite';
 import { katexAssetsPlugin } from '../../scripts/katex-assets-plugin.js';
 import { CLI_WORKER_PROTOCOL_VERSION } from '../../packages/shared/src/cli-protocol.js';
 
@@ -18,6 +19,50 @@ const commitHash = execSync('git rev-parse --short HEAD', {
   .toString()
   .trim();
 
+/**
+ * Emit the isolated pagination program next to the main bundle. `out/main` is
+ * emptied on every main build, so bundling the program here keeps it present in
+ * development and production alike; watching the entry also rebuilds it when the
+ * program changes during `electron-vite dev`.
+ */
+function paginatedProgramPlugin(): Plugin {
+  const entry = resolve(desktopRoot, 'src/renderer/paginated-program.ts');
+  return {
+    name: 'mps-paginated-program',
+    buildStart() {
+      this.addWatchFile(entry);
+    },
+    async generateBundle() {
+      const result = await viteBuild({
+        configFile: false,
+        logLevel: 'warn',
+        build: {
+          write: false,
+          target: 'chrome120',
+          minify: false,
+          lib: {
+            entry,
+            formats: ['iife'],
+            name: 'PublicationPaginationProgram',
+            fileName: () => 'paginated-program.js',
+          },
+        },
+      });
+      for (const output of Array.isArray(result) ? result : [result]) {
+        if (!('output' in output)) continue;
+        for (const item of output.output) {
+          if (item.type !== 'chunk' || !item.isEntry) continue;
+          this.emitFile({
+            type: 'asset',
+            fileName: 'paginated-program.js',
+            source: item.code,
+          });
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig({
   main: {
     define: {
@@ -27,6 +72,7 @@ export default defineConfig({
       katexAssetsPlugin(
         resolve(desktopRoot, '../../packages/publication-core'),
       ),
+      paginatedProgramPlugin(),
       {
         name: 'mps-paged-engine',
         generateBundle() {

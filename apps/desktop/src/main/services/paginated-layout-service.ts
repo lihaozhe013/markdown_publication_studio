@@ -152,6 +152,23 @@ export class PaginatedLayoutService {
 
   private engineVersionPromise?: Promise<string>;
 
+  private async readBundle(
+    path: string,
+    kind: 'engine' | 'program',
+  ): Promise<string> {
+    try {
+      return await readFile(path, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      // A missing bundle means the application was launched from an incomplete
+      // build tree, most often a dev session started before `pnpm build`.
+      throw new Error(
+        `The pagination ${kind} bundle is missing at ${path}. Run "pnpm build" or restart "pnpm dev" to generate it.`,
+        { cause: error },
+      );
+    }
+  }
+
   private engineVersion(): Promise<string> {
     this.engineVersionPromise ??= readFile(
       join(dirname(this.engineBundlePath), 'paged-engine.json'),
@@ -169,8 +186,8 @@ export class PaginatedLayoutService {
     request: PaginatedLayoutRequest,
   ): Promise<PaginatedLayoutResult> {
     const diagnostics: PublicationDiagnostic[] = [];
-    const engine = await readFile(this.engineBundlePath, 'utf8');
-    const program = await readFile(this.programBundlePath, 'utf8');
+    const engine = await this.readBundle(this.engineBundlePath, 'engine');
+    const program = await this.readBundle(this.programBundlePath, 'program');
     const engineVersion = await this.engineVersion();
     let prefillLabels: Record<string, string> = {};
     const seenLabels = new Set<string>();

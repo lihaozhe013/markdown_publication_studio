@@ -79,6 +79,20 @@ describe('table of contents rendering', () => {
     expect(stylesheet).toContain('border-bottom: 1pt dotted');
   });
 
+  it('outranks theme heading and link rules without !important', () => {
+    const stylesheet = getTableOfContentsStylesheet();
+
+    expect(stylesheet).toContain(
+      '.publication-toc[data-toc] .publication-toc-heading',
+    );
+    expect(stylesheet).toContain(
+      '.publication-toc[data-toc] .publication-toc-link',
+    );
+    expect(stylesheet).not.toContain('!important');
+    expect(stylesheet).toContain('text-align: left');
+    expect(stylesheet).toContain('color: inherit');
+  });
+
   it('does not create an empty contents section', () => {
     expect(
       renderTableOfContents({

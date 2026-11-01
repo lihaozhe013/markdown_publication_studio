@@ -99,7 +99,9 @@ export function templateBackgrounds(
 ): Record<PageTemplateId, string> {
   return {
     default: '#ffffff',
-    toc: pageCanvasMode === 'full-bleed' ? '#e8eefb' : '#f4f7fd',
+    // Generated contents pages use the body sheet so a publication reads as one
+    // continuous document instead of marking the contents as a special surface.
+    toc: '#ffffff',
     section: pageCanvasMode === 'full-bleed' ? '#fff6e5' : '#fdf8ee',
   };
 }
@@ -412,7 +414,6 @@ export class PaginatedLayoutService {
         getBuiltInTheme(request.themeId).pageCanvasMode,
       ),
       ...folio,
-      tocPageColumnWidthEm: 4,
       prefillLabels: labels,
     };
   }

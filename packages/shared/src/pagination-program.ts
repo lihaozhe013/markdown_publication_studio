@@ -14,7 +14,6 @@ export interface PaginationProgramOptions {
   folioFontWeight: number;
   folioFontStyle: 'normal' | 'italic';
   folioColor: string;
-  tocPageColumnWidthEm: number;
   prefillLabels: Record<string, string>;
 }
 

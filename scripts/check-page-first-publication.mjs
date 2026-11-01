@@ -451,11 +451,9 @@ async function main() {
   );
   const bodyColor = sheetColor(pdfPath, defaultBodyPage.physicalPage);
   const sectionColor = sheetColor(pdfPath, assembledSectionPage.physicalPage);
-  check(
-    tocColor !== '(255, 255, 255)',
-    'contents pages paint the whole sheet',
-    { tocColor },
-  );
+  check(tocColor === '(255, 255, 255)', 'contents pages keep the body sheet', {
+    tocColor,
+  });
   check(
     bodyColor === '(255, 255, 255)',
     'default body pages keep a white sheet',

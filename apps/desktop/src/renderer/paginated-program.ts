@@ -55,10 +55,6 @@ async function paginateProgram(
     .publication-page-template { display: block !important; break-before: page !important;
       height: 0 !important; margin: 0 !important; padding: 0 !important; }
     .publication-toc { break-after: page; }
-    .publication-toc .publication-toc-page {
-      display: inline-block; flex: 0 0 ${options.tocPageColumnWidthEm}em;
-      width: ${options.tocPageColumnWidthEm}em; text-align: right; white-space: nowrap;
-      font-variant-numeric: tabular-nums; overflow-wrap: normal; }
     .publication-folio { position: absolute; left: 0; right: 0; bottom: 6mm;
       text-align: center; line-height: 1; pointer-events: none;
       -webkit-print-color-adjust: exact; print-color-adjust: exact; }

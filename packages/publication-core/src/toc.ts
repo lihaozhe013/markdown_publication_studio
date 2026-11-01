@@ -41,16 +41,17 @@ export function renderTableOfContents(options: PublicationTocOptions): string {
 
 export function getTableOfContentsStylesheet(): string {
   // Plain, print-first typography: a left-aligned heading, indented levels, and
-  // dotted leaders that run to a right-aligned page column. No accent rails,
-  // cards, or hover fills, so the page reads like a book or Word contents page.
+  // dotted leaders that run to a right-aligned page column. Every rule is scoped
+  // through `[data-toc]` so theme heading and link rules cannot override the
+  // contents layout; user style overrides still win because they use !important.
   return `
-      .publication-toc {
+      .publication-toc[data-toc] {
         break-after: page;
         color: var(--fgColor-default, #182230);
         margin: 0;
         padding: 0;
       }
-      .publication-toc .publication-toc-heading {
+      .publication-toc[data-toc] .publication-toc-heading {
         background: transparent;
         border: 0;
         color: var(--fgColor-default, #102a43);
@@ -58,23 +59,23 @@ export function getTableOfContentsStylesheet(): string {
         font-size: 18pt;
         font-weight: 600;
         letter-spacing: normal;
-        line-height: 1.3;
-        margin: 0 0 18pt;
+        line-height: 1.25;
+        margin: 0 0 20pt;
         padding: 0;
         text-align: left;
         text-transform: none;
       }
-      .publication-toc .publication-toc-list {
+      .publication-toc[data-toc] .publication-toc-list {
         list-style: none;
         margin: 0;
         padding: 0;
       }
-      .publication-toc .publication-toc-entry {
+      .publication-toc[data-toc] .publication-toc-entry {
         break-inside: avoid;
         margin: 0;
         padding: 0;
       }
-      .publication-toc .publication-toc-link {
+      .publication-toc[data-toc] .publication-toc-link {
         align-items: baseline;
         color: inherit;
         display: flex;
@@ -82,68 +83,67 @@ export function getTableOfContentsStylesheet(): string {
         padding: 2.5pt 0;
         text-decoration: none;
       }
-      .publication-toc .publication-toc-link:hover {
+      .publication-toc[data-toc] .publication-toc-link:hover {
         text-decoration: underline;
       }
-      .publication-toc .publication-toc-link:focus-visible {
+      .publication-toc[data-toc] .publication-toc-link:focus-visible {
         outline: 1pt solid currentColor;
         outline-offset: 2pt;
       }
-      .publication-toc .publication-toc-title-text {
+      .publication-toc[data-toc] .publication-toc-title-text {
         flex: 0 1 auto;
         min-width: 0;
         overflow-wrap: anywhere;
       }
-      .publication-toc .publication-toc-dots {
+      .publication-toc[data-toc] .publication-toc-dots {
         border-bottom: 1pt dotted currentColor;
         flex: 1 1 auto;
-        margin: 0 0.5em;
+        margin: 0 0.4em;
         min-width: 1.5em;
-        opacity: 0.45;
+        opacity: 0.4;
       }
-      .publication-toc .publication-toc-page {
+      .publication-toc[data-toc] .publication-toc-page {
         flex: 0 0 auto;
+        font-size: 10pt;
         font-variant-numeric: tabular-nums;
         text-align: right;
         white-space: nowrap;
       }
-      .publication-toc .publication-toc-entry--level-1 {
-        font-family: inherit;
+      .publication-toc[data-toc] .publication-toc-entry--level-1 {
         font-size: 12pt;
         font-weight: 600;
-        margin-top: 10pt;
+        margin-top: 12pt;
       }
-      .publication-toc .publication-toc-entry--level-1:first-child {
+      .publication-toc[data-toc] .publication-toc-entry--level-1:first-child {
         margin-top: 0;
       }
-      .publication-toc .publication-toc-entry--level-2 {
-        font-size: 10.5pt;
-        margin-left: 1.5em;
+      .publication-toc[data-toc] .publication-toc-entry--level-2 {
+        font-size: 11pt;
+        margin-left: 14pt;
       }
-      .publication-toc .publication-toc-entry--level-3 {
+      .publication-toc[data-toc] .publication-toc-entry--level-3 {
         color: var(--fgColor-muted, #52606d);
-        font-size: 10pt;
-        margin-left: 3em;
+        font-size: 10.5pt;
+        margin-left: 28pt;
       }
-      .publication-toc--modern-technical {
+      .publication-toc--modern-technical[data-toc] {
         font-family: var(--fontStack-sansSerif, Arial, sans-serif);
       }
-      .publication-toc--modern-technical .publication-toc-entry--level-1 {
-        font-family: inherit;
+      .publication-toc--modern-technical[data-toc] .publication-toc-entry--level-1 {
         font-size: 11pt;
-        margin-top: 8pt;
+        margin-top: 10pt;
       }
-      .publication-toc--modern-technical .publication-toc-dots {
+      .publication-toc--modern-technical[data-toc] .publication-toc-dots {
         display: none;
       }
-      .publication-toc--modern-technical .publication-toc-title-text {
+      .publication-toc--modern-technical[data-toc] .publication-toc-title-text {
         flex: 1 1 auto;
       }
-      .publication-toc--modern-technical .publication-toc-page {
+      .publication-toc--modern-technical[data-toc] .publication-toc-page {
         margin-left: 0.75em;
       }
       @media screen {
-        .publication-toc {
+        .publication-toc[data-toc] {
           background: var(--publication-surface-background, white);
           box-shadow: 0 12px 40px rgb(16 35 58 / 12%);
           margin: 0 0 32px;
@@ -151,8 +151,8 @@ export function getTableOfContentsStylesheet(): string {
         }
       }
       @media print {
-        .publication-toc,
-        .publication-toc .publication-toc-entry {
+        .publication-toc[data-toc],
+        .publication-toc[data-toc] .publication-toc-entry {
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }

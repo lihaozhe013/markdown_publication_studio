@@ -95,12 +95,27 @@ export function getTableOfContentsStylesheet(): string {
         min-width: 0;
         overflow-wrap: anywhere;
       }
+      /* Leaders are drawn as a repeating radial gradient instead of a dotted
+         border: border dots scale with the border width (about 1.3px) and read
+         as a hairline, while a gradient keeps an exact 1.2pt dot at a 4pt
+         rhythm. The empty box collapses to zero height, so its bottom edge sits
+         on the text baseline; the padding lifts the dot band to the middle of
+         lowercase letters, matching a middle-dot leader. */
       .publication-toc[data-toc] .publication-toc-dots {
-        border-bottom: 1pt dotted currentColor;
+        background-image: radial-gradient(
+          circle at 50% 50%,
+          currentColor 0 0.6pt,
+          transparent 0.62pt
+        );
+        background-position: 0 50%;
+        background-repeat: repeat-x;
+        background-size: 4pt 1.2pt;
         flex: 1 1 auto;
+        height: 0;
         margin: 0 0.4em;
         min-width: 1.5em;
-        opacity: 0.4;
+        opacity: 0.55;
+        padding-bottom: 0.46em;
       }
       .publication-toc[data-toc] .publication-toc-page {
         flex: 0 0 auto;

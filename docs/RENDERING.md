@@ -224,7 +224,9 @@ Contents rules are scoped through the `data-toc` attribute so theme heading and
 link styles cannot override the generated layout. Contents pages use the same
 white sheet as body pages, keep a left-aligned heading, and let page numbers
 take only the width their label needs, so leaders end at the number instead of
-at a fixed column.
+at a fixed column. Leaders are drawn as a repeating gradient of 1.2pt middle
+dots on a 4pt rhythm rather than a dotted border, because border dots take their
+size from the border width and collapse into a hairline in print.
 
 In the page-first path, every entry also carries the logical page label of its
 destination, resolved after layout and refilled until the contents geometry is

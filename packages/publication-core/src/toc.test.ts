@@ -76,7 +76,18 @@ describe('table of contents rendering', () => {
     expect(stylesheet).not.toContain('--publication-toc-accent');
     expect(stylesheet).not.toContain('border-left');
     expect(stylesheet).not.toContain('background: rgb(');
-    expect(stylesheet).toContain('border-bottom: 1pt dotted');
+    expect(stylesheet).toContain('radial-gradient(');
+  });
+
+  it('draws leaders as evenly spaced middle dots instead of a dotted hairline', () => {
+    const stylesheet = getTableOfContentsStylesheet();
+
+    // A dotted border ties the dot size to the border width and spaces dots one
+    // width apart, so it reads as a hairline; the gradient keeps an explicit dot
+    // size and rhythm.
+    expect(stylesheet).not.toContain('border-bottom');
+    expect(stylesheet).toContain('background-size: 4pt 1.2pt');
+    expect(stylesheet).toContain('padding-bottom: 0.46em');
   });
 
   it('outranks theme heading and link rules without !important', () => {

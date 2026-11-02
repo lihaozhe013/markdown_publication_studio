@@ -422,6 +422,7 @@ function registerIpcHandlers(): void {
         {
           pageNumber: request.pageNumber,
           pageLayout: request.pageLayout,
+          headingNumbering: request.headingNumbering,
           assets: isThemeAssetSchemeAvailable() ? 'asset-url' : 'inline',
           signal: controller.signal,
         },
@@ -460,6 +461,7 @@ function registerIpcHandlers(): void {
       request.styleOverrides,
       request.toc,
       request.pageLayout,
+      request.headingNumbering,
     );
     exportedOutputPaths.add(exported.outputPath);
     return exported;
@@ -489,6 +491,7 @@ function registerIpcHandlers(): void {
       request.themeId,
       request.pageSize,
       request.styleOverrides,
+      request.headingNumbering,
     );
     exportedOutputPaths.add(exported.outputPath);
     return exported;

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
@@ -35,6 +36,7 @@ function createSnapshot(): McpRendererSnapshot {
       themeId: 'rose',
       pageSize: 'A4',
       toc: DEFAULT_TOC_SETTINGS,
+      headingNumbering: DEFAULT_HEADING_NUMBERING_SETTINGS,
       pageNumber: DEFAULT_PAGE_NUMBER_SETTINGS,
       styleOverrides: { version: 1, body: { fontSizePt: 14 } },
       savedStyle: DEFAULT_PUBLICATION_STYLE_OVERRIDES,

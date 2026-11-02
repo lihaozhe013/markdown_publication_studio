@@ -2,9 +2,11 @@ import { z } from 'zod/v4';
 import {
   CoverAssetKindSchema,
   CoverAssetReferenceSchema,
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
+  HeadingNumberingSettingsSchema,
   PageNumberSettingsSchema,
   PageSizeIdSchema,
   PublicationDiagnosticSchema,
@@ -60,6 +62,7 @@ export const McpPublicationOptionsSchema = z
     themeId: ThemeIdSchema.optional(),
     pageSize: PageSizeIdSchema.optional(),
     toc: TocSettingsSchema.optional(),
+    headingNumbering: HeadingNumberingSettingsSchema.optional(),
     pageNumber: PageNumberSettingsSchema.optional(),
     styleOverrides: PublicationStyleOverridesSchema.optional(),
     covers: z
@@ -141,6 +144,7 @@ export const McpSessionUpdateSchema = McpSessionRefSchema.extend({
   themeId: ThemeIdSchema.optional(),
   pageSize: PageSizeIdSchema.optional(),
   toc: TocSettingsSchema.optional(),
+  headingNumbering: HeadingNumberingSettingsSchema.optional(),
   pageNumber: PageNumberSettingsSchema.optional(),
   styleOverrides: PublicationStyleOverridesSchema.optional(),
   covers: z
@@ -206,6 +210,9 @@ export const McpSessionStateSchema = z
         themeId: ThemeIdSchema,
         pageSize: PageSizeIdSchema,
         toc: TocSettingsSchema,
+        headingNumbering: HeadingNumberingSettingsSchema.default(
+          DEFAULT_HEADING_NUMBERING_SETTINGS,
+        ),
         pageNumber: PageNumberSettingsSchema,
         styleOverrides: PublicationStyleOverridesSchema,
         covers: z
@@ -242,6 +249,9 @@ export const McpRendererSnapshotSchema = z
         themeId: ThemeIdSchema,
         pageSize: PageSizeIdSchema,
         toc: TocSettingsSchema,
+        headingNumbering: HeadingNumberingSettingsSchema.default(
+          DEFAULT_HEADING_NUMBERING_SETTINGS,
+        ),
         pageNumber: PageNumberSettingsSchema,
         styleOverrides: PublicationStyleOverridesSchema,
         savedStyle: PublicationStyleOverridesSchema,
@@ -319,6 +329,7 @@ export const DEFAULT_MCP_SESSION_SETTINGS = {
   themeId: 'rose',
   pageSize: 'A4',
   toc: DEFAULT_TOC_SETTINGS,
+  headingNumbering: DEFAULT_HEADING_NUMBERING_SETTINGS,
   pageNumber: DEFAULT_PAGE_NUMBER_SETTINGS,
   styleOverrides: DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   covers: { front: null, back: null },

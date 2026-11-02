@@ -12,6 +12,8 @@ pageSize: A4
 toc:
   enabled: true
   preset: classic-book
+headingNumbering:
+  enabled: true
 pageNumber:
   enabled: true
   fontFamily: source-sans-3
@@ -54,7 +56,7 @@ mps describe --json
 mps validate --config publish.yaml --json
 mps build --config publish.yaml --json
 mps build ./report.md --format html --output ./dist/report.html --json
-mps build ./report.md --format pdf --toc --page-numbers --strict --json
+mps build ./report.md --format pdf --toc --heading-numbering --page-numbers --strict --json
 ```
 
 The JSON result is the only content written to stdout with `--json`; progress

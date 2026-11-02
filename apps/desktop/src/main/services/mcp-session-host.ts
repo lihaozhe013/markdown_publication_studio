@@ -17,6 +17,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { app, type BrowserWindow } from 'electron';
 import { z } from 'zod/v4';
 import {
+  HeadingNumberingSettingsSchema,
   PageNumberSettingsSchema,
   PublicationStyleOverridesSchema,
   TocSettingsSchema,
@@ -323,6 +324,7 @@ export class McpSessionHost {
         themeId: snapshot.settings.themeId,
         pageSize: snapshot.settings.pageSize,
         toc: snapshot.settings.toc,
+        headingNumbering: snapshot.settings.headingNumbering,
         pageNumber: snapshot.settings.pageNumber,
         styleOverrides: snapshot.settings.styleOverrides,
         covers: {
@@ -453,6 +455,10 @@ export class McpSessionHost {
         settings.pageSize = PageSizeIdSchema.parse(input.pageSize);
       if (input.toc !== undefined)
         settings.toc = TocSettingsSchema.parse(input.toc);
+      if (input.headingNumbering !== undefined)
+        settings.headingNumbering = HeadingNumberingSettingsSchema.parse(
+          input.headingNumbering,
+        );
       if (input.pageNumber !== undefined)
         settings.pageNumber = PageNumberSettingsSchema.parse(input.pageNumber);
       if (input.styleOverrides !== undefined)
@@ -530,6 +536,7 @@ export class McpSessionHost {
         themeId: current.settings.themeId,
         pageSize: current.settings.pageSize,
         toc: current.settings.toc,
+        headingNumbering: current.settings.headingNumbering,
         pageNumber: current.settings.pageNumber,
         styleOverrides: current.settings.styleOverrides,
         frontCover: current.settings.covers.front,

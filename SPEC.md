@@ -181,16 +181,18 @@ on the process working directory. Preserve portable, scriptable project files.
 
 CLI and desktop MCP file tools accept a strict single-source subset of
 `publish.yaml` with `version: 1`, `source`, `format`, `output`, `themeId`,
-`pageSize`, `toc`, `pageNumber`, `pageLayout`, `covers`, and `styleOverrides`.
-It uses the same Zod definitions and publishing services as the desktop app. CLI
-paths resolve from the configuration file or the command working directory;
-Markdown images remain relative to their source file. CLI configuration never
-reads desktop settings. Preserve that strict v1 contract and its defaults until
-new layout/template/numbering options have explicit versioned schemas and
-capability support; do not treat planned fields as already accepted input.
-Existing cover and first-page numbering behavior remains the compatibility
-default. Restarting main-body numbering after the TOC is an explicit opt-in
-policy.
+`pageSize`, `toc`, `headingNumbering`, `pageNumber`, `pageLayout`, `covers`, and
+`styleOverrides`. It uses the same Zod definitions and publishing services as
+the desktop app. CLI paths resolve from the configuration file or the command
+working directory; Markdown images remain relative to their source file. CLI
+configuration never reads desktop settings. Preserve that strict v1 contract and
+its defaults until new layout/template/numbering options have explicit versioned
+schemas and capability support; do not treat planned fields as already accepted
+input. Existing cover and first-page numbering behavior remains the
+compatibility default. Automatic hierarchical heading numbering (`1`, `1.1`,
+`1.1.1`) in both document headings and table of contents entries is an explicit
+opt-in policy via `headingNumbering.enabled`. Restarting main-body numbering
+after the TOC is an explicit opt-in policy.
 
 ### Desktop MCP and AI connection
 

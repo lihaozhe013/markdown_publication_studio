@@ -9,7 +9,11 @@ export type {
   TocHeadingLevel,
 } from './model.js';
 export type { MarkdownCompiler } from './markdown.js';
-export { compileMarkdownFile, createMarkdownCompiler } from './markdown.js';
+export {
+  compileMarkdownFile,
+  createMarkdownCompiler,
+  formatHeadingNumber,
+} from './markdown.js';
 export { renderPublicationHtml } from './html.js';
 export {
   getTableOfContentsStylesheet,

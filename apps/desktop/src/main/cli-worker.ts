@@ -183,6 +183,7 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
           request.themeId,
           request.pageSize,
           request.styleOverrides,
+          request.headingNumbering,
         );
       throwIfCancellationRequested();
       diagnostics.push(...buildDiagnostics);
@@ -225,6 +226,7 @@ async function runCliWorkerInternal(requestPath: string): Promise<void> {
         request.styleOverrides,
         request.toc,
         request.pageLayout,
+        request.headingNumbering,
         { ...(jobController ? { signal: jobController.signal } : {}) },
       );
       throwIfCancellationRequested();

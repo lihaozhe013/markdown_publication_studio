@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   BUILT_IN_THEMES,
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
   DEFAULT_PAGE_LAYOUT_SETTINGS,
   DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_NUMBER_SETTINGS,
@@ -8,11 +9,13 @@ import {
   DEFAULT_TOC_SETTINGS,
   DEFAULT_UI_PREFERENCES,
   type UiPreferences,
+  HeadingNumberingSettingsSchema,
   PageNumberSettingsSchema,
   PublicationStyleOverridesSchema,
   TocSettingsSchema,
   ThemeIdSchema,
   type CoverSelection,
+  type HeadingNumberingSettings,
   type PublicationDiagnostic,
   type PublicationStyleOverrides,
   type PageLayoutSettings,
@@ -68,6 +71,7 @@ function previewRequestKey(
   pageSize: PageSizeId,
   style: PublicationStyleOverrides,
   toc: TocSettings,
+  headingNumbering: HeadingNumberingSettings,
   pageNumber: PageNumberSettings,
   pageLayout: PageLayoutSettings,
 ): string {
@@ -77,6 +81,7 @@ function previewRequestKey(
     pageSize,
     style,
     toc,
+    headingNumbering,
     pageNumber,
     pageLayout,
   ]);
@@ -101,6 +106,12 @@ export function App(): React.JSX.Element {
   const [toc, setToc] = useState<TocSettings>({
     ...DEFAULT_TOC_SETTINGS,
   });
+  const [headingNumbering, setHeadingNumbering] =
+    useState<HeadingNumberingSettings>({
+      ...DEFAULT_HEADING_NUMBERING_SETTINGS,
+    });
+  const headingNumberingRef = useRef(headingNumbering);
+  headingNumberingRef.current = headingNumbering;
   const [pageNumber, setPageNumber] = useState<PageNumberSettings>({
     ...DEFAULT_PAGE_NUMBER_SETTINGS,
   });
@@ -255,16 +266,20 @@ export function App(): React.JSX.Element {
     overrides: {
       pageNumber?: PageNumberSettings;
       pageLayout?: PageLayoutSettings;
+      headingNumbering?: HeadingNumberingSettings;
     } = {},
   ): Promise<void> {
     const selectedPageNumber = overrides.pageNumber ?? pageNumberRef.current;
     const selectedPageLayout = overrides.pageLayout ?? pageLayoutRef.current;
+    const selectedHeadingNumbering =
+      overrides.headingNumbering ?? headingNumberingRef.current;
     const requestKey = previewRequestKey(
       path,
       selectedTheme,
       selectedPageSize,
       selectedStyle,
       selectedToc,
+      selectedHeadingNumbering,
       selectedPageNumber,
       selectedPageLayout,
     );
@@ -283,6 +298,7 @@ export function App(): React.JSX.Element {
         themeId: selectedTheme,
         pageSize: selectedPageSize,
         toc: selectedToc,
+        headingNumbering: selectedHeadingNumbering,
         styleOverrides: selectedStyle,
         pageNumber: selectedPageNumber,
         pageLayout: selectedPageLayout,
@@ -358,6 +374,7 @@ export function App(): React.JSX.Element {
       themeId,
       pageSize,
       toc,
+      headingNumbering,
       pageNumber,
       styleOverrides: effectiveStyle,
       savedStyle: customStyle,
@@ -461,6 +478,7 @@ export function App(): React.JSX.Element {
               setPagination(null);
               setCovers({});
               setToc({ ...DEFAULT_TOC_SETTINGS });
+              setHeadingNumbering({ ...DEFAULT_HEADING_NUMBERING_SETTINGS });
               dispatchStyle({ type: 'close-document' });
             }
           } else if (command.operation === 'save') {
@@ -569,6 +587,7 @@ export function App(): React.JSX.Element {
         pageSize,
         styleDraft,
         toc,
+        headingNumberingRef.current,
         pageNumberRef.current,
         pageLayoutRef.current,
       )
@@ -716,6 +735,20 @@ export function App(): React.JSX.Element {
     }
   }
 
+  function updateHeadingNumbering(next: HeadingNumberingSettings): void {
+    const parsed = HeadingNumberingSettingsSchema.safeParse(next);
+    if (!parsed.success) {
+      setStatus('Invalid heading numbering settings.');
+      return;
+    }
+    setHeadingNumbering(parsed.data);
+    if (source) {
+      void refreshPreview(source.path, themeId, pageSize, effectiveStyle, toc, {
+        headingNumbering: parsed.data,
+      });
+    }
+  }
+
   async function chooseCoverAsset(slot: CoverSlot): Promise<void> {
     if (!source || busy || styleSaving) return;
     setBusy(true);
@@ -791,6 +824,7 @@ export function App(): React.JSX.Element {
       setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
+      setHeadingNumbering({ ...DEFAULT_HEADING_NUMBERING_SETTINGS });
       dispatchStyle({ type: 'close-document' });
       await refreshPreview(
         selected.path,
@@ -798,6 +832,7 @@ export function App(): React.JSX.Element {
         pageSize,
         customStyle,
         DEFAULT_TOC_SETTINGS,
+        { headingNumbering: DEFAULT_HEADING_NUMBERING_SETTINGS },
       );
     } catch (error) {
       console.error('[open-file] Open Markdown failed.', error);
@@ -838,6 +873,7 @@ export function App(): React.JSX.Element {
       setZoomMode('fit');
       setCovers({});
       setToc({ ...DEFAULT_TOC_SETTINGS });
+      setHeadingNumbering({ ...DEFAULT_HEADING_NUMBERING_SETTINGS });
       dispatchStyle({ type: 'close-document' });
       await refreshPreview(
         selected.path,
@@ -845,6 +881,7 @@ export function App(): React.JSX.Element {
         pageSize,
         customStyle,
         DEFAULT_TOC_SETTINGS,
+        { headingNumbering: DEFAULT_HEADING_NUMBERING_SETTINGS },
       );
     } catch (error) {
       console.error('[open-file] Open dropped Markdown failed.', error);
@@ -874,6 +911,7 @@ export function App(): React.JSX.Element {
     setDiagnostics([]);
     setCovers({});
     setToc({ ...DEFAULT_TOC_SETTINGS });
+    setHeadingNumbering({ ...DEFAULT_HEADING_NUMBERING_SETTINGS });
     dispatchStyle({ type: 'close-document' });
     setStatus(`Closed ${closed.name}.`);
     console.info('[close-file] Markdown closed.', { fileName: closed.name });
@@ -971,6 +1009,7 @@ export function App(): React.JSX.Element {
         pageLayout,
         covers,
         toc,
+        headingNumbering,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -1009,6 +1048,7 @@ export function App(): React.JSX.Element {
         themeId,
         pageSize,
         styleOverrides: effectiveStyle,
+        headingNumbering,
       });
       if (!result) {
         setStatus('Export cancelled.');
@@ -1046,12 +1086,14 @@ export function App(): React.JSX.Element {
     disabled: !source || busy || styleSaving,
     pageSize,
     toc,
+    headingNumbering,
     onChooseCover: (slot: CoverSlot) => {
       void chooseCoverAsset(slot);
     },
     onClearCover: clearCoverAsset,
     onPageSizeChange: updatePageSize,
     onTocChange: updateToc,
+    onHeadingNumberingChange: updateHeadingNumbering,
   };
 
   const themePanel = (

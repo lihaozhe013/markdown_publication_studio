@@ -15,6 +15,8 @@ import {
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
+  HeadingNumberingSettingsSchema,
   PageNumberSettingsSchema,
   PublishConfigurationSchema,
   PublicationStyleOverridesSchema,
@@ -36,6 +38,7 @@ export interface PublicationRequestOptions {
   themeId?: z.input<typeof ThemeIdSchema>;
   pageSize?: z.input<typeof PageSizeIdSchema>;
   toc?: z.input<typeof TocSettingsSchema>;
+  headingNumbering?: z.input<typeof HeadingNumberingSettingsSchema>;
   pageNumber?: z.input<typeof PageNumberSettingsSchema>;
   styleOverrides?: z.input<typeof PublicationStyleOverridesSchema>;
   frontCover?: string | null;
@@ -43,6 +46,7 @@ export interface PublicationRequestOptions {
   strict?: boolean;
   overwrite?: boolean;
   enableToc?: boolean;
+  enableHeadingNumbering?: boolean;
   enablePageNumber?: boolean;
   workingDirectory?: string;
 }
@@ -220,11 +224,22 @@ export async function buildPublicationRequest(
   }
 
   const configuredToc = options.toc ?? config.toc ?? DEFAULT_TOC_SETTINGS;
+  const configuredHeadingNumbering =
+    options.headingNumbering ??
+    config.headingNumbering ??
+    DEFAULT_HEADING_NUMBERING_SETTINGS;
   const configuredPageNumber =
     options.pageNumber ?? config.pageNumber ?? DEFAULT_PAGE_NUMBER_SETTINGS;
   const toc = options.enableToc
     ? { ...configuredToc, enabled: true }
     : configuredToc;
+  const headingNumbering =
+    options.enableHeadingNumbering !== undefined
+      ? {
+          ...configuredHeadingNumbering,
+          enabled: options.enableHeadingNumbering,
+        }
+      : configuredHeadingNumbering;
   const pageNumber = options.enablePageNumber
     ? { ...configuredPageNumber, enabled: true }
     : configuredPageNumber;
@@ -238,6 +253,7 @@ export async function buildPublicationRequest(
     themeId: options.themeId ?? config.themeId ?? 'rose',
     pageSize: options.pageSize ?? config.pageSize ?? 'A4',
     toc,
+    headingNumbering,
     pageNumber,
     covers: {
       ...(front ? { front: { path: front } } : {}),

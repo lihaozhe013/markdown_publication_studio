@@ -28,7 +28,10 @@ function renderTocEntry(entry: TocEntry, pageReferences: boolean): string {
   const label = pageReferences
     ? `<span class="publication-toc-dots" aria-hidden="true"></span><span class="publication-toc-page" data-toc-page-for="${escapeHtml(entry.id)}"></span>`
     : '';
-  return `<li class="publication-toc-entry publication-toc-entry--level-${entry.level}"><a class="publication-toc-link" href="#${escapeHtml(entry.id)}"><span class="publication-toc-title-text">${escapeHtml(entry.title)}</span>${label}</a></li>`;
+  const number = entry.number
+    ? `<span class="publication-toc-number">${escapeHtml(entry.number)}</span>`
+    : '';
+  return `<li class="publication-toc-entry publication-toc-entry--level-${entry.level}"><a class="publication-toc-link" href="#${escapeHtml(entry.id)}">${number}<span class="publication-toc-title-text">${escapeHtml(entry.title)}</span>${label}</a></li>`;
 }
 
 export function renderTableOfContents(options: PublicationTocOptions): string {
@@ -94,6 +97,11 @@ export function getTableOfContentsStylesheet(): string {
         flex: 0 1 auto;
         min-width: 0;
         overflow-wrap: anywhere;
+      }
+      .publication-toc[data-toc] .publication-toc-number {
+        flex: 0 0 auto;
+        font-variant-numeric: tabular-nums;
+        margin-right: 0.5em;
       }
       /* Leaders are drawn as a repeating radial gradient instead of a dotted
          border: border dots scale with the border width (about 1.3px) and read

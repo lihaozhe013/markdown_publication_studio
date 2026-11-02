@@ -10,6 +10,7 @@ import {
 } from '@markdown-publication/publication-core';
 import type {
   ExportResult,
+  HeadingNumberingSettings,
   PageLayoutSettings,
   PageNumberSettings,
   PageSizeId,
@@ -21,6 +22,7 @@ import type {
 } from '@markdown-publication/shared';
 import type { PublicationDiagnostic } from '@markdown-publication/shared';
 import {
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PAGE_SIZE,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
@@ -42,6 +44,7 @@ import type { PaginatedLayoutService } from './paginated-layout-service.js';
 interface PublicationBuildOptions {
   pageNumber?: PageNumberSettings;
   pageLayout?: PageLayoutSettings;
+  headingNumbering?: HeadingNumberingSettings;
   frontCoverPages?: number;
   backCoverPages?: number;
   signal?: AbortSignal;
@@ -197,6 +200,7 @@ export class PublicationService {
       pageSize,
       styleOverrides,
       tocSettings,
+      options.headingNumbering ?? DEFAULT_HEADING_NUMBERING_SETTINGS,
       { paginate, assets: options.assets ?? 'inline' },
     );
     throwIfAborted(options.signal);
@@ -242,6 +246,7 @@ export class PublicationService {
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides,
     tocSettings: TocSettings,
+    headingNumbering: HeadingNumberingSettings,
     options: { paginate: boolean; assets: 'inline' | 'asset-url' },
   ): Promise<PreparedPublication> {
     const sourceStat = await stat(sourcePath).catch(() => undefined);
@@ -253,6 +258,7 @@ export class PublicationService {
       pageSize,
       styleOverrides,
       tocSettings,
+      headingNumbering,
       options.paginate,
       options.assets,
     ]);
@@ -265,6 +271,7 @@ export class PublicationService {
       pageSize,
       styleOverrides,
       tocSettings,
+      headingNumbering,
       options,
     );
     this.preparedCache.set(cacheKey, loading);
@@ -286,6 +293,7 @@ export class PublicationService {
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides,
     tocSettings: TocSettings,
+    headingNumbering: HeadingNumberingSettings,
     options: { paginate: boolean; assets: 'inline' | 'asset-url' },
   ): Promise<PreparedPublication> {
     if (isRenderingDebugEnabled) {
@@ -300,6 +308,7 @@ export class PublicationService {
       math: { enabled: true },
       mermaid: { enabled: true },
       html: { policy: 'safe-static' },
+      headingNumbering,
     });
     logAssetDiagnostics(sourcePath, chapter.diagnostics);
     const tocEntries = tocSettings.enabled ? chapter.tocEntries : [];
@@ -358,6 +367,7 @@ export class PublicationService {
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
     pageLayout?: PageLayoutSettings,
+    headingNumbering: HeadingNumberingSettings = DEFAULT_HEADING_NUMBERING_SETTINGS,
     options: { signal?: AbortSignal } = {},
   ): Promise<ExportResult> {
     const { pdf, diagnostics, pagination } = await this.renderPdf(
@@ -369,6 +379,7 @@ export class PublicationService {
       styleOverrides,
       tocSettings,
       pageLayout,
+      headingNumbering,
       options,
     );
     const temporaryPath = resolve(
@@ -393,6 +404,7 @@ export class PublicationService {
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
     tocSettings: TocSettings = DEFAULT_TOC_SETTINGS,
     pageLayout?: PageLayoutSettings,
+    headingNumbering: HeadingNumberingSettings = DEFAULT_HEADING_NUMBERING_SETTINGS,
     options: { signal?: AbortSignal } = {},
   ): Promise<{
     pdf: Uint8Array;
@@ -409,6 +421,7 @@ export class PublicationService {
       {
         pageNumber,
         ...(pageLayout ? { pageLayout } : {}),
+        headingNumbering,
         ...(options.signal ? { signal: options.signal } : {}),
         ...coverPages,
       },
@@ -458,12 +471,14 @@ export class PublicationService {
     themeId: ThemeId,
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+    headingNumbering: HeadingNumberingSettings = DEFAULT_HEADING_NUMBERING_SETTINGS,
   ): Promise<ExportResult> {
     const { html, diagnostics } = await this.renderHtml(
       sourcePath,
       themeId,
       pageSize,
       styleOverrides,
+      headingNumbering,
     );
     const temporaryPath = resolve(
       dirname(outputPath),
@@ -479,6 +494,7 @@ export class PublicationService {
     themeId: ThemeId,
     pageSize: PageSizeId,
     styleOverrides: PublicationStyleOverrides = DEFAULT_PUBLICATION_STYLE_OVERRIDES,
+    headingNumbering: HeadingNumberingSettings = DEFAULT_HEADING_NUMBERING_SETTINGS,
   ): Promise<{ html: string; diagnostics: PreviewResult['diagnostics'] }> {
     const publication = await this.buildPreview(
       sourcePath,
@@ -487,7 +503,10 @@ export class PublicationService {
       styleOverrides,
       DEFAULT_TOC_SETTINGS,
       // The flowing HTML profile stays flow-based and never fixes pages.
-      { pageLayout: { enabled: false, restartBodyAfterToc: false } },
+      {
+        pageLayout: { enabled: false, restartBodyAfterToc: false },
+        headingNumbering,
+      },
     );
     this.throwOnFatalDiagnostics(publication.diagnostics);
     return { html: publication.html, diagnostics: publication.diagnostics };

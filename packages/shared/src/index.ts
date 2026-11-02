@@ -76,6 +76,20 @@ export const DEFAULT_TOC_SETTINGS = {
   preset: 'classic-book',
 } as const satisfies TocSettings;
 
+export const HeadingNumberingSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export type HeadingNumberingSettings = z.infer<
+  typeof HeadingNumberingSettingsSchema
+>;
+
+export const DEFAULT_HEADING_NUMBERING_SETTINGS = {
+  enabled: false,
+} as const satisfies HeadingNumberingSettings;
+
 export interface PageSizeDefinition {
   id: PageSizeId;
   label: string;
@@ -472,6 +486,9 @@ export const PreviewRequestSchema = z.object({
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
+  headingNumbering: HeadingNumberingSettingsSchema.default(
+    DEFAULT_HEADING_NUMBERING_SETTINGS,
+  ),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -484,6 +501,9 @@ export const PdfExportRequestSchema = z.object({
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
   toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
+  headingNumbering: HeadingNumberingSettingsSchema.default(
+    DEFAULT_HEADING_NUMBERING_SETTINGS,
+  ),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -496,6 +516,9 @@ export const HtmlExportRequestSchema = z.object({
   sourcePath: z.string().min(1),
   themeId: ThemeIdSchema.default('rose'),
   pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
+  headingNumbering: HeadingNumberingSettingsSchema.default(
+    DEFAULT_HEADING_NUMBERING_SETTINGS,
+  ),
   styleOverrides: PublicationStyleOverridesSchema.default(
     DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   ),
@@ -510,6 +533,7 @@ export const PublishConfigurationSchema = z
     themeId: ThemeIdSchema.optional(),
     pageSize: PageSizeIdSchema.optional(),
     toc: TocSettingsSchema.optional(),
+    headingNumbering: HeadingNumberingSettingsSchema.optional(),
     pageNumber: PageNumberSettingsSchema.optional(),
     pageLayout: PageLayoutSettingsSchema.optional(),
     covers: z
@@ -533,6 +557,9 @@ export const CliWorkerRequestSchema = z
     themeId: ThemeIdSchema.default('rose'),
     pageSize: PageSizeIdSchema.default(DEFAULT_PAGE_SIZE),
     toc: TocSettingsSchema.default(DEFAULT_TOC_SETTINGS),
+    headingNumbering: HeadingNumberingSettingsSchema.default(
+      DEFAULT_HEADING_NUMBERING_SETTINGS,
+    ),
     pageNumber: PageNumberSettingsSchema.default(DEFAULT_PAGE_NUMBER_SETTINGS),
     pageLayout: PageLayoutSettingsSchema.default(DEFAULT_PAGE_LAYOUT_SETTINGS),
     covers: z

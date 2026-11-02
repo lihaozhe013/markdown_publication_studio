@@ -89,6 +89,7 @@ export function renderPublicationHtml(
       }
       body { color: #182230; font-size: 11pt; line-height: 1.6; }
       h1, h2, h3, h4 { color: #102a43; line-height: 1.2; break-after: avoid; }
+      .heading-number { font-variant-numeric: tabular-nums; margin-right: 0.4em; }
       h1 { font-size: 28pt; margin: 0 0 20pt; border-bottom: 2px solid #2f80ed; padding-bottom: 8pt; }
       h2 { font-size: 18pt; margin-top: 24pt; }
       h3 { font-size: 14pt; margin-top: 18pt; }

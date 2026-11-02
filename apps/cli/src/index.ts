@@ -115,6 +115,7 @@ interface CliOptions {
   theme?: string;
   'page-size'?: string;
   toc?: boolean;
+  'heading-numbering'?: boolean;
   'page-numbers'?: boolean;
   'front-cover'?: string;
   'back-cover'?: string;
@@ -241,6 +242,7 @@ function getParseOptions() {
       theme: { type: 'string' as const },
       'page-size': { type: 'string' as const },
       toc: { type: 'boolean' as const },
+      'heading-numbering': { type: 'boolean' as const },
       'page-numbers': { type: 'boolean' as const },
       'front-cover': { type: 'string' as const },
       'back-cover': { type: 'string' as const },
@@ -619,6 +621,13 @@ async function buildWorkerRequest(
         ? { pageSize: parsed.options['page-size'] as never }
         : {}),
       ...(parsed.options.toc ? { enableToc: true } : {}),
+      ...(parsed.options['heading-numbering'] !== undefined
+        ? {
+            enableHeadingNumbering: Boolean(
+              parsed.options['heading-numbering'],
+            ),
+          }
+        : {}),
       ...(parsed.options['page-numbers'] ? { enablePageNumber: true } : {}),
       ...(parsed.options['front-cover']
         ? { frontCover: resolve(process.cwd(), parsed.options['front-cover']) }

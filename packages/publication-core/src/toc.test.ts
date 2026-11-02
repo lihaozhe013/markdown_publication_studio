@@ -60,6 +60,30 @@ describe('table of contents rendering', () => {
     expect(withPages).toContain('data-toc-page-for="heading-guide-intro"');
   });
 
+  it('renders heading numbers when provided on entries', () => {
+    const numberedEntries: TocEntry[] = [
+      {
+        ...entries[0]!,
+        number: '1',
+      },
+      {
+        ...entries[1]!,
+        number: '1.1',
+      },
+    ];
+    const html = renderTableOfContents({
+      preset: 'classic-book',
+      entries: numberedEntries,
+    });
+
+    expect(html).toContain(
+      '<span class="publication-toc-number">1</span><span class="publication-toc-title-text">Introduction &amp; scope</span>',
+    );
+    expect(html).toContain(
+      '<span class="publication-toc-number">1.1</span><span class="publication-toc-title-text">Setup</span>',
+    );
+  });
+
   it('provides hierarchy-focused preset hooks and print pagination rules', () => {
     const stylesheet = getTableOfContentsStylesheet();
 

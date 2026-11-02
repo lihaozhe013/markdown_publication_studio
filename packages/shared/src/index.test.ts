@@ -8,10 +8,12 @@ import {
   DEFAULT_PAGE_LAYOUT_SETTINGS,
   compareMermaidGeometry,
   compareMermaidMetrics,
+  DEFAULT_HEADING_NUMBERING_SETTINGS,
   DEFAULT_PAGE_NUMBER_SETTINGS,
   DEFAULT_PUBLICATION_STYLE_OVERRIDES,
   DEFAULT_TOC_SETTINGS,
   getBuiltInTheme,
+  HeadingNumberingSettingsSchema,
   HtmlExportRequestSchema,
   PageSizeIdSchema,
   PAGE_SIZE_DEFINITIONS,
@@ -200,6 +202,38 @@ describe('Table of contents settings', () => {
         preset: 'classic-book',
         arbitrary: true,
       }),
+    ).toThrow();
+  });
+});
+
+describe('Heading numbering settings', () => {
+  it('defaults requests to disabled heading numbering', () => {
+    expect(
+      HeadingNumberingSettingsSchema.parse(DEFAULT_HEADING_NUMBERING_SETTINGS),
+    ).toEqual(DEFAULT_HEADING_NUMBERING_SETTINGS);
+    expect(
+      PreviewRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .headingNumbering,
+    ).toEqual(DEFAULT_HEADING_NUMBERING_SETTINGS);
+    expect(
+      PdfExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .headingNumbering,
+    ).toEqual(DEFAULT_HEADING_NUMBERING_SETTINGS);
+    expect(
+      HtmlExportRequestSchema.parse({ sourcePath: '/manuscripts/book.md' })
+        .headingNumbering,
+    ).toEqual(DEFAULT_HEADING_NUMBERING_SETTINGS);
+  });
+
+  it('validates heading numbering settings strictly', () => {
+    expect(HeadingNumberingSettingsSchema.parse({ enabled: true })).toEqual({
+      enabled: true,
+    });
+    expect(() =>
+      HeadingNumberingSettingsSchema.parse({ enabled: 'yes' }),
+    ).toThrow();
+    expect(() =>
+      HeadingNumberingSettingsSchema.parse({ enabled: true, extra: 1 }),
     ).toThrow();
   });
 });

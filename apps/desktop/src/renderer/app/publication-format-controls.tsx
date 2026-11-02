@@ -1,4 +1,5 @@
 import {
+  HeadingNumberingSettingsSchema,
   PAGE_SIZE_DEFINITIONS,
   PageSizeIdSchema,
   TOC_PRESET_DEFINITIONS,
@@ -6,6 +7,7 @@ import {
   TocSettingsSchema,
   type CoverAssetReference,
   type CoverSelection,
+  type HeadingNumberingSettings,
   type PageSizeId,
   type TocSettings,
 } from '@markdown-publication/shared';
@@ -98,10 +100,12 @@ interface PublicationFormatControlsProps {
   disabled: boolean;
   pageSize: PageSizeId;
   toc: TocSettings;
+  headingNumbering: HeadingNumberingSettings;
   onChooseCover: (slot: CoverSlot) => void;
   onClearCover: (slot: CoverSlot) => void;
   onPageSizeChange: (pageSize: PageSizeId) => void;
   onTocChange: (settings: TocSettings) => void;
+  onHeadingNumberingChange: (settings: HeadingNumberingSettings) => void;
 }
 
 export function PublicationFormatControls({
@@ -110,10 +114,12 @@ export function PublicationFormatControls({
   disabled,
   pageSize,
   toc,
+  headingNumbering,
   onChooseCover,
   onClearCover,
   onPageSizeChange,
   onTocChange,
+  onHeadingNumberingChange,
 }: PublicationFormatControlsProps): React.JSX.Element {
   const coverSizeError = getCoverSizeError(covers, pageSize);
 
@@ -204,6 +210,34 @@ export function PublicationFormatControls({
             {!TocSettingsSchema.safeParse(toc).success ? (
               <p className="diagnostic error">
                 Invalid table of contents settings.
+              </p>
+            ) : null}
+          </div>
+          <div className="panel-block heading-numbering-panel">
+            <p className="eyebrow">HEADINGS</p>
+            <label className="toggle-row" htmlFor="heading-numbering-enabled">
+              <input
+                id="heading-numbering-enabled"
+                type="checkbox"
+                checked={headingNumbering.enabled}
+                disabled={disabled}
+                onChange={(event) =>
+                  onHeadingNumberingChange({
+                    ...headingNumbering,
+                    enabled: event.target.checked,
+                  })
+                }
+              />
+              <span>Auto-number headings</span>
+            </label>
+            <p className="muted heading-numbering-help">
+              Automatically numbers headings (1, 1.1, 1.1.1) in both the
+              document body and table of contents.
+            </p>
+            {!HeadingNumberingSettingsSchema.safeParse(headingNumbering)
+              .success ? (
+              <p className="diagnostic error">
+                Invalid heading numbering settings.
               </p>
             ) : null}
           </div>

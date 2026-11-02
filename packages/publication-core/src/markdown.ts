@@ -42,6 +42,7 @@ const defaultFeatures: Required<PublicationFeatureOptions> = {
   math: { enabled: true },
   mermaid: { enabled: true },
   html: { policy: 'safe-static' },
+  headingNumbering: { enabled: false },
 };
 
 function getFeatures(
@@ -52,6 +53,10 @@ function getFeatures(
     math: { ...defaultFeatures.math, ...features?.math },
     mermaid: { ...defaultFeatures.mermaid, ...features?.mermaid },
     html: { ...defaultFeatures.html, ...features?.html },
+    headingNumbering: {
+      ...defaultFeatures.headingNumbering,
+      ...features?.headingNumbering,
+    },
   };
 }
 
@@ -91,6 +96,23 @@ function getInlineText(token: InlineTokenLike | undefined): string {
 function headingLevel(tag: string): number | undefined {
   const level = Number.parseInt(tag.slice(1), 10);
   return level >= 1 && level <= 6 ? level : undefined;
+}
+
+export function formatHeadingNumber(level: number, counters: number[]): string {
+  counters[level - 1] = (counters[level - 1] ?? 0) + 1;
+  for (let i = level; i < counters.length; i += 1) {
+    counters[i] = 0;
+  }
+  const firstActiveIndex = counters.findIndex((count) => count > 0);
+  if (firstActiveIndex === -1 || firstActiveIndex >= level) {
+    return String(counters[level - 1]);
+  }
+  for (let i = firstActiveIndex; i < level - 1; i += 1) {
+    if (counters[i] === 0) {
+      counters[i] = 1;
+    }
+  }
+  return counters.slice(firstActiveIndex, level).join('.');
 }
 
 function headingSlug(value: string, headingIndex: number): string {
@@ -410,6 +432,7 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
         },
       });
       registerLayoutControls(markdown);
+      const headingCounters = [0, 0, 0, 0, 0, 0];
       const defaultHeadingOpen = markdown.renderer.rules.heading_open;
       markdown.renderer.rules.heading_open = (
         tokens,
@@ -439,21 +462,35 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
         headingIndex += 1;
         token.attrSet('id', id);
         token.attrSet('data-toc-id', id);
+
+        let headingNumber: string | undefined;
+        if (features.headingNumbering.enabled) {
+          headingNumber = formatHeadingNumber(level, headingCounters);
+        }
+
         if (level <= 3 && title.length > 0) {
           tocEntries.push({
             id,
             level: level as TocHeadingLevel,
             title,
-            searchText: normalizeTocText(title),
+            ...(headingNumber ? { number: headingNumber } : {}),
+            searchText: normalizeTocText(
+              headingNumber ? `${headingNumber} ${title}` : title,
+            ),
             order: tocEntries.length,
             chapterId,
             sourcePath: input.path,
           });
         }
 
-        return defaultHeadingOpen
+        const renderedOpen = defaultHeadingOpen
           ? defaultHeadingOpen(tokens, index, options, env, renderer)
           : renderer.renderToken(tokens, index, options);
+
+        if (headingNumber) {
+          return `${renderedOpen}<span class="heading-number">${escapeHtml(headingNumber)}</span> `;
+        }
+        return renderedOpen;
       };
 
       const renderedMarkdown = markdown.render(math.source);
@@ -481,8 +518,10 @@ export async function createMarkdownCompiler(): Promise<MarkdownCompiler> {
       );
       const titleMatch = embedded.html.match(/<h1[^>]*>(.*?)<\/h1>/iu);
       const title =
-        titleMatch?.[1]?.replace(/<[^>]+>/gu, '').trim() ||
-        basename(input.path, extname(input.path));
+        titleMatch?.[1]
+          ?.replace(/<span class="heading-number">.*?<\/span>/giu, '')
+          .replace(/<[^>]+>/gu, '')
+          .trim() || basename(input.path, extname(input.path));
       return {
         id: chapterId,
         sourcePath: input.path,

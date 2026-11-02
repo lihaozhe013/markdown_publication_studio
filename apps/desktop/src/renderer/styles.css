@@ -1103,6 +1103,7 @@ button svg {
   grid-column: 1 / -1;
   margin: 0;
 }
+.heading-numbering-help,
 .toc-help {
   margin-bottom: 0;
 }

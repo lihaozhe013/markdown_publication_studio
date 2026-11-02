@@ -47,6 +47,30 @@ describe('publication runtime request construction', () => {
     expect(request.format).toBe('html');
     expect(request.themeId).toBe('claude');
     expect(request.toc.enabled).toBe(true);
+    expect(request.headingNumbering.enabled).toBe(false);
+  });
+
+  it('enables heading numbering from options and configuration', async () => {
+    const sourcePath = join(directory, 'numbered.md');
+    const configPath = join(directory, 'numbered.yaml');
+    await writeFile(sourcePath, '# Numbered');
+    await writeFile(
+      configPath,
+      'version: 1\nsource: ./numbered.md\nheadingNumbering:\n  enabled: true\n',
+    );
+
+    const fromConfig = await buildPublicationRequest({
+      command: 'build',
+      configPath,
+    });
+    expect(fromConfig.headingNumbering.enabled).toBe(true);
+
+    const fromOption = await buildPublicationRequest({
+      command: 'build',
+      sourcePath,
+      enableHeadingNumbering: true,
+    });
+    expect(fromOption.headingNumbering.enabled).toBe(true);
   });
 
   it('never lets overwrite replace a source, config, or cover asset through a path alias', async () => {

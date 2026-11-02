@@ -2,7 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { compileMarkdownFile, createMarkdownCompiler } from './markdown.js';
+import {
+  compileMarkdownFile,
+  createMarkdownCompiler,
+  formatHeadingNumber,
+} from './markdown.js';
 import { renderPublicationHtml } from './html.js';
 import { getKatexFontAssetSummary } from './math.js';
 import {
@@ -74,6 +78,93 @@ describe('publication core', () => {
     expect(chapter.tocEntries[0]?.searchText).toBe('gettingstartedguide');
     expect(chapter.html).toContain('id="heading-guide-deep-detail"');
     expect(chapter.html).toContain('data-toc-id="heading-guide-deep-detail"');
+  });
+
+  it('formats heading numbers hierarchically and handles missing levels', () => {
+    const counters = [0, 0, 0, 0, 0, 0];
+    expect(formatHeadingNumber(1, counters)).toBe('1');
+    expect(formatHeadingNumber(2, counters)).toBe('1.1');
+    expect(formatHeadingNumber(3, counters)).toBe('1.1.1');
+    expect(formatHeadingNumber(2, counters)).toBe('1.2');
+    expect(formatHeadingNumber(1, counters)).toBe('2');
+
+    // Document starting at H2 without H1
+    const h2Counters = [0, 0, 0, 0, 0, 0];
+    expect(formatHeadingNumber(2, h2Counters)).toBe('1');
+    expect(formatHeadingNumber(3, h2Counters)).toBe('1.1');
+    expect(formatHeadingNumber(2, h2Counters)).toBe('2');
+
+    // Skipped levels (H1 followed directly by H3)
+    const skippedCounters = [0, 0, 0, 0, 0, 0];
+    expect(formatHeadingNumber(1, skippedCounters)).toBe('1');
+    expect(formatHeadingNumber(3, skippedCounters)).toBe('1.1.1');
+  });
+
+  it('automatically numbers headings in HTML and TOC when heading numbering is enabled', async () => {
+    const compiler = await createMarkdownCompiler();
+    const chapter = await compiler.compile(
+      {
+        path: '/tmp/numbered.md',
+        content: `# Introduction
+
+## Scope & goals
+
+### Technical stack
+
+## Architecture
+
+# Implementation`,
+      },
+      {
+        projectRoot: '/tmp',
+        features: { headingNumbering: { enabled: true } },
+      },
+    );
+
+    expect(chapter.title).toBe('Introduction');
+    expect(chapter.html).toContain(
+      '<h1 id="heading-numbered-introduction" data-toc-id="heading-numbered-introduction"><span class="heading-number">1</span> Introduction</h1>',
+    );
+    expect(chapter.html).toContain(
+      '<h2 id="heading-numbered-scope-goals" data-toc-id="heading-numbered-scope-goals"><span class="heading-number">1.1</span> Scope &amp; goals</h2>',
+    );
+    expect(chapter.html).toContain(
+      '<h3 id="heading-numbered-technical-stack" data-toc-id="heading-numbered-technical-stack"><span class="heading-number">1.1.1</span> Technical stack</h3>',
+    );
+    expect(chapter.html).toContain(
+      '<h2 id="heading-numbered-architecture" data-toc-id="heading-numbered-architecture"><span class="heading-number">1.2</span> Architecture</h2>',
+    );
+    expect(chapter.html).toContain(
+      '<h1 id="heading-numbered-implementation" data-toc-id="heading-numbered-implementation"><span class="heading-number">2</span> Implementation</h1>',
+    );
+
+    expect(chapter.tocEntries).toHaveLength(5);
+    expect(chapter.tocEntries[0]?.number).toBe('1');
+    expect(chapter.tocEntries[0]?.title).toBe('Introduction');
+    expect(chapter.tocEntries[1]?.number).toBe('1.1');
+    expect(chapter.tocEntries[1]?.title).toBe('Scope & goals');
+    expect(chapter.tocEntries[2]?.number).toBe('1.1.1');
+    expect(chapter.tocEntries[2]?.title).toBe('Technical stack');
+    expect(chapter.tocEntries[3]?.number).toBe('1.2');
+    expect(chapter.tocEntries[4]?.number).toBe('2');
+  });
+
+  it('does not number headings when heading numbering is disabled', async () => {
+    const compiler = await createMarkdownCompiler();
+    const chapter = await compiler.compile(
+      {
+        path: '/tmp/un为其.md',
+        content: '# Unnumbered\n\n## Sub heading',
+      },
+      {
+        projectRoot: '/tmp',
+        features: { headingNumbering: { enabled: false } },
+      },
+    );
+
+    expect(chapter.html).not.toContain('class="heading-number"');
+    expect(chapter.tocEntries[0]?.number).toBeUndefined();
+    expect(chapter.tocEntries[1]?.number).toBeUndefined();
   });
 
   it('does not render page numbers in preview or HTML export', async () => {

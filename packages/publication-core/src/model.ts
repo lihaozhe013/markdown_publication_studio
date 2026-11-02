@@ -24,6 +24,9 @@ export interface PublicationFeatureOptions {
   html?: {
     policy: 'safe-static';
   };
+  headingNumbering?: {
+    enabled: boolean;
+  };
 }
 
 export interface CompileContext {
@@ -47,6 +50,7 @@ export interface TocEntry {
   id: string;
   level: TocHeadingLevel;
   title: string;
+  number?: string;
   searchText: string;
   order: number;
   chapterId: string;
